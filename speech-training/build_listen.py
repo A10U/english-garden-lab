@@ -8,8 +8,8 @@ Example:
     --training-result speech-training/runs/training/result.json
 
 Only this command's requested HTML output is written. WAV files remain separate
-local assets, addressed relative to the HTML. Optional phonetic analysis contacts
-the local service only after an explicit action in the listening page.
+local assets, addressed relative to the HTML. Phonetic analysis starts only after
+an explicit action, using the browser model in the hosted demo or local service.
 """
 from __future__ import annotations
 
@@ -235,12 +235,13 @@ def build(baseline_path: Path, candidate_path: Path, result_path: Path, output: 
 <aside class="phrase-sidebar" aria-label="เลือกประโยคฝึก"><h2 class="sidebar-title">ประโยคสำหรับฝึก</h2><label class="filter-label" for="phrase-search">ค้นหาประโยคอังกฤษหรือความหมายไทย</label><input class="filter-field" id="phrase-search" type="search" placeholder="เช่น ใบไม้ หรือ leaf" autocomplete="off"><label class="filter-label" for="phrase-category">เลือกเรื่อง</label><select class="filter-field" id="phrase-category"><option value="">ทุกเรื่อง</option></select><p class="filter-count" id="filter-count" role="status"></p><nav class="phrase-list" id="phrase-list" aria-label="รายการประโยค"></nav></aside>
 <section class="practice" aria-label="พื้นที่ฝึกประโยคที่เลือก"><div class="phrase-navigation"><p class="phrase-counter" id="phrase-counter" aria-live="polite"></p><div class="nav-buttons"><button type="button" id="previous" class="nav-button">← ก่อนหน้า</button><button type="button" id="next" class="nav-button">ถัดไป →</button></div></div><div class="current-phrase" id="current-phrase"></div></section>
 </div>
-<p class="privacy">ผลฟังและคะแนนอยู่ในหน้านี้ บันทึก JSON เพื่อเก็บไว้ก่อนปิดหรือรีเฟรช เสียงที่บันทึกจะเตรียมเป็นไฟล์สำหรับฟังซ้ำในเครื่อง กดดูผลจึงเริ่มวิเคราะห์ ไม่มีการส่งเสียงไปบริการคลาวด์</p>
+<p class="privacy">ผลฟังและคะแนนอยู่ในหน้านี้ บันทึก JSON เพื่อเก็บไว้ก่อนปิดหรือรีเฟรช เสียงที่บันทึกใช้ฟังซ้ำได้ กดดูผลจึงเริ่มวิเคราะห์ เดโมเว็บประมวลผลเสียงในเบราว์เซอร์และดาวน์โหลดโมเดลประมาณ 318 MB ในครั้งแรก ไม่มีการส่งเสียงไปบริการคลาวด์</p>
 <footer class="footer"><details class="experiment" id="experiment"><summary>รายละเอียดการทดลองเสียง</summary><div class="metrics" aria-label="ผลฝึกที่บันทึกจริง"><div class="metric"><span>ขั้นตอนปรับน้ำหนัก</span><strong>__STEPS__ steps</strong></div><div class="metric"><span>Validation token loss · ก่อน → ค่าดีสุด</span><strong>__CE__</strong></div><div class="metric"><span>น้ำหนัก adapter</span><strong>__CHANGED__</strong></div></div><p>ค่า loss วัดการทำนาย token เสียง ยังสรุปไม่ได้ว่าฟังเป็นธรรมชาติขึ้น คุณภาพการฟังต้องประเมินแยก ตัวอย่างเสียงที่ฝึกยังไม่ได้เชื่อมเข้าแอปเรียน</p><div id="technical">กดเฉลยเสียง A / B เพื่อดูรุ่นที่ใช้ในรอบนี้</div></details><p>เสียงฝึก: <strong>Cori Samuel (speaker 92)</strong> จาก Hi-Fi TTS โดย E. Bakhturina, V. Lavrukhin, B. Ginsburg และ Y. Zhang (2021) · <a href="https://www.openslr.org/109/" target="_blank" rel="noopener noreferrer">แหล่งข้อมูล</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p><p>คัดข้อมูลบางส่วน แปลงเป็น 24 kHz และใช้ปรับ adapter</p></footer>
 </main>
 <script id="trial-data" type="application/json">__DATA__</script>
 <script src="__PHONE_GUIDE_JS__"></script>
 <script src="__STUDY_HELP_JS__"></script>
+<script src="__BROWSER_PHONETICS_JS__"></script>
 <script src="__PHONETICS_JS__"></script>
 <script>
 'use strict';
@@ -319,6 +320,7 @@ renderList();renderCurrent();updateProgress();
             .replace("__PHONETICS_CSS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/phonetics.css", output), quote=True))
             .replace("__PHONE_GUIDE_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/phone-guide.js", output), quote=True))
             .replace("__STUDY_HELP_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/study-help.js", output), quote=True))
+            .replace("__BROWSER_PHONETICS_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/browser-phonetics.js", output), quote=True))
             .replace("__PHONETICS_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/phonetics.js", output), quote=True)))
 
 

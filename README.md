@@ -5,7 +5,7 @@
 **[เปิดเดโมออนไลน์](https://a10u.github.io/english-garden-lab/)** · [GitHub repository](https://github.com/A10U/english-garden-lab)
 
 - **[Learning App](app/index.html)** — 3 บทเรียน สวนคำศัพท์ และความก้าวหน้าที่บันทึกในเบราว์เซอร์
-- **[Speech Training](speech-training/listen.html)** — 24 ประโยค ตัวอย่างเสียง AI, IPA, ฟังรายคำ และบันทึกเสียงตัวเอง
+- **[Speech Training](speech-training/listen.html)** — 24 ประโยค ตัวอย่างเสียง AI, IPA, ฟังรายคำ และวิเคราะห์เสียงที่บันทึกในเบราว์เซอร์
 
 เปิด `index.html` เพื่อเลือก App หรือ Speech Training
 
@@ -18,7 +18,9 @@ python3 speech-training/build_demo.py
 python3 -m http.server 8080 --directory dist
 ```
 
-เปิด http://localhost:8080 แล้วอนุญาตไมโครโฟนเมื่อต้องการบันทึกเสียง เดโมใช้ผลวิเคราะห์เสียง AI ที่เตรียมไว้ล่วงหน้า ไม่ส่งเสียงที่บันทึกใหม่ไปวิเคราะห์ ส่วนการประเมินเสียงของผู้เรียนแบบสดต้องเปิดบริการ Python ตาม [คู่มือ Speech Training](speech-training/README.md)
+เปิด http://localhost:8080 แล้วอนุญาตไมโครโฟนเมื่อต้องการบันทึกเสียง กดดูผลเพื่อวิเคราะห์เสียงของคุณในเบราว์เซอร์ ครั้งแรกดาวน์โหลดโมเดลประมาณ **318 MB** จาก Hugging Face และชุดประมวลผลประมาณ **12 MB** จากเว็บนี้ เสียงที่บันทึกไม่ถูกส่งไปเซิร์ฟเวอร์ ส่วนผลของเสียง AI เป็นข้อมูลที่เตรียมไว้แยกกัน การฟังตัวอย่างและเรียนบทเรียนไม่ต้องดาวน์โหลดโมเดล
+
+การวิเคราะห์ใช้หน่วยความจำมากกว่าขนาดไฟล์โมเดลและอาจช้าในโทรศัพท์หรือเครื่องเก่า ลองเริ่มจากคำหรือประโยคสั้น ๆ หากอุปกรณ์ไม่รองรับยังฟังและอัดเสียงได้ หรือใช้ [บริการวิเคราะห์ในเครื่อง](speech-training/README.md#local-service)
 
 ## ตรวจสอบ
 
@@ -32,4 +34,4 @@ python3 speech-training/export_demo_assets.py --verify
 
 ## ขอบเขต repository
 
-เผยแพร่เฉพาะ App, Speech Training และหน้าเลือกเดโม ไม่รวม `SDLC/`, `Resource/`, โมเดล, dataset ที่ดาวน์โหลด, training runs, environment, log หรือเสียงส่วนตัว การฝึกโมเดลต้องเตรียมข้อมูลและดาวน์โหลดโมเดลแยกตามคู่มือ
+เผยแพร่เฉพาะ App, Speech Training และหน้าเลือกเดโม ไม่รวม `SDLC/`, `Resource/`, model weights, dataset ที่ดาวน์โหลด, training runs, environment, log หรือเสียงส่วนตัว รวม ONNX Runtime Web 1.23.2 สำหรับประมวลผลในเบราว์เซอร์ โมเดล phoneme แบบ quantized ดาวน์โหลดจาก revision ที่ระบุไว้เมื่อผู้ใช้กดวิเคราะห์ การฝึก TTS ต้องเตรียมข้อมูลและดาวน์โหลดโมเดลแยกตามคู่มือ

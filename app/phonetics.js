@@ -121,8 +121,10 @@
     }
     const apiBase = api ? api.href.replace(/\/$/, '') : null;
     const localAnalysisRequired = 'การวิเคราะห์เสียงที่คุณบันทึกต้องเปิดรุ่นในเครื่อง';
+    const browserAnalysisNotice = 'วิเคราะห์เสียงในเบราว์เซอร์ · ครั้งแรกดาวน์โหลดโมเดลประมาณ 318 MB และ WASM · เสียงของคุณอยู่ในเบราว์เซอร์ ไม่ส่งไปเซิร์ฟเวอร์';
+    const unsupportedBrowserNotice = 'เบราว์เซอร์นี้ยังวิเคราะห์เสียงในหน้าเว็บไม่ได้ · บันทึกและฟังได้ หรือเปิดรุ่นในเครื่องเพื่อวิเคราะห์';
     const id = 'egl-phonetics-' + (++nextId);
-    let disposed = false, version = 0, controller = null, busy = false;
+    let disposed = false, version = 0, controller = null, busy = false, browserRequest = false;
     let stream = null, recorder = null, recording = false, requestingMic = false, preparing = false;
     let prepareController = null, decodeContext = null;
     let recordingVersion = 0, recordTimer = null, playbackTimer = null, playbackEnd = null;
@@ -155,10 +157,20 @@
       status.textContent = message || '';
       status.classList.toggle('egl-ph-status-error', Boolean(error));
     }
+    function browserEngine() {
+      const engine = global.EGLBrowserPhonetics;
+      try {
+        return engine && typeof engine.supported === 'function' && typeof engine.analyze === 'function' && engine.supported() === true ? engine : null;
+      } catch (_) { return null; }
+    }
     function updateButtons() {
       const occupied = busy || preparing;
       textButton.disabled = occupied || recording || requestingMic;
-      analyzeButton.disabled = demoMode || occupied || recording || requestingMic || !clip;
+      const browserAvailable = demoMode && Boolean(browserEngine());
+      analyzeButton.disabled = (demoMode && !browserAvailable) || occupied || recording || requestingMic || !clip;
+      analyzeButton.title = demoMode && !browserAvailable ? unsupportedBrowserNotice : '';
+      cancelBrowserButton.hidden = !browserRequest || !busy;
+      if (browserNotice) browserNotice.textContent = browserAvailable ? browserAnalysisNotice : unsupportedBrowserNotice;
       sourceButtons.forEach(node => { node.disabled = occupied || recording || requestingMic; });
       listenButtons.forEach(node => { node.disabled = occupied || recording || requestingMic; });
       recordButton.disabled = occupied || requestingMic;
@@ -181,7 +193,7 @@
       version += 1;
       if (controller) controller.abort();
       controller = null;
-      busy = false;
+      busy = false; browserRequest = false;
       updateButtons();
     }
     function clearObserved() {
@@ -260,7 +272,7 @@
       } catch (error) {
         if (!disposed && current === version && error.name !== 'AbortError') showServiceError(error);
       } finally {
-        if (!disposed && current === version) { busy = false; controller = null; updateButtons(); }
+        if (!disposed && current === version) { busy = false; browserRequest = false; controller = null; updateButtons(); }
       }
     }
     async function jsonResponse(response) {
@@ -408,6 +420,45 @@
         form.append('context_word_index', String(practiceWord.index));
       }
       return jsonResponse(await win.fetch(apiBase + '/api/phonetics/analyze', { method: 'POST', body: form, signal: signal }));
+    }
+    function browserReference(values) {
+      const originalText = textarea.value.trim();
+      const bundled = demoData().texts && demoData().texts[originalText];
+      const candidates = [reference, options.precomputed, bundled, global.EGL_PHONETIC_DATA && global.EGL_PHONETIC_DATA[originalText]];
+      const original = candidates.find(item => item && item.text === originalText && item.accent === values.accent && Array.isArray(item.words) && item.words.some(word => Array.isArray(word.phones) && word.phones.length));
+      if (!original) throw friendly('ยังไม่มีคำอ่านอ้างอิงสำหรับข้อความหรือสำเนียงนี้ เลือกข้อความตัวอย่างและสำเนียง US หรือเปิดรุ่นในเครื่อง');
+      if (!practiceWord) return original;
+      const selected = original.words.find(word => String(word.index) === String(practiceWord.index));
+      const normalize = text => String(text).trim().toLowerCase().replace(/’/g, "'");
+      if (!selected || normalize(selected.text) !== normalize(values.text) || !Array.isArray(selected.phones) || !selected.phones.length) {
+        throw friendly('ยังไม่พบคำอ่านของคำที่เลือกในประโยคเดิม กลับไปเลือกคำอีกครั้งครับ');
+      }
+      return {
+        text: values.text, accent: values.accent, ipa: selected.ipa,
+        words: [{ ...selected, index: 0, phones: selected.phones.slice() }],
+        analysis_type: 'text_pronunciation_reference', audio_analyzed: false,
+        reference_context: 'word_in_sentence',
+        context: { text: originalText, word_index: practiceWord.index },
+        notes: ['ใช้คำอ่านตามตำแหน่งในประโยคเดิม รวมรูปเสียงเบาของคำสั้น ๆ'],
+      };
+    }
+    async function analyzeInBrowser(blob, values, signal, current) {
+      const expectedReference = browserReference(values);
+      const engine = browserEngine();
+      if (!engine) throw friendly(unsupportedBrowserNotice);
+      checkBlob(blob);
+      browserRequest = true; updateButtons();
+      const data = await engine.analyze({
+        blob, text: values.text, accent: values.accent, reference: expectedReference, signal,
+        onProgress: message => {
+          if (current() && busy && browserRequest && !signal.aborted && typeof message === 'string') setStatus(message);
+        },
+      });
+      // A learner clip must never receive the bundled AI result as its own.
+      if (!data || data.audio_analyzed !== true || data.analysis_type !== 'acoustic_phone_comparison' || data.precomputed === true || data.live_analysis === false || data.playback_source === 'prerecorded_ai' || !data.reference || data.reference.text !== values.text || data.reference.accent !== values.accent) {
+        throw friendly('ยังวิเคราะห์เสียงของคุณไม่สำเร็จ ลองบันทึกใหม่แล้วกดดูผลอีกครั้ง');
+      }
+      return data;
     }
     function ipaText(value) { return Array.isArray(value) ? value.join(' ') : value == null ? '—' : String(value); }
     function guideFor(phone) {
@@ -901,17 +952,23 @@
     fileLabel.append(fileInput);
     const recordButton = button('บันทึกเสียงของฉัน', record, 'egl-ph-button egl-ph-primary');
     const analyzeButton = button('ดูผลเสียงของฉัน', () => {
-      if (demoMode) { setStatus(localAnalysisRequired, true); return; }
       if (!clip) { setStatus('เลือกไฟล์หรือบันทึกเสียงก่อน', true); return; }
       const selected = clip;
-      request((values, signal) => upload(selected, values, signal));
+      if (demoMode) {
+        if (!browserEngine()) { setStatus(unsupportedBrowserNotice, true); return; }
+        request((values, signal, current) => analyzeInBrowser(selected, values, signal, current), 'กำลังเตรียมการวิเคราะห์ในเบราว์เซอร์…');
+      } else request((values, signal) => upload(selected, values, signal));
     });
-    if (demoMode) analyzeButton.title = localAnalysisRequired;
-    const recordingControls = el('div', 'egl-ph-actions'); recordingControls.append(recordButton, analyzeButton);
+    const cancelBrowserButton = button('ยกเลิกการวิเคราะห์', () => {
+      cancelRequest(); setStatus('ยกเลิกการวิเคราะห์ในเบราว์เซอร์แล้ว');
+    });
+    cancelBrowserButton.hidden = true;
+    const recordingControls = el('div', 'egl-ph-actions'); recordingControls.append(recordButton, analyzeButton, cancelBrowserButton);
     const uploadDetails = el('details', 'egl-ph-technical egl-ph-upload');
     uploadDetails.append(el('summary', '', 'หรือเลือกไฟล์เสียง'), fileLabel);
     ownPanel.append(recordHint, recordingControls, uploadDetails);
-    if (demoMode) ownPanel.append(el('p', 'egl-ph-note egl-ph-demo-learner-notice', localAnalysisRequired + ' · เดโมนี้บันทึกและฟังเสียงของคุณได้ในเบราว์เซอร์'));
+    const browserNotice = demoMode ? el('p', 'egl-ph-note egl-ph-demo-learner-notice') : null;
+    if (browserNotice) ownPanel.append(browserNotice);
     const chosen = el('p', 'egl-ph-note');
     const player = el('audio', 'egl-ph-player');
     player.controls = true; player.preload = 'metadata'; player.hidden = true;
@@ -934,7 +991,7 @@
     observed.setAttribute('aria-label', 'ผลตรวจจากไฟล์เสียง');
     const resultPlaceholder = el('p', 'egl-ph-result-placeholder', '3 · เมื่อกดดูผล แตะคำที่ไฮไลต์เพื่อฟังและฝึกทีละเสียง');
     secondStep.append(tabs, targetBanner, ownPanel, aiPanel,
-      el('p', 'egl-ph-note', demoMode ? 'ไม่เกิน 15 วินาที / 10 MB · บันทึกและเตรียมไฟล์เพื่อฟังในเบราว์เซอร์ เสียงของคุณไม่ถูกส่งไปวิเคราะห์' : 'ไม่เกิน 15 วินาที / 10 MB · เตรียมไฟล์เพื่อฟังในเบราว์เซอร์ หรือบริการในเครื่องเมื่อจำเป็น · กดดูผลเพื่อวิเคราะห์เสียง'), chosen, durationText, selfAudioControls, player);
+      el('p', 'egl-ph-note', demoMode ? 'ไม่เกิน 15 วินาที / 10 MB · ขอใช้เฉพาะไมโครโฟนเมื่อกดบันทึก ไม่ใช้กล้อง · ไฟล์เสียงอยู่ในเบราว์เซอร์ กดดูผลจึงเริ่มวิเคราะห์' : 'ไม่เกิน 15 วินาที / 10 MB · เตรียมไฟล์เพื่อฟังในเบราว์เซอร์ หรือบริการในเครื่องเมื่อจำเป็น · กดดูผลเพื่อวิเคราะห์เสียง'), chosen, durationText, selfAudioControls, player);
     body.append(steps, firstStep, secondStep, status, service, resultPlaceholder, observed, examplePlayer);
     root.append(body); container.append(root);
 

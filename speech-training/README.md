@@ -4,7 +4,7 @@
 
 ## ใช้เดโมที่เผยแพร่
 
-เมื่อเปิดผ่าน HTTPS คุณบันทึกเสียงและฟังตัวเองได้ในเบราว์เซอร์ ผลเปอร์เซ็นต์และการจับคู่หน่วยเสียงของ AI เป็น **ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้** ซึ่งผูกกับไฟล์นั้นโดยตรง เดโมไม่วิเคราะห์เสียงใหม่ของผู้เรียน ไม่ส่งเสียงผู้ใช้ไปเซิร์ฟเวอร์ และไม่เชื่อมต่อ localhost ของผู้เข้าชม
+เมื่อเปิดผ่าน HTTPS คุณบันทึก ฟัง และวิเคราะห์เสียงตัวเองได้ในเบราว์เซอร์ กดดูผลครั้งแรกเพื่อดาวน์โหลดโมเดลประมาณ **318 MB** จาก Hugging Face และชุดประมวลผลประมาณ **12 MB** จากเว็บนี้ เสียงของคุณประมวลผลในเบราว์เซอร์ ไม่ส่งไปเซิร์ฟเวอร์และไม่เชื่อมต่อ localhost ของผู้เข้าชม ผลของเสียง AI เป็น **ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้** ซึ่งผูกกับไฟล์นั้นโดยตรงและแยกจากเสียงที่คุณบันทึก
 
 หากดาวน์โหลด repository ให้รันจากโฟลเดอร์หลัก:
 
@@ -13,7 +13,11 @@ python3 speech-training/build_demo.py
 python3 -m http.server 8765 --bind 127.0.0.1 --directory dist
 ```
 
-เปิด <http://127.0.0.1:8765/speech-training/listen.html> เพื่อฟังไฟล์ที่รวมไว้ใน `dist/` การวิเคราะห์ไฟล์ใหม่ต้องติดตั้งบริการด้านล่าง ไม่จำเป็นต้องดาวน์โหลดโมเดลเพื่อ build หรือฟังเดโม
+เปิด <http://127.0.0.1:8765/speech-training/listen.html> เพื่อฝึกจากไฟล์ใน `dist/` ไม่ต้องติดตั้ง Python dependencies เพื่อใช้โมเดลในเบราว์เซอร์ และไม่ดาวน์โหลดโมเดลเพื่อ build เรียน หรือฟังตัวอย่าง
+
+เบราว์เซอร์ใช้ [ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) **1.23.2** แบบ WebAssembly ใน worker และ [wav2vec2-lv-60-espeak-cv-ft-ONNX](https://huggingface.co/onnx-community/wav2vec2-lv-60-espeak-cv-ft-ONNX/tree/c69750f5043e5e1f8a71ab95dd3b98338c280c92) revision `c69750f5043e5e1f8a71ab95dd3b98338c280c92` ไฟล์ `onnx/model_quantized.onnx` ขนาด 317,712,852 bytes; SHA256 `3d1479b5c70836645a4310902479f7f7e8bbc8c16c58745d918804f4f6f9d120` รับเสียง mono 16 kHz และอ่าน acoustic phone labels จริง ไม่ได้แปลงข้อความที่ผู้ใช้คาดว่าจะพูดมาแทนเสียง
+
+ใช้หน่วยความจำมากกว่า 318 MB และความเร็วขึ้นกับอุปกรณ์ ลองฝึกคำหรือประโยคสั้นก่อน อุปกรณ์ที่หน่วยความจำไม่พออาจโหลดโมเดลไม่ได้ ผลจับคู่และเวลาเป็นค่าประมาณจาก acoustic model ไม่ใช่คะแนนความสามารถภาษา การรับรองสำเนียง หรือ forced alignment ที่ผู้เชี่ยวชาญตรวจ หากไม่ใช้โมเดลในเบราว์เซอร์ยังฟังและอัดเสียงได้ หรือใช้บริการในเครื่องด้านล่าง
 
 ## Local service
 
@@ -29,7 +33,7 @@ speech-training/.venv/bin/python speech-training/download_phonetic_model.py
 bash speech-training/start-phonetics.command
 ```
 
-เปิด <http://127.0.0.1:8766/speech-training/listen.html> หรือ <http://127.0.0.1:8766/app/index.html> และหยุดบริการด้วย **Ctrl+C** ต้องเปิดหน้า localhost นี้เพื่อวิเคราะห์เสียงใหม่; เดโมบนเว็บไซต์ยังคงปิดการส่งเสียงวิเคราะห์
+เปิด <http://127.0.0.1:8766/speech-training/listen.html> หรือ <http://127.0.0.1:8766/app/index.html> เพื่อใช้บริการ Python ในเครื่อง และหยุดบริการด้วย **Ctrl+C** เดโมบนเว็บไซต์ใช้โมเดลในเบราว์เซอร์แทน ไม่ติดต่อบริการ localhost นี้
 
 กดบันทึก → หยุด → รอเตรียม WAV → **ฟังเสียงของฉัน** หรือ **ดูผลเสียงของฉัน** รับไฟล์ไม่เกิน 15 วินาที / 10 MB หากเบราว์เซอร์ถอดเสียงบันทึกไม่ได้ `/api/phonetics/normalize` จะเตรียม WAV ในเครื่องโดยไม่เรียกโมเดลวิเคราะห์ ไฟล์ชั่วคราวถูกลบหลังประมวลผล และไม่มีการเล่นเสียงอัตโนมัติ
 
@@ -108,4 +112,4 @@ npm test
 
 ข้อมูลฝึก [Hi-Fi TTS](https://www.openslr.org/109/) โดย Evelina Bakhturina, Vitaly Lavrukhin, Boris Ginsburg และ Yang Zhang (2021) ใช้ **CC BY 4.0** เลือก subset และ resample เพื่อฝึกเสียง ดูรายละเอียดการดัดแปลงและที่มาของเดโมใน [ATTRIBUTION.txt](demo-assets/ATTRIBUTION.txt)
 
-[Qwen3-TTS Base](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base), [MLX Audio](https://github.com/Blaizzy/mlx-audio), [MLX-Tune](https://github.com/ARahim3/mlx-tune) และ acoustic checkpoint [wav2vec2-lv-60-espeak-cv-ft](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) ระบุ Apache 2.0 ส่วน [Phonemizer](https://bootphon.github.io/phonemizer/) และ [eSpeak NG](https://github.com/espeak-ng/espeak-ng) เป็น dependency GPL 3.0 ที่ติดตั้งแยก ไม่รวม model weights หรือชุดเสียงต้นฉบับไว้ในเดโม
+[Qwen3-TTS Base](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base), [MLX Audio](https://github.com/Blaizzy/mlx-audio), [MLX-Tune](https://github.com/ARahim3/mlx-tune), acoustic checkpoint [wav2vec2-lv-60-espeak-cv-ft](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) และ [ONNX conversion](https://huggingface.co/onnx-community/wav2vec2-lv-60-espeak-cv-ft-ONNX) ระบุ Apache 2.0; ONNX Runtime ใช้ MIT License พร้อม notices ใน `app/vendor/onnxruntime/` ส่วน [Phonemizer](https://bootphon.github.io/phonemizer/) และ [eSpeak NG](https://github.com/espeak-ng/espeak-ng) เป็น dependency GPL 3.0 ที่ติดตั้งแยก โมเดล browser ดาวน์โหลดเมื่อกดใช้ ไม่รวม model weights หรือชุดเสียงต้นฉบับไว้ใน repository

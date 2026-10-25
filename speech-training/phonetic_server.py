@@ -216,7 +216,11 @@ def favicon():
 def static_asset(asset: str):
     allowed_app = {"index.html", "app.js", "content.js", "core.js", "storage.js", "garden.js",
         "styles.css", "phonetics.js", "phonetics.css", "phonetic-data.js", "phone-guide.js",
-        "study-help.js", "reference-audio.js"}
+        "study-help.js", "reference-audio.js", "browser-phonetics.js",
+        "browser-phonetics-worker.js", "browser-phoneme-model.js", "phonetic-alignment.js",
+        "vendor/onnxruntime/ort.wasm.min.js", "vendor/onnxruntime/ort-wasm-simd-threaded.mjs",
+        "vendor/onnxruntime/ort-wasm-simd-threaded.wasm", "vendor/onnxruntime/LICENSE.txt",
+        "vendor/onnxruntime/ThirdPartyNotices.txt"}
     allowed = asset.startswith("app/") and asset[4:] in allowed_app
     allowed = allowed or asset in {"index.html", "speech-training/listen.html"}
     allowed = allowed or bool(re.fullmatch(

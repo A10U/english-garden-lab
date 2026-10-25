@@ -22,18 +22,37 @@ from export_demo_assets import assert_public, verify_export
 
 
 MARKER = ".egl-demo-build.json"
-RUNTIME_SUFFIXES = {".html", ".js", ".css", ".svg", ".png", ".jpg", ".jpeg", ".webp", ".ico", ".woff", ".woff2"}
+RUNTIME_SUFFIXES = {".html", ".js", ".mjs", ".wasm", ".txt", ".css", ".svg", ".png", ".jpg", ".jpeg", ".webp", ".ico", ".woff", ".woff2"}
 EXCLUDED_PARTS = {"tests", "node_modules", "__pycache__", "logs"}
 PRIVATE_PATH = re.compile(
     r"/Users/|/home/|file://|\\Users\\|(?:\.\./)*(?:Resource|SDLC|research_notes|reports|runs|models|\.venv)/"
 )
 LOOPBACK_URL = re.compile(r"https?://(?:127(?:\.\d{1,3}){3}|localhost|\[::1\])(?::\d+)?", re.I)
-PHONETICS_SCRIPT = re.compile(r"<script\b[^>]*\bsrc\s*=\s*(['\"])([^'\"]*phonetics\.js)\1[^>]*>\s*</script>", re.I)
+PHONETICS_SCRIPT = re.compile(r"<script\b[^>]*\bsrc\s*=\s*(['\"])((?:[^'\"]*/)?phonetics\.js)\1[^>]*>\s*</script>", re.I)
 TRIAL_SCRIPT = re.compile(r"(<script\b(?=[^>]*\bid=['\"]trial-data['\"])[^>]*>).*?(</script\s*>)", re.I | re.S)
 NOTICE = """<aside id="egl-hosted-demo-notice" role="note" style="margin:16px auto;padding:12px 16px;max-width:1120px;border:1px solid #c7d8bd;border-radius:12px;background:#f1f6eb;color:#234b35;font:14px/1.7 system-ui,sans-serif">
-<strong>เดโมบนเว็บ</strong> · ฟังเสียง AI และดูผลแยกเสียงที่เตรียมไว้ได้ บันทึกและฟังเสียงของคุณซ้ำได้ในเบราว์เซอร์ การวิเคราะห์เสียงของคุณแบบสดต้องใช้ฉบับในเครื่อง
+<strong>ฝึกเสียงบนเว็บ</strong> · ฟังเสียง AI พร้อมผลที่เตรียมไว้ หรือบันทึกและวิเคราะห์เสียงของคุณในเบราว์เซอร์ เมื่อกดวิเคราะห์ครั้งแรกจะดาวน์โหลดโมเดลประมาณ 318 MB และชุดประมวลผลประมาณ 12 MB เสียงของคุณไม่ถูกส่งออกจากเบราว์เซอร์ เครื่องที่ช้าอาจใช้เวลารอ
  · <a href="../speech-training/demo-assets/ATTRIBUTION.txt">ที่มาของเสียงตัวอย่าง</a></aside>"""
-CSP = '<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="connect-src \'self\'; media-src \'self\' blob: data:; object-src \'none\'; base-uri \'self\'">'
+CSP = '<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="connect-src \'self\' https://huggingface.co https://*.hf.co; worker-src \'self\' blob:; media-src \'self\' blob: data:; object-src \'none\'; base-uri \'self\'">'
+MODEL_REPOSITORY = "https://huggingface.co/onnx-community/wav2vec2-lv-60-espeak-cv-ft-ONNX/"
+MODEL_URL = MODEL_REPOSITORY + "resolve/c69750f5043e5e1f8a71ab95dd3b98338c280c92/onnx/model_quantized.onnx"
+BROWSER_ASSETS = (
+    "app/browser-phonetics.js", "app/browser-phonetics-worker.js", "app/browser-phoneme-model.js",
+    "app/phonetic-alignment.js", "app/vendor/onnxruntime/ort.wasm.min.js",
+    "app/vendor/onnxruntime/ort-wasm-simd-threaded.mjs",
+    "app/vendor/onnxruntime/ort-wasm-simd-threaded.wasm",
+    "app/vendor/onnxruntime/LICENSE.txt", "app/vendor/onnxruntime/ThirdPartyNotices.txt",
+)
+# Unmodified ONNX Runtime Web 1.23.2 distribution plus upstream license/notices.
+# Emscripten embeds a virtual /home/web_user and a file:// scheme detector;
+# these upstream literals are allowed only when the complete file hash matches.
+VENDOR_SHA256 = {
+    "app/vendor/onnxruntime/LICENSE.txt": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+    "app/vendor/onnxruntime/ThirdPartyNotices.txt": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc",
+    "app/vendor/onnxruntime/ort-wasm-simd-threaded.mjs": "90a557d15c02bac4504d95b67f431d8594635ed2a0a62a7f2cd83d090ff91d3e",
+    "app/vendor/onnxruntime/ort-wasm-simd-threaded.wasm": "45eaee27761ad883742a8d4b8fce1538d60ce43b51adf1726fafccc59b8c1a15",
+    "app/vendor/onnxruntime/ort.wasm.min.js": "c6bc9f8e1d0ecc3983a57910e6a30b2230a512bcd2e0207cd64306459c3de7b4",
+}
 
 
 def script_json(value: object) -> str:
@@ -99,15 +118,28 @@ class LocalReferences(HTMLParser):
 
 def validate_files(files: dict[str, bytes]) -> None:
     """Catch stale authoring links and broken local runtime assets before writes."""
+    for name in BROWSER_ASSETS:
+        if name not in files:
+            raise ValueError(f"Missing browser phoneme runtime asset: {name}")
     for name, raw in files.items():
+        if name in VENDOR_SHA256:
+            if hashlib.sha256(raw).hexdigest() != VENDOR_SHA256[name]:
+                raise ValueError(f"Vendored runtime integrity check failed: {name}")
+            continue
         suffix = Path(name).suffix.lower()
-        if suffix not in {".html", ".js", ".css", ".json", ".txt"}:
+        if suffix not in {".html", ".js", ".mjs", ".css", ".json", ".txt"}:
             continue
         text = raw.decode("utf-8")
         if PRIVATE_PATH.search(text):
             raise ValueError(f"Private/authoring path remains in public file: {name}")
         if LOOPBACK_URL.search(text):
             raise ValueError(f"Loopback URL remains in public file: {name}")
+        if name == "app/browser-phoneme-model.js":
+            # A public model is fetched on demand; keep the allowed executable
+            # model URL pinned rather than accepting arbitrary remote weights.
+            model_urls = re.findall(r"https://[^\s\"'`<>]+\.onnx(?:\?[^\s\"'`<>]*)?", text)
+            if model_urls != [MODEL_URL]:
+                raise ValueError("Browser phoneme metadata must name only the pinned public ONNX model URL")
         if suffix != ".html":
             continue
         parser = LocalReferences()
@@ -149,6 +181,8 @@ def build(project_root: Path, output: Path) -> dict:
     for path in sorted(app_source.rglob("*")):
         relative = path.relative_to(app_source)
         if not path.is_file() or path.suffix.lower() not in RUNTIME_SUFFIXES:
+            continue
+        if path.suffix.lower() == ".txt" and relative.parts[:2] != ("vendor", "onnxruntime"):
             continue
         if any(part.startswith(".") or part in EXCLUDED_PARTS for part in relative.parts):
             continue

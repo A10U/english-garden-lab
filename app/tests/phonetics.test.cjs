@@ -637,7 +637,7 @@ test('hosted demo uses bundled US text references and never probes localhost for
   app.button('ดูคำอ่าน').click(); await flush();
   assert.equal(app.calls.length, 0);
   assert.equal(app.container.querySelector('.egl-ph-service-link').hasAttribute('href'), false);
-  assert.match(app.container.querySelector('.egl-ph-demo-learner-notice').textContent, /การวิเคราะห์เสียงที่คุณบันทึกต้องเปิดรุ่นในเครื่อง/);
+  assert.match(app.container.querySelector('.egl-ph-demo-learner-notice').textContent, /เบราว์เซอร์นี้ยังวิเคราะห์เสียงในหน้าเว็บไม่ได้/);
   app.cleanup(); app.dom.window.close();
 });
 
@@ -645,8 +645,10 @@ test('hosted AI results match exact exported source URLs and use real bundled an
   const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'speech-training', 'demo-assets', 'demo-data.json'), 'utf8'));
   const pair = data.pairs[0];
   for (const page of ['app/index.html', 'speech-training/listen.html']) {
-    let app;
-    app = setup({ url: 'https://garden.example/nested/site/' + page, globals: { EGL_DEMO_DATA: data }, mount: { text: pair.text,
+    let app, learnerCalls = 0;
+    app = setup({ url: 'https://garden.example/nested/site/' + page, globals: { EGL_DEMO_DATA: data,
+      EGLBrowserPhonetics: { supported: () => true, analyze: () => { learnerCalls++; throw new Error('AI examples must use their real prepared results'); } },
+    }, mount: { text: pair.text,
       apiBase: 'http://localhost:8766', audioSources: [{ label: 'A', url: pair.baseline.audio }, { label: 'B', url: pair.candidate.audio }, { label: 'X', url: '../other/tts-001.wav' }] },
       fetch: async (url, init) => {
         assert.equal(init.method, undefined, 'only static audio GET is allowed');
@@ -665,6 +667,7 @@ test('hosted AI results match exact exported source URLs and use real bundled an
     assert.equal(app.calls.length, 2);
     app.button('วิเคราะห์เสียง X').click(); await flush();
     assert.equal(app.calls.length, 2, 'a matching basename must never select another cached file');
+    assert.equal(learnerCalls, 0, 'cached AI examples must not download or invoke the learner model');
     assert.equal(app.container.querySelector('.egl-ph-observed').hidden, true);
     assert.match(app.container.querySelector('[role=status]').textContent, /ยังไม่มีผลวิเคราะห์/);
     assert.ok(app.calls.every(([url]) => url.startsWith('https://garden.example/nested/site/speech-training/demo-assets/audio/')));
@@ -683,7 +686,7 @@ test('hosted recordings can be prepared and played but never receive cached lear
   assert.equal(app.button('ดูผลเสียงของฉัน').disabled, true);
   app.button('ดูผลเสียงของฉัน').dispatchEvent(new app.window.Event('click'));
   await flush();
-  assert.match(app.container.querySelector('[role=status]').textContent, /การวิเคราะห์เสียงที่คุณบันทึกต้องเปิดรุ่นในเครื่อง/);
+  assert.match(app.container.querySelector('[role=status]').textContent, /เบราว์เซอร์นี้ยังวิเคราะห์เสียงในหน้าเว็บไม่ได้/);
   assert.equal(app.container.querySelector('.egl-ph-percent'), null);
   assert.equal(app.calls.length, 0);
   app.cleanup(); app.dom.window.close();
@@ -726,5 +729,126 @@ test('explicit demo runtime on a local preview disables APIs but permits its sam
   assert.match(app.container.querySelector('.egl-ph-demo-result').textContent, /ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้/);
   assert.equal(app.calls.length, 1);
   assert.equal(app.button('ดูผลเสียงของฉัน').disabled, true);
+  app.cleanup(); app.dom.window.close();
+});
+
+test('hosted learner analysis dispatches the selected clip and cached reference only on explicit click', async () => {
+  const expected = reference();
+  let args, finish;
+  const app = setup({ url: 'https://garden.example/app/index.html', globals: {
+    EGL_DEMO_DATA: { texts: { [expected.text]: expected } },
+    EGLBrowserPhonetics: { supported: () => true, analyze: options => { args = options; return new Promise(resolve => { finish = resolve; }); } },
+  } });
+  assert.equal(args, undefined);
+  assert.equal(app.button('ดูผลเสียงของฉัน').disabled, true);
+  assert.match(app.container.querySelector('.egl-ph-demo-learner-notice').textContent, /318 MB.*WASM.*เสียงของคุณอยู่ในเบราว์เซอร์/);
+  selectFile(app, pcmFixture());
+  const selected = app.container.querySelector('input[type=file]').files[0];
+  assert.equal(app.button('ดูผลเสียงของฉัน').disabled, false);
+  assert.equal(args, undefined, 'selecting a clip must not load the model');
+  app.button('ดูคำอ่าน').click(); await flush();
+  assert.equal(args, undefined, 'reading the bundled IPA must not load the model');
+  app.button('ดูผลเสียงของฉัน').click();
+  assert.equal(args.blob, selected);
+  assert.equal(args.reference, expected);
+  assert.equal(args.text, expected.text);
+  assert.equal(args.accent, 'en-us');
+  assert.equal(args.signal.aborted, false);
+  assert.equal(app.button('ยกเลิกการวิเคราะห์').hidden, false);
+  assert.equal(app.button('ดูผลเสียงของฉัน').disabled, true);
+  args.onProgress('กำลังดาวน์โหลดโมเดล 42%');
+  assert.equal(app.container.querySelector('[role=status]').textContent, 'กำลังดาวน์โหลดโมเดล 42%');
+  finish(analysis({ analysis_type: 'acoustic_phone_comparison', live_analysis: true, precomputed: false, playback_source: 'learner_browser' }));
+  await flush();
+  assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '100.0%');
+  assert.equal(app.container.querySelector('.egl-ph-demo-result'), null);
+  assert.equal(app.button('ยกเลิกการวิเคราะห์').hidden, true);
+  const finalStatus = app.container.querySelector('[role=status]').textContent;
+  args.onProgress('late progress must be ignored');
+  assert.equal(app.container.querySelector('[role=status]').textContent, finalStatus);
+  assert.equal(app.calls.length, 0, 'learner audio must not be POSTed or sent to localhost');
+  app.cleanup(); app.dom.window.close();
+});
+
+test('hosted cancel and cleanup abort the worker request and ignore late progress and results', async () => {
+  const expected = reference();
+  const attempts = [];
+  const app = setup({ url: 'https://garden.example/app/index.html', mount: { precomputed: expected }, globals: {
+    EGLBrowserPhonetics: { supported: () => true, analyze: args => new Promise(resolve => { attempts.push({ args, resolve }); }) },
+  } });
+  selectFile(app, pcmFixture()); app.button('ดูผลเสียงของฉัน').click();
+  app.button('ยกเลิกการวิเคราะห์').click();
+  assert.equal(attempts[0].args.signal.aborted, true);
+  assert.equal(app.button('ยกเลิกการวิเคราะห์').hidden, true);
+  assert.equal(app.button('ดูผลเสียงของฉัน').disabled, false);
+  attempts[0].args.onProgress('stale download');
+  attempts[0].resolve(analysis({ analysis_type: 'acoustic_phone_comparison' })); await flush();
+  assert.match(app.container.querySelector('[role=status]').textContent, /ยกเลิกการวิเคราะห์/);
+  assert.equal(app.container.querySelector('.egl-ph-percent'), null);
+  app.button('ดูผลเสียงของฉัน').click();
+  app.cleanup();
+  assert.equal(attempts[1].args.signal.aborted, true);
+  attempts[1].args.onProgress('stale after cleanup');
+  attempts[1].resolve(analysis({ analysis_type: 'acoustic_phone_comparison' })); await flush();
+  assert.equal(app.container.children.length, 0);
+  assert.equal(app.calls.length, 0);
+  app.dom.window.close();
+});
+
+test('hosted word practice preserves the selected word sentence-context phones and resets its result index', async () => {
+  const expected = { ...reference('This is a leaf.'), words: [
+    { index: 0, text: 'This', ipa: 'ðɪs', phones: ['ð', 'ɪ', 's'] },
+    { index: 1, text: 'is', ipa: 'ɪz', phones: ['ɪ', 'z'] },
+    { index: 2, text: 'a', ipa: 'ə', phones: ['ə'] },
+    { index: 3, text: 'leaf', ipa: 'liːf', phones: ['l', 'iː', 'f'] },
+  ] };
+  let args;
+  const app = setup({ url: 'https://garden.example/app/index.html', mount: { text: expected.text, precomputed: expected }, globals: {
+    EGLBrowserPhonetics: { supported: () => true, analyze: options => { args = options; return Promise.resolve(analysis({ analysis_type: 'acoustic_phone_comparison', reference: options.reference })); } },
+  } });
+  [...app.container.querySelectorAll('.egl-ph-ref-word')].find(node => node.querySelector('.egl-ph-token').textContent === 'a').click();
+  app.button('ฝึกคำนี้').click();
+  assert.equal(args, undefined);
+  selectFile(app, pcmFixture()); app.button('ดูผลเสียงของฉัน').click(); await flush();
+  assert.equal(args.text, 'a');
+  assert.equal(args.reference.ipa, 'ə');
+  assert.deepEqual([...args.reference.words[0].phones], ['ə']);
+  assert.equal(args.reference.words[0].index, 0);
+  assert.equal(args.reference.context.text, expected.text);
+  assert.equal(args.reference.context.word_index, 2);
+  assert.equal(args.reference.reference_context, 'word_in_sentence');
+  assert.equal(expected.words[2].index, 2, 'the shared sentence reference must not be mutated');
+  assert.equal(app.calls.length, 0);
+  app.cleanup(); app.dom.window.close();
+});
+
+test('hosted missing or wrong-accent reference never starts the browser model download', async () => {
+  let analyzed = 0;
+  const expected = reference();
+  const app = setup({ url: 'https://garden.example/app/index.html', globals: {
+    EGL_DEMO_DATA: { texts: { [expected.text]: expected } },
+    EGLBrowserPhonetics: { supported: () => true, analyze: () => { analyzed++; return Promise.resolve(); } },
+  } });
+  const accent = app.container.querySelector('select'); accent.value = 'en-gb'; accent.dispatchEvent(new app.window.Event('change'));
+  selectFile(app, pcmFixture()); app.button('ดูผลเสียงของฉัน').click(); await flush();
+  assert.equal(analyzed, 0);
+  assert.match(app.container.querySelector('[role=status]').textContent, /ยังไม่มีคำอ่านอ้างอิง/);
+  const text = app.container.querySelector('textarea'); text.value = 'Unknown.'; text.dispatchEvent(new app.window.Event('input'));
+  selectFile(app, pcmFixture()); app.button('ดูผลเสียงของฉัน').click(); await flush();
+  assert.equal(analyzed, 0);
+  assert.equal(app.button('ยกเลิกการวิเคราะห์').hidden, true);
+  assert.equal(app.calls.length, 0);
+  app.cleanup(); app.dom.window.close();
+});
+
+test('hosted learner route refuses prerecorded AI results even when their text matches', async () => {
+  const expected = reference();
+  const app = setup({ url: 'https://garden.example/app/index.html', mount: { precomputed: expected }, globals: {
+    EGLBrowserPhonetics: { supported: () => true, analyze: async () => analysis({ analysis_type: 'acoustic_phone_comparison', playback_source: 'prerecorded_ai', precomputed: true, live_analysis: false }) },
+  } });
+  selectFile(app, pcmFixture()); app.button('ดูผลเสียงของฉัน').click(); await flush();
+  assert.equal(app.container.querySelector('.egl-ph-percent'), null);
+  assert.match(app.container.querySelector('[role=status]').textContent, /ยังวิเคราะห์เสียงของคุณไม่สำเร็จ/);
+  assert.equal(app.calls.length, 0);
   app.cleanup(); app.dom.window.close();
 });
