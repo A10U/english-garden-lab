@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const { JSDOM } = require('jsdom');
 const alignment = require('../phonetic-alignment.js');
 
-const sources = Object.fromEntries(['phone-guide.js', 'sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'word-audio.js', 'phonetics.js']
+const sources = Object.fromEntries(['phone-guide.js', 'sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js', 'phonetics.js']
   .map(name => [name, fs.readFileSync(path.join(__dirname, '..', name), 'utf8')]));
 const exampleScope = {};
 vm.runInNewContext(sources['word-audio.js'], exampleScope);
@@ -46,7 +46,7 @@ function setup(options = {}) {
   win.HTMLMediaElement.prototype.load = function () { loads.push(this); };
   win.fetch = async (...args) => { calls.push(args); return options.fetch ? options.fetch(...args) : Promise.reject(new Error('No automatic network request expected')); };
   Object.defineProperty(win.navigator, 'mediaDevices', { value: { getUserMedia: () => { microphones++; return Promise.reject(new Error('Explicit recording only')); } } });
-  for (const name of ['phone-guide.js', 'sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'word-audio.js']) win.eval(sources[name]);
+  for (const name of ['phone-guide.js', 'sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js']) win.eval(sources[name]);
   if (options.globals) Object.assign(win, options.globals);
   win.eval(sources['phonetics.js']);
   const container = win.document.getElementById('widget'), expected = options.reference || reference();
@@ -78,6 +78,21 @@ function selectFile(app) {
   return file;
 }
 function close(app) { app.cleanup(); app.dom.window.close(); }
+function singleWord(text, phones) {
+  return reference(text, [{ index: 0, text, ipa: phones.join(''), phones }]);
+}
+function heard(phones) {
+  return phones.map((phone, index) => ({ phone, start: .1 + index * .1, end: .18 + index * .1 }));
+}
+function parts(section) { return [...section.querySelectorAll('.egl-ph-spelling-group')]; }
+function partPercentages(section) { return parts(section).map(node => node.querySelector('.egl-ph-part-percent').textContent); }
+function part(section, label) { return parts(section).find(node => node.querySelector('.egl-ph-grapheme').textContent === label); }
+async function analyzedParts(expected, phones) {
+  const data = compose(expected, heard(phones));
+  const app = setup({ reference: expected, fetch: async () => ({ ok: true, status: 200, json: async () => data }) });
+  selectFile(app); app.button('ดูผลเสียงของฉัน').click(); await flush();
+  return { app, section: app.container.querySelector('.egl-ph-inspector .egl-ph-spelling'), data };
+}
 
 test('leaf spelling groups lead to only /iː/ practice, with exact local word/phone context and a separate result heading', async () => {
   const original = reference();
@@ -412,5 +427,164 @@ test('switching weak a to standalone practice refreshes the visible sound panel 
   assert.equal(form.get('context_word_index'), '0');
   assert.equal(form.get('context_phone_index'), '0');
   assert.match(app.container.querySelector('.egl-ph-observed > h3').textContent, /ผลเฉพาะเสียง \/eɪ\//);
+  close(app);
+});
+
+test('real feedback gives leaf l/ea 100%, f 0% red, and focuses the substitution with actionable practice', async () => {
+  const { app, section } = await analyzedParts(singleWord('leaf', ['l', 'iː', 'f']), ['l', 'iː', 's']);
+  assert.equal(typeof app.win.EGLSpellingFeedback.analyzeWord, 'function');
+  assert.deepEqual(partPercentages(section), ['100.0%', '100.0%', '0.0%']);
+  assert.ok(part(section, 'l').classList.contains('egl-ph-purple'));
+  assert.ok(part(section, 'ea').classList.contains('egl-ph-purple'));
+  assert.ok(part(section, 'f').classList.contains('egl-ph-red'));
+  assert.equal(part(section, 'f').getAttribute('aria-pressed'), 'true');
+  assert.equal(part(section, 'f').querySelector('.egl-ph-part-counts').textContent, '0 / 1 เสียง');
+  assert.match(part(section, 'f').getAttribute('aria-label'), /f.*0\.0%/);
+  assert.match(section.querySelector('.egl-ph-spelling-summary').textContent, /ควรฝึกก่อน:.*f.*0\.0%/);
+  assert.equal(section.querySelector('.egl-ph-feedback-source').textContent, 'ผลจากเสียงของฉัน');
+  const panel = section.querySelector('.egl-ph-spelling-detail');
+  assert.match(panel.querySelector('.egl-ph-part-advice').textContent, /อ้างอิง \/f\/.*ตรวจพบ \/s\//);
+  assert.match(panel.querySelector('.egl-ph-part-method').textContent, /ฝึก \/f\/.*คำเต็ม leaf/);
+  assert.ok(panel.querySelector('.egl-ph-foundation'), 'the advice must connect to actual articulation guidance');
+  app.button('ฝึกเสียงที่แนะนำ', section).click();
+  assert.match(app.container.querySelector('.egl-ph-target > strong').textContent, /ฝึกเสียง \/f\/.*leaf/);
+  assert.equal(app.container.querySelector('.egl-ph-player').getAttribute('src'), null);
+  assert.equal(app.microphones(), 0);
+  close(app);
+});
+
+test("It's with only /ɪ/ heard shows deleted t and 's at zero and recommends the whole word for a stop", async () => {
+  const { app, section } = await analyzedParts(singleWord("It's", ['ɪ', 't', 's']), ['ɪ']);
+  assert.deepEqual(parts(section).map(node => node.querySelector('.egl-ph-grapheme').textContent), ['I', 't', "'s"]);
+  assert.deepEqual(partPercentages(section), ['100.0%', '0.0%', '0.0%']);
+  assert.ok(part(section, 't').classList.contains('egl-ph-red'));
+  assert.ok(part(section, "'s").classList.contains('egl-ph-red'));
+  assert.equal(part(section, 't').getAttribute('aria-pressed'), 'true');
+  assert.match(section.querySelector('.egl-ph-part-advice').textContent, /ยังไม่พบเสียง \/t\//);
+  assert.match(section.querySelector('.egl-ph-spelling-summary .egl-ph-part-method').textContent, /คำเต็ม It's.*\/t\/.*ปล่อยสั้น/);
+  assert.equal(app.button('ฝึกเสียงที่แนะนำ', section), undefined);
+  app.button('ฝึกคำเต็มโดยเน้นเสียงที่แนะนำ', section).click();
+  assert.match(app.container.querySelector('.egl-ph-target > strong').textContent, /กำลังฝึกคำ: It's/);
+  assert.equal(app.container.querySelector('.egl-ph-sound-target').hidden, true);
+  assert.equal(app.microphones(), 0);
+  close(app);
+});
+
+test('an insertion before /iː/ belongs to ea, lowers that group to 50%, and explains the added sound', async () => {
+  const { app, section, data } = await analyzedParts(singleWord('leaf', ['l', 'iː', 'f']), ['l', 'ə', 'iː', 'f']);
+  assert.ok(data.alignment.operations.some(op => op.type === 'insert' && op.observed === 'ə'));
+  assert.deepEqual(partPercentages(section), ['100.0%', '50.0%', '100.0%']);
+  assert.ok(part(section, 'ea').classList.contains('egl-ph-yellow'));
+  assert.equal(part(section, 'ea').querySelector('.egl-ph-part-counts').textContent, '1 / 2 เสียง');
+  assert.equal(part(section, 'ea').getAttribute('aria-pressed'), 'true');
+  assert.match(section.querySelector('.egl-ph-spelling-summary').textContent, /ควรฝึกก่อน:.*ea.*50\.0%/);
+  assert.match(section.querySelector('.egl-ph-part-advice').textContent, /พบเสียงเพิ่มใกล้ \/iː\//);
+  close(app);
+});
+
+test('silent make e stays unassessed while actual voiced groups get percentages', async () => {
+  const { app, section } = await analyzedParts(singleWord('make', ['m', 'eɪ', 'k']), ['m', 'eɪ', 'k']);
+  assert.deepEqual(partPercentages(section), ['100.0%', '100.0%', '100.0%', '—']);
+  const silent = part(section, 'e');
+  assert.ok(silent.classList.contains('egl-ph-silent'));
+  assert.ok(silent.classList.contains('egl-ph-unassessed'));
+  assert.equal(silent.querySelector('.egl-ph-part-counts').textContent, 'ไม่มีเสียงแยก');
+  silent.click();
+  assert.equal(section.querySelector('.egl-ph-spelling-detail .egl-ph-part-result'), null);
+  assert.match(section.querySelector('.egl-ph-spelling-detail').textContent, /ไม่ออกเสียงแยก/);
+  close(app);
+});
+
+test('unknown spelling keeps honest phone-only percentages without guessing letter groups', async () => {
+  const { app, section } = await analyzedParts(singleWord('quark', ['k', 'w', 'ɑː', 'k']), ['k', 'w', 'ɑː', 's']);
+  assert.match(section.textContent, /ยังไม่ได้ตรวจการจับคู่ตัวสะกดกับเสียง.*โดยไม่เดา/);
+  assert.deepEqual(parts(section).map(node => node.querySelector('.egl-ph-grapheme').textContent), ['k', 'w', 'ɑː', 'k']);
+  assert.deepEqual(partPercentages(section), ['100.0%', '100.0%', '100.0%', '0.0%']);
+  assert.equal(parts(section)[3].getAttribute('aria-pressed'), 'true');
+  assert.ok(parts(section)[3].classList.contains('egl-ph-red'));
+  assert.match(section.querySelector('.egl-ph-part-advice').textContent, /อ้างอิง \/k\/.*ตรวจพบ \/s\//);
+  close(app);
+});
+
+test('before analysis and after choosing a new clip all connected group scores show an unassessed dash', async () => {
+  const expected = singleWord('leaf', ['l', 'iː', 'f']);
+  const app = setup({ reference: expected, fetch: async () => ({ ok: true, status: 200, json: async () => compose(expected, heard(['l', 'iː', 's'])) }) });
+  const before = selectWord(app, 'leaf');
+  assert.deepEqual(partPercentages(before), ['—', '—', '—']);
+  assert.ok(parts(before).every(node => node.classList.contains('egl-ph-unassessed')));
+  assert.equal(before.querySelector('.egl-ph-feedback-source').textContent, 'ยังไม่ได้วิเคราะห์เสียง');
+  assert.equal(app.calls.length, 0);
+  selectFile(app); app.button('ดูผลเสียงของฉัน').click(); await flush();
+  assert.deepEqual(partPercentages(app.container.querySelector('.egl-ph-inspector .egl-ph-spelling')), ['100.0%', '100.0%', '0.0%']);
+  selectFile(app);
+  assert.equal(app.container.querySelector('.egl-ph-observed').hidden, true);
+  const fresh = selectWord(app, 'leaf');
+  assert.deepEqual(partPercentages(fresh), ['—', '—', '—']);
+  assert.ok([...app.container.querySelectorAll('.egl-ph-spelling-group .egl-ph-part-percent')].every(node => node.textContent === '—'));
+  assert.equal(fresh.querySelector('.egl-ph-feedback-source').textContent, 'ยังไม่ได้วิเคราะห์เสียง');
+  close(app);
+});
+
+test('single-phone practice scores only its selected original index and leaves the rest of leaf unassessed', async () => {
+  const expected = reference();
+  const app = setup({ reference: expected, fetch: async (_url, init) => ({ ok: true, status: 200, json: async () => compose(selectedReference(init.body, expected)) }) });
+  const panel = selectGroup(selectWord(app, 'leaf'), 'ea');
+  app.button('ฝึกเฉพาะเสียง /iː/', panel).click();
+  selectFile(app); app.button('ดูผลเสียงของฉัน').click(); await flush();
+  const section = app.container.querySelector('.egl-ph-inspector .egl-ph-spelling');
+  assert.deepEqual(partPercentages(section), ['—', '100.0%', '—']);
+  assert.ok(part(section, 'l').classList.contains('egl-ph-unassessed'));
+  assert.ok(part(section, 'f').classList.contains('egl-ph-unassessed'));
+  assert.ok(part(section, 'ea').classList.contains('egl-ph-purple'));
+  assert.match(section.textContent, /วิเคราะห์เฉพาะหน่วยเสียงที่ฝึก/);
+  selectGroup(section, 'ea');
+  assert.equal(section.querySelector('.egl-ph-part-result .egl-ph-part-percent').textContent, '100.0%');
+  close(app);
+});
+
+test('changing the target aborts pending analysis and ignores late per-group scores', async () => {
+  let pending, finish;
+  const expected = singleWord('leaf', ['l', 'iː', 'f']);
+  const app = setup({ url: 'https://example.test/app/index.html', reference: expected, globals: {
+    EGLBrowserPhonetics: { supported: () => true, analyze: options => { pending = options; return new Promise(resolve => { finish = resolve; }); } },
+  } });
+  const section = selectWord(app, 'leaf');
+  selectFile(app); app.button('ดูผลเสียงของฉัน').click();
+  assert.ok(pending);
+  const panel = selectGroup(section, 'ea'); app.button('ฝึกเฉพาะเสียง /iː/', panel).click();
+  assert.equal(pending.signal.aborted, true);
+  finish(compose(expected, heard(['l', 'iː', 's']))); await flush();
+  assert.equal(app.container.querySelector('.egl-ph-observed').hidden, true);
+  assert.ok([...app.container.querySelectorAll('.egl-ph-spelling-group .egl-ph-part-percent')].every(node => node.textContent === '—'));
+  assert.ok(!app.container.textContent.includes('ผลจากเสียงของฉัน'));
+  assert.equal(app.calls.length, 0);
+  close(app);
+});
+
+test('actual cached AI group scores keep their source label and never become scores for a new learner clip', async () => {
+  const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'speech-training/demo-assets/demo-data.json'), 'utf8'));
+  const [url, cached] = Object.entries(data.analyses).find(([_url, item]) => item.reference.text === 'This is a leaf.');
+  const bytes = fs.readFileSync(path.resolve(__dirname, '..', url));
+  let app;
+  app = setup({ url: 'https://example.test/prefix/app/index.html', reference: cached.reference,
+    mount: { audioSources: [{ label: 'A', url }] }, globals: { EGL_DEMO_DATA: data },
+    fetch: async (requested, init) => {
+      assert.equal(requested, new URL(url, app.win.document.baseURI).href);
+      assert.equal(init.method, undefined, 'only the bundled AI audio may be fetched');
+      return { ok: true, headers: { get: () => String(bytes.length) }, blob: async () => new app.win.Blob([bytes], { type: 'audio/wav' }) };
+    },
+  });
+  app.button('วิเคราะห์เสียง A').click(); await flush(); await flush();
+  [...app.container.querySelectorAll('.egl-ph-compare')].find(node => node.querySelector('.egl-ph-token').textContent === 'leaf').click();
+  const ai = app.container.querySelector('.egl-ph-inspector .egl-ph-spelling');
+  assert.equal(ai.querySelector('.egl-ph-feedback-source').textContent, 'ผลจากเสียงตัวอย่าง AI');
+  assert.match(app.container.querySelector('.egl-ph-demo-result').textContent, /ไม่ใช่ผลจากเสียงที่คุณบันทึก/);
+  assert.ok(partPercentages(ai).some(value => value !== '—'));
+  app.button('เสียงของฉัน').click(); selectFile(app);
+  const own = selectWord(app, 'leaf');
+  assert.deepEqual(partPercentages(own), ['—', '—', '—']);
+  assert.equal(own.querySelector('.egl-ph-feedback-source').textContent, 'ยังไม่ได้วิเคราะห์เสียง');
+  assert.equal(app.container.querySelector('.egl-ph-demo-result'), null);
+  assert.equal(app.calls.length, 1);
   close(app);
 });

@@ -245,6 +245,7 @@ def build(baseline_path: Path, candidate_path: Path, result_path: Path, output: 
 <script src="__STUDY_HELP_JS__"></script>
 <script src="__BROWSER_PHONETICS_JS__"></script>
 <script src="__SPELLING_GUIDE_JS__"></script>
+<script src="__SPELLING_FEEDBACK_JS__"></script>
 <script src="__WORD_AUDIO_JS__"></script>
 <script src="__PHONETICS_JS__"></script>
 <script>
@@ -328,6 +329,7 @@ renderList();renderCurrent();updateProgress();
             .replace("__STUDY_HELP_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/study-help.js", output), quote=True))
             .replace("__BROWSER_PHONETICS_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/browser-phonetics.js", output), quote=True))
             .replace("__SPELLING_GUIDE_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/spelling-guide.js", output), quote=True))
+            .replace("__SPELLING_FEEDBACK_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/spelling-feedback.js", output), quote=True))
             .replace("__WORD_AUDIO_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/word-audio.js", output), quote=True))
             .replace("__PHONETICS_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/phonetics.js", output), quote=True)))
 

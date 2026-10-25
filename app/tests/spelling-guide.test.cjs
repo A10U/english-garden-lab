@@ -62,6 +62,14 @@ test('silent letters are visible without invented phonemes', () => {
   assert.doesNotMatch(guide.forWord('have', ['h', 'æ', 'v']).note, /สระกับ e/);
 });
 
+test('its contraction retains the apostrophe without inventing an extra sound', () => {
+  const phones = ['ɪ', 't', 's'];
+  const result = guide.forWord("It's", phones);
+  complete(result, "It's", phones);
+  assert.deepEqual(result.groups.map(group => group.letters), ['I', 't', "'s"]);
+  complete(guide.forWord('its', phones), 'its', phones);
+});
+
 test('composite rhotic and syllabic phone tokens stay intact and map once', () => {
   for (const phones of [['ɡ', 'ɑːɹ', 'd', 'ə', 'n'], ['ɡ', 'ɑː', 'ɹ', 'd', 'ə', 'n'], ['ɡ', 'ɑː', 'd', 'ə', 'n']]) {
     const result = guide.forWord('garden', phones);

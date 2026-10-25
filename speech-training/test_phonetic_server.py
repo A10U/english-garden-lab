@@ -130,7 +130,7 @@ class PhoneticAPITests(unittest.TestCase):
             (public / 'demo-data.json').write_text('{"schema_version": 1, "pairs": []}')
             (public / 'demo-data.js').write_text('globalThis.EGL_DEMO_DATA = {"schema_version": 1};')
             (root / 'app').mkdir()
-            for name in ['sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'word-audio.js']:
+            for name in ['sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js']:
                 (root / 'app' / name).write_text('globalThis.TEST_PUBLIC_HELPER = true;')
             self.assertFalse((root / 'speech-training/runs').exists())
             with patch.object(server, 'ROOT', root):
@@ -150,7 +150,7 @@ class PhoneticAPITests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertIn('javascript', response.headers['content-type'])
                 self.assertIn('EGL_DEMO_DATA', response.text)
-                for name in ['sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'word-audio.js']:
+                for name in ['sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js']:
                     response = self.client.get('/app/' + name)
                     self.assertEqual(response.status_code, 200)
                     self.assertIn('javascript', response.headers['content-type'])

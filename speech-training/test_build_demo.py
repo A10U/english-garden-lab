@@ -34,6 +34,7 @@ class StaticDemoBuildTests(unittest.TestCase):
 <script src="articulation-images.js" defer></script>
 <script src="browser-phonetics.js" defer></script>
 <script src="spelling-guide.js" defer></script>
+<script src="spelling-feedback.js" defer></script>
 <script src="word-audio.js" defer></script>
 <script src="phonetics.js" defer></script><script src="app.js" defer></script>
 </head><body><main>App</main></body></html>''')
@@ -54,6 +55,7 @@ class StaticDemoBuildTests(unittest.TestCase):
         (credits / 'ATTRIBUTION.json').write_text('{"images":[]}')
         (credits / 'ATTRIBUTION.md').write_text('# Articulation image credits\n')
         (app / 'spelling-guide.js').write_text('globalThis.EGLSpellingGuide={};')
+        (app / 'spelling-feedback.js').write_text('globalThis.EGLSpellingFeedback={};')
         (app / 'phone-examples.js').write_text('globalThis.OBSOLETE_PHONE_CUTS=[];')
         vendor = app / 'vendor/onnxruntime'
         shutil.copytree(Path(__file__).resolve().parent.parent / 'app/vendor/onnxruntime', vendor)
@@ -72,6 +74,7 @@ class StaticDemoBuildTests(unittest.TestCase):
 <script src="../app/articulation-images.js"></script>
 <script src="../app/browser-phonetics.js"></script>
 <script src="../app/spelling-guide.js"></script>
+<script src="../app/spelling-feedback.js"></script>
 <script src="../app/word-audio.js"></script>
 <script src="../app/phonetics.js"></script>
 <script>mount({apiBase:'http://127.0.0.1:8766'});</script></body></html>''')
@@ -115,6 +118,8 @@ class StaticDemoBuildTests(unittest.TestCase):
             self.assertLess(text.index('sound-foundations.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
             self.assertLess(text.index('spelling-guide.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
             self.assertLess(text.index('spelling-guide.js'), text.index('word-audio.js'))
+            self.assertLess(text.index('spelling-guide.js'), text.index('spelling-feedback.js'))
+            self.assertLess(text.index('spelling-feedback.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
             self.assertLess(text.index('word-audio.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
             self.assertNotIn('phone-examples.js', text)
             self.assertIn('id="egl-hosted-demo-notice"', text)
@@ -123,7 +128,7 @@ class StaticDemoBuildTests(unittest.TestCase):
             self.assertIn('318 MB', text)
             self.assertNotRegex(text, LOOPBACK_URL)
         for name in ('sound-foundations.js', 'articulation-images.js', 'assets/articulation/ATTRIBUTION.json', 'assets/articulation/ATTRIBUTION.md',
-                     'spelling-guide.js', 'word-audio.js', 'browser-phonetics.js', 'browser-phonetics-worker.js', 'browser-phoneme-model.js', 'phonetic-alignment.js',
+                     'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js', 'browser-phonetics.js', 'browser-phonetics-worker.js', 'browser-phoneme-model.js', 'phonetic-alignment.js',
                      'vendor/onnxruntime/ort.wasm.min.js', 'vendor/onnxruntime/ort-wasm-simd-threaded.mjs',
                      'vendor/onnxruntime/ort-wasm-simd-threaded.wasm', 'vendor/onnxruntime/LICENSE.txt',
                      'vendor/onnxruntime/ThirdPartyNotices.txt'):
@@ -187,6 +192,12 @@ class StaticDemoBuildTests(unittest.TestCase):
     def test_missing_spelling_guide_fails_before_writing(self):
         (self.root / 'app/spelling-guide.js').unlink()
         with self.assertRaisesRegex(ValueError, 'Missing browser phoneme runtime asset: app/spelling-guide.js'):
+            build(self.root, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_missing_spelling_feedback_fails_before_writing(self):
+        (self.root / 'app/spelling-feedback.js').unlink()
+        with self.assertRaisesRegex(ValueError, 'Missing browser phoneme runtime asset: app/spelling-feedback.js'):
             build(self.root, self.output)
         self.assertFalse(self.output.exists())
 
@@ -284,9 +295,12 @@ class StaticDemoBuildTests(unittest.TestCase):
         self.assertLess(scripts.index('articulation-images.js'), scripts.index('phonetics.js'))
         self.assertLess(scripts.index('sound-foundations.js'), scripts.index('phonetics.js'))
         self.assertLess(scripts.index('spelling-guide.js'), scripts.index('word-audio.js'))
+        self.assertLess(scripts.index('spelling-guide.js'), scripts.index('spelling-feedback.js'))
+        self.assertLess(scripts.index('spelling-feedback.js'), scripts.index('phonetics.js'))
         self.assertLess(scripts.index('word-audio.js'), scripts.index('phonetics.js'))
         self.assertNotIn('phone-examples.js', scripts)
         self.assertNotIn('__SPELLING_GUIDE_JS__', html)
+        self.assertNotIn('__SPELLING_FEEDBACK_JS__', html)
         self.assertNotIn('__WORD_AUDIO_JS__', html)
         self.assertNotIn('__SOUND_FOUNDATIONS_JS__', html)
         self.assertNotIn('__ARTICULATION_IMAGES_JS__', html)

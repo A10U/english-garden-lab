@@ -91,14 +91,24 @@
 .egl-ph-phone-missing { display: flex; align-items: center; justify-content: center; min-height: 44px; color: #859080; }
 .egl-ph-spelling { display: grid; gap: 10px; padding: 14px; border: 1px solid #cbdcc2; border-radius: 13px; background: #f5f9ef; }
 .egl-ph-spelling-groups,.egl-ph-letter-strip { display: flex; flex-wrap: wrap; gap: 8px; }
-.egl-ph-spelling-group { flex: 1 0 65px; display: grid; gap: 3px; justify-items: center; padding: 10px 14px; min-height: 72px; border: 1px solid #b9cdb0; border-radius: 11px; color: #244c37; background: #fffefa; cursor: pointer; font: inherit; }
-.egl-ph-spelling-group[aria-pressed=true] { border-color: #315f46; background: #e1edda; box-shadow: inset 0 0 0 1px #315f46; }
+.egl-ph-spelling-group { flex: 1 0 65px; display: grid; gap: 3px; justify-items: center; padding: 10px 14px; min-height: 72px; border: 1px solid var(--ph-border,#b9cdb0); border-radius: 11px; color: var(--ph-ink,#244c37); background: var(--ph-fill,#fffefa); cursor: pointer; font: inherit; }
+.egl-ph-spelling-group[aria-pressed=true] { border-color: var(--ph-tone,#315f46); box-shadow: inset 0 0 0 1px var(--ph-tone,#315f46); }
 .egl-ph-grapheme { font-size: 26px; font-weight: 650; line-height: 1.25; }
 .egl-ph-grapheme-sound { font-size: 13px; }
 .egl-ph-silent { color: #7b8274; border-style: dashed; }
 .egl-ph-silent .egl-ph-grapheme { text-decoration: underline dotted; text-underline-offset: 5px; }
 .egl-ph-spelling-detail { display: grid; gap: 10px; padding-top: 5px; }
 .egl-ph-spelling-focus { font-size: 20px; color: #31563d; }
+.egl-ph-part-percent { font-size: 18px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.egl-ph-part-counts { font-size: 11px; opacity: .8; }
+.egl-ph-part-result { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; padding: 12px; border: 1px solid var(--ph-border,#d3ddcd); border-left: 4px solid var(--ph-tone,#b5c2ad); border-radius: 10px; background: var(--ph-fill,#f5f7f1); color: var(--ph-ink,#5b6d52); }
+.egl-ph-part-result .egl-ph-part-percent { grid-row: span 2; font-size: 26px; }
+.egl-ph-part-result-label { font-size: 12px; }
+.egl-ph-part-advice { grid-column: 1/-1; font-size: 13px; margin: 6px 0 0; }
+.egl-ph-part-method { grid-column: 1/-1; margin: 0; font-size: 12px; line-height: 1.7; }
+.egl-ph-spelling-summary { display: grid; gap: 7px; padding: 12px 14px; border: 1px solid var(--ph-border,#d4decd); border-left: 4px solid var(--ph-tone,#b8c6ae); border-radius: 10px; background: var(--ph-fill,#f4f7ef); color: var(--ph-ink,#5c7051); }
+.egl-ph-feedback-source { font-size: 11px; opacity: .85; }
+.egl-ph-feedback-explainer { margin: 0; font-size: 11px; opacity: .85; }
 .egl-ph-letter-names { color: #5a7054; font-size: 12px; }
 .egl-ph-letter-names > summary { cursor: pointer; min-height: 30px; }
 .egl-ph-letter-strip { margin: 6px 0; }
