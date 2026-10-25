@@ -62,6 +62,62 @@ class PhoneticAPITests(unittest.TestCase):
             'Origin': 'null', 'Access-Control-Request-Method': 'POST'})
         self.assertEqual(response.headers.get('access-control-allow-origin'), 'null')
 
+    def test_phone_context_api_changes_only_the_reference_and_keeps_word_mode_compatible(self):
+        context = {"words": [
+            {"index": 0, "text": "a", "ipa": "ɐ", "phones": ["ɐ"]},
+            {"index": 1, "text": "leaf", "ipa": "liːf", "phones": ["l", "iː", "f"]},
+        ]}
+        acoustic = [{"phone": "f", "start": 0.1, "end": 0.3}]
+        recording = self.recording_bytes(np.full(16000, 0.05))
+        base = {"text": "leaf", "context_text": "a leaf", "context_word_index": 1}
+        with patch.object(analyzer, 'annotate_text', return_value=context), \
+                patch.object(analyzer, '_recognize', return_value=acoustic) as recognize:
+            first = self.client.post('/api/phonetics/analyze', data={**base, 'context_phone_index': 0},
+                files={'audio': ('practice.wav', recording, 'audio/wav')})
+            final = self.client.post('/api/phonetics/analyze', data={**base, 'context_phone_index': 2},
+                files={'audio': ('practice.wav', recording, 'audio/wav')})
+            whole_word = self.client.post('/api/phonetics/analyze', data=base,
+                files={'audio': ('practice.wav', recording, 'audio/wav')})
+        for response in [first, final, whole_word]:
+            self.assertEqual(response.status_code, 200, response.text[:200])
+        self.assertEqual(recognize.call_count, 3)
+        self.assertEqual(first.json()['observed'], final.json()['observed'])
+        self.assertEqual(first.json()['reference']['context'], {'text': 'a leaf', 'word_index': 1, 'phone_index': 0})
+        self.assertEqual(first.json()['reference']['reference_context'], 'phone_in_word')
+        self.assertEqual(first.json()['reference']['words'][0]['phones'], ['l'])
+        self.assertEqual(first.json()['alignment']['summary']['match_percent'], 0.0)
+        self.assertEqual(final.json()['alignment']['summary']['match_percent'], 100.0)
+        self.assertEqual(whole_word.json()['reference']['reference_context'], 'word_in_sentence')
+        self.assertEqual(whole_word.json()['reference']['words'][0]['phones'], ['l', 'iː', 'f'])
+        self.assertNotIn('phone_index', whole_word.json()['reference']['context'])
+
+    def test_phone_without_word_context_is_rejected_before_decoding(self):
+        with patch.object(server, 'decode_audio', side_effect=AssertionError('must not decode')):
+            for context in [
+                {'context_phone_index': 0},
+                {'context_text': 'a leaf', 'context_phone_index': 0},
+                {'context_word_index': 1, 'context_phone_index': 0},
+            ]:
+                with self.subTest(context=context):
+                    response = self.client.post('/api/phonetics/analyze', data={'text': 'leaf', **context},
+                        files={'audio': ('practice.wav', b'not decoded', 'audio/wav')})
+                    self.assertEqual(response.status_code, 422)
+                    self.assertIn('ต้นฉบับ', response.json()['detail'])
+
+    def test_invalid_phone_indices_and_word_mismatch_are_422_without_model_inference(self):
+        context = {'words': [{'index': 0, 'text': 'leaf', 'ipa': 'liːf', 'phones': ['l', 'iː', 'f']}]}
+        recording = self.recording_bytes(np.full(16000, 0.05))
+        base = {'text': 'leaf', 'context_text': 'leaf', 'context_word_index': 0, 'context_phone_index': 0}
+        with patch.object(analyzer, 'annotate_text', return_value=context), \
+                patch.object(analyzer, '_recognize', side_effect=AssertionError('must not infer')):
+            for change in [{'context_phone_index': -1}, {'context_phone_index': 3},
+                           {'context_phone_index': 'not-an-integer'}, {'context_phone_index': '1.5'},
+                           {'context_word_index': -1}, {'text': 'f'}]:
+                with self.subTest(change=change):
+                    response = self.client.post('/api/phonetics/analyze', data={**base, **change},
+                        files={'audio': ('practice.wav', recording, 'audio/wav')})
+                    self.assertEqual(response.status_code, 422, response.text[:200])
+
     def test_portable_demo_assets_and_ranges_work_without_old_training_runs(self):
         with tempfile.TemporaryDirectory(prefix='egl-static-demo-') as temporary:
             root = Path(temporary).resolve()
@@ -73,6 +129,9 @@ class PhoneticAPITests(unittest.TestCase):
                 (directory / 'tts-005.wav').write_bytes(audio)
             (public / 'demo-data.json').write_text('{"schema_version": 1, "pairs": []}')
             (public / 'demo-data.js').write_text('globalThis.EGL_DEMO_DATA = {"schema_version": 1};')
+            (root / 'app').mkdir()
+            for name in ['sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'word-audio.js']:
+                (root / 'app' / name).write_text('globalThis.TEST_PUBLIC_HELPER = true;')
             self.assertFalse((root / 'speech-training/runs').exists())
             with patch.object(server, 'ROOT', root):
                 for variant in ['baseline', 'candidate', 'practice']:
@@ -91,7 +150,37 @@ class PhoneticAPITests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertIn('javascript', response.headers['content-type'])
                 self.assertIn('EGL_DEMO_DATA', response.text)
+                for name in ['sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'word-audio.js']:
+                    response = self.client.get('/app/' + name)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIn('javascript', response.headers['content-type'])
                 self.assertEqual(self.client.get('/speech-training/runs/baseline-speaker/tts-005.wav').status_code, 404)
+
+    def test_standalone_word_audio_and_public_metadata_are_served_with_ranges_and_containment(self):
+        with tempfile.TemporaryDirectory(prefix='egl-word-assets-') as temporary:
+            root = Path(temporary).resolve()
+            words = root / 'speech-training/word-audio'
+            words.mkdir(parents=True)
+            audio = self.recording_bytes(np.full(6400, .1))
+            (words / 'word-valid.wav').write_bytes(audio)
+            for name, content in {'manifest.json': '{"schema_version":1}', 'ATTRIBUTION.txt': 'Standalone word credits', 'SHA256SUMS': 'Public hashes'}.items():
+                (words / name).write_text(content)
+            (words / 'private.json').write_text('{"private":true}')
+            private = root / 'private.wav'
+            private.write_bytes(audio)
+            (words / 'escape.wav').symlink_to(private)
+            with patch.object(server, 'ROOT', root):
+                response = self.client.get('/speech-training/word-audio/word-valid.wav')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content, audio)
+                ranged = self.client.get('/speech-training/word-audio/word-valid.wav', headers={'Range': 'bytes=0-15'})
+                self.assertEqual(ranged.status_code, 206)
+                self.assertEqual(ranged.content, audio[:16])
+                for name in ['manifest.json', 'ATTRIBUTION.txt', 'SHA256SUMS']:
+                    self.assertEqual(self.client.get('/speech-training/word-audio/' + name).status_code, 200)
+                for name in ['private.json', 'escape.wav', 'WORD.wav', 'nested/word-valid.wav', '../private.wav']:
+                    self.assertEqual(self.client.get('/speech-training/word-audio/' + name).status_code, 404, name)
+                self.assertEqual(self.client.get('/app/phone-examples.js').status_code, 404)
 
     def test_demo_asset_allowlist_rejects_traversal_private_files_and_symlink_escape(self):
         with tempfile.TemporaryDirectory(prefix='egl-static-boundary-') as temporary:
@@ -117,6 +206,72 @@ class PhoneticAPITests(unittest.TestCase):
                 ]:
                     with self.subTest(url=url):
                         self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_curated_articulation_images_and_attribution_are_served_from_a_fresh_root(self):
+        names = ['b', 'd', 'eth', 'f', 'g', 'i', 'ih', 'k', 'l', 'm',
+                 'n', 'ng', 'p', 's', 'sh', 't', 'theta', 'v', 'z', 'zh']
+        with tempfile.TemporaryDirectory(prefix='egl-articulation-public-') as temporary:
+            root = Path(temporary).resolve()
+            images = root / 'app/assets/articulation'
+            images.mkdir(parents=True)
+            expected = {}
+            for name in names:
+                expected[name] = ('<svg xmlns="http://www.w3.org/2000/svg"><title>'
+                                  + name + '</title></svg>').encode('utf-8')
+                (images / (name + '.svg')).write_bytes(expected[name])
+            (images / 'ATTRIBUTION.json').write_text('{"license": "CC BY-SA", "images": 20}', encoding='utf-8')
+            (images / 'ATTRIBUTION.md').write_text('# Image attribution\nLicensed educational diagrams.\n', encoding='utf-8')
+            with patch.object(server, 'ROOT', root):
+                for name in names:
+                    with self.subTest(name=name):
+                        response = self.client.get('/app/assets/articulation/' + name + '.svg')
+                        self.assertEqual(response.status_code, 200, response.text[:100])
+                        self.assertEqual(response.content, expected[name])
+                        self.assertIn('image/svg+xml', response.headers['content-type'])
+                attribution = self.client.get('/app/assets/articulation/ATTRIBUTION.json')
+                self.assertEqual(attribution.status_code, 200)
+                self.assertEqual(attribution.json(), {'license': 'CC BY-SA', 'images': 20})
+                attribution = self.client.get('/app/assets/articulation/ATTRIBUTION.md')
+                self.assertEqual(attribution.status_code, 200)
+                self.assertEqual(attribution.text, '# Image attribution\nLicensed educational diagrams.\n')
+
+    def test_articulation_allowlist_denies_unlisted_files_traversal_and_symlinks_to_private_svg(self):
+        with tempfile.TemporaryDirectory(prefix='egl-articulation-boundary-') as temporary:
+            root = Path(temporary).resolve()
+            images = root / 'app/assets/articulation'
+            images.mkdir(parents=True)
+            private = root / 'private'
+            private.mkdir()
+            secret = b'<svg xmlns="http://www.w3.org/2000/svg"><title>private-secret</title></svg>'
+            (private / 'secret.svg').write_bytes(secret)
+            (private / 'secret.json').write_text('{"private": true}', encoding='utf-8')
+            # Both targets are inside ROOT but outside the curated image folder;
+            # a root-only containment check would incorrectly expose them.
+            (images / 'p.svg').symlink_to(private / 'secret.svg')
+            (images / 'ATTRIBUTION.json').symlink_to(private / 'secret.json')
+            for filename in ['unlisted.svg', 'p.SVG', 'p.svg.json', 'ATTRIBUTION.txt', 'attribution.json']:
+                (images / filename).write_bytes(secret)
+            (images / 'nested').mkdir()
+            (images / 'nested/p.svg').write_bytes(secret)
+            with patch.object(server, 'ROOT', root):
+                for url in [
+                    '/app/assets/articulation/unlisted.svg',
+                    '/app/assets/articulation/p.SVG',
+                    '/app/assets/articulation/p.svg.json',
+                    '/app/assets/articulation/ATTRIBUTION.txt',
+                    '/app/assets/articulation/attribution.json',
+                    '/app/assets/articulation/nested/p.svg',
+                    '/app/assets/articulation/../../../private/secret.svg',
+                    '/app/assets/articulation/%2e%2e/%2e%2e/%2e%2e/private/secret.svg',
+                    '/app/assets/articulation/%2e%2e%2f%2e%2e%2f%2e%2e%2fprivate%2fsecret.svg',
+                    '/app/assets/articulation/p.svg',
+                    '/app/assets/articulation/ATTRIBUTION.json',
+                    '/private/secret.svg',
+                ]:
+                    with self.subTest(url=url):
+                        response = self.client.get(url)
+                        self.assertEqual(response.status_code, 404)
+                        self.assertNotIn(b'private-secret', response.content)
 
     @staticmethod
     def recording_bytes(audio, rate=16000):

@@ -107,6 +107,75 @@ class PhoneticEngineTests(unittest.TestCase):
                 with self.subTest(kwargs=kwargs), self.assertRaises(AnalysisError):
                     analyzer.analyze_waveform(np.full(16000, 0.05), "root", **kwargs)
 
+    def test_phone_practice_selects_one_context_phone_without_forcing_observed_audio(self):
+        analyzer = PhoneticAnalyzer()
+        context = {"words": [word("a", ["ɐ"]), word("leaf", ["l", "iː", "f"], 1)]}
+        acoustic = observed(["f"])
+        with patch.object(analyzer, "annotate_text", return_value=context), \
+                patch.object(analyzer, "_recognize", return_value=acoustic) as recognize:
+            first = analyzer.analyze_waveform(np.full(16000, 0.05), "leaf",
+                context_text="a leaf", context_word_index=1, context_phone_index=0)
+            final = analyzer.analyze_waveform(np.full(16000, 0.05), "leaf",
+                context_text="a leaf", context_word_index=1, context_phone_index=2)
+        self.assertEqual(recognize.call_count, 2)
+        self.assertEqual(first["observed"], final["observed"])
+        self.assertEqual(first["observed"]["phones"], acoustic)
+        reference = first["reference"]
+        self.assertEqual(reference["text"], "leaf")
+        self.assertEqual(reference["ipa"], "l")
+        self.assertEqual(reference["words"], [{"index": 0, "text": "leaf", "ipa": "l", "phones": ["l"]}])
+        self.assertEqual(reference["reference_context"], "phone_in_word")
+        self.assertEqual(reference["context"], {"text": "a leaf", "word_index": 1, "phone_index": 0})
+        self.assertIn("ทั้งคำ", reference["notes"][0])
+        self.assertEqual(first["alignment"]["summary"]["match_percent"], 0.0)
+        self.assertEqual(final["reference"]["words"][0]["phones"], ["f"])
+        self.assertEqual(final["alignment"]["summary"]["match_percent"], 100.0)
+
+    def test_phone_practice_keeps_affricate_units_and_counts_repeated_observations(self):
+        analyzer = PhoneticAnalyzer()
+        context = {"words": [word("chair", ["tʃ", "ɛɹ"])]}
+        with patch.object(analyzer, "annotate_text", return_value=context), \
+                patch.object(analyzer, "_recognize", side_effect=[observed(["t͡ʃ"]), observed(["t͡ʃ", "tʃ"]) ]):
+            single = analyzer.analyze_waveform(np.full(16000, 0.05), "chair",
+                context_text="chair", context_word_index=0, context_phone_index=0)
+            repeated = analyzer.analyze_waveform(np.full(16000, 0.05), "chair",
+                context_text="chair", context_word_index=0, context_phone_index=0)
+        self.assertEqual(single["reference"]["words"][0]["phones"], ["tʃ"])
+        self.assertEqual(single["alignment"]["summary"]["reference_phones"], 1)
+        self.assertEqual(single["alignment"]["summary"]["match_percent"], 100.0)
+        self.assertEqual(repeated["alignment"]["summary"]["inserted_phones"], 1)
+        self.assertEqual(repeated["alignment"]["summary"]["match_percent"], 50.0)
+
+    def test_phone_context_requires_matching_word_and_valid_phone_index_before_inference(self):
+        analyzer = PhoneticAnalyzer()
+        with patch.object(analyzer, "annotate_text", return_value={"words": [word("leaf", ["l", "iː", "f"])]}), \
+                patch.object(analyzer, "_recognize", side_effect=AssertionError("must not run")):
+            invalid = [
+                {"context_phone_index": 0},
+                {"context_text": "leaf", "context_phone_index": 0},
+                {"context_word_index": 0, "context_phone_index": 0},
+                {"context_text": "leaf", "context_word_index": -1, "context_phone_index": 0},
+                {"context_text": "leaf", "context_word_index": 0, "context_phone_index": -1},
+                {"context_text": "leaf", "context_word_index": 0, "context_phone_index": 3},
+                {"context_text": "leaf", "context_word_index": 0, "context_phone_index": 1.5},
+                {"context_text": "leaf", "context_word_index": 0, "context_phone_index": False},
+            ]
+            for kwargs in invalid:
+                with self.subTest(kwargs=kwargs), self.assertRaises(AnalysisError):
+                    analyzer.analyze_waveform(np.full(16000, 0.05), "leaf", **kwargs)
+            with self.assertRaises(AnalysisError):
+                analyzer.analyze_waveform(np.full(16000, 0.05), "f",
+                    context_text="leaf", context_word_index=0, context_phone_index=2)
+
+    def test_phone_practice_retains_audio_duration_and_silence_thresholds(self):
+        analyzer = PhoneticAnalyzer()
+        with patch.object(analyzer, "annotate_text", side_effect=AssertionError("must not run")), \
+                patch.object(analyzer, "_recognize", side_effect=AssertionError("must not run")):
+            for audio in [np.full(3200, 0.05), np.full(16 * 16000, 0.05), np.zeros(16000)]:
+                with self.subTest(samples=len(audio)), self.assertRaises(AnalysisError):
+                    analyzer.analyze_waveform(audio, "leaf", context_text="leaf",
+                        context_word_index=0, context_phone_index=0)
+
     def test_ctc_blank_preserves_separate_identical_phones(self):
         phones = decode_ctc_segments(
             [0, 4, 4, 0, 4, 5, 5, 1], {0: "<pad>", 1: "<s>", 4: "t", 5: "tʃ"},

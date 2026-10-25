@@ -180,11 +180,14 @@ async def prepare_recording(audio: UploadFile = File(...)):
 
 @app.post("/api/phonetics/analyze")
 async def analyze(audio: UploadFile = File(...), text: str = Form(...), accent: str = Form("en-us"),
-                  context_text: str | None = Form(None), context_word_index: int | None = Form(None)):
+                  context_text: str | None = Form(None), context_word_index: int | None = Form(None),
+                  context_phone_index: int | None = Form(None)):
     text = validate_text(text, accent)
     if context_text is not None:
         context_text = validate_text(context_text, accent)
     try:
+        if context_phone_index is not None and (context_text is None or context_word_index is None):
+            raise HTTPException(422, "เลือกคำและประโยคต้นฉบับให้ครบก่อนฝึกหน่วยเสียง")
         data = await audio.read(MAX_BYTES + 1)
         if not data:
             raise HTTPException(422, "ยังไม่มีไฟล์เสียงให้วิเคราะห์")
@@ -193,7 +196,8 @@ async def analyze(audio: UploadFile = File(...), text: str = Form(...), accent: 
         async with audio_lock:
             waveform = await run_in_threadpool(decode_audio, data)
             return await run_in_threadpool(analyzer.analyze_waveform, waveform, text, accent,
-                context_text=context_text, context_word_index=context_word_index)
+                context_text=context_text, context_word_index=context_word_index,
+                context_phone_index=context_phone_index)
     except AnalysisError as exc:
         raise HTTPException(422, str(exc)) from exc
     except (FileNotFoundError, RuntimeError) as exc:
@@ -215,8 +219,8 @@ def favicon():
 @app.get("/{asset:path}")
 def static_asset(asset: str):
     allowed_app = {"index.html", "app.js", "content.js", "core.js", "storage.js", "garden.js",
-        "styles.css", "phonetics.js", "phonetics.css", "phonetic-data.js", "phone-guide.js",
-        "study-help.js", "reference-audio.js", "browser-phonetics.js",
+        "styles.css", "phonetics.js", "phonetics.css", "phonetic-data.js", "phone-guide.js", "sound-foundations.js", "articulation-images.js",
+        "study-help.js", "reference-audio.js", "spelling-guide.js", "word-audio.js", "browser-phonetics.js",
         "browser-phonetics-worker.js", "browser-phoneme-model.js", "phonetic-alignment.js",
         "vendor/onnxruntime/ort.wasm.min.js", "vendor/onnxruntime/ort-wasm-simd-threaded.mjs",
         "vendor/onnxruntime/ort-wasm-simd-threaded.wasm", "vendor/onnxruntime/LICENSE.txt",
@@ -229,13 +233,25 @@ def static_asset(asset: str):
                             "speech-training/demo-assets/demo-data.js"}
     allowed_demo = allowed_demo or bool(re.fullmatch(
         r"speech-training/demo-assets/audio/(?:baseline|candidate|practice)/tts-\d{3}\.wav", asset))
-    allowed = allowed or allowed_demo
+    allowed_word = bool(re.fullmatch(
+        r"speech-training/word-audio/(?:[a-z0-9_-]+\.wav|manifest\.json|ATTRIBUTION\.txt|SHA256SUMS)", asset))
+    articulation_assets = {"b.svg", "d.svg", "eth.svg", "f.svg", "g.svg", "i.svg", "ih.svg",
+        "k.svg", "l.svg", "m.svg", "n.svg", "ng.svg", "p.svg", "s.svg", "sh.svg", "t.svg",
+        "theta.svg", "v.svg", "z.svg", "zh.svg", "ATTRIBUTION.json", "ATTRIBUTION.md"}
+    allowed_articulation = asset.startswith("app/assets/articulation/") and asset[len("app/assets/articulation/"):] in articulation_assets
+    allowed = allowed or allowed_demo or allowed_word or allowed_articulation
     if not allowed:
         raise HTTPException(404, "ไม่พบหน้านี้")
     path = (ROOT / asset).resolve()
     if not path.is_relative_to(ROOT) or not path.is_file():
         raise HTTPException(404, "ไม่พบไฟล์นี้")
     if allowed_demo and not path.is_relative_to((ROOT / "speech-training/demo-assets").resolve()):
+        raise HTTPException(404, "ไม่พบไฟล์นี้")
+    if allowed_word:
+        word_directory = ROOT / "speech-training/word-audio"
+        if word_directory.is_symlink() or not path.is_relative_to(word_directory.resolve()):
+            raise HTTPException(404, "ไม่พบไฟล์นี้")
+    if allowed_articulation and not path.is_relative_to((ROOT / "app/assets/articulation").resolve()):
         raise HTTPException(404, "ไม่พบไฟล์นี้")
     return FileResponse(path)
 

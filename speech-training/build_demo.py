@@ -18,7 +18,8 @@ from pathlib import Path
 import re
 from urllib.parse import unquote, urlsplit
 
-from export_demo_assets import assert_public, verify_export
+from export_demo_assets import assert_public, verify_export, wav_info
+from build_word_audio import filename as word_filename, normalize_word, verify_public as verify_word_audio
 
 
 MARKER = ".egl-demo-build.json"
@@ -37,11 +38,15 @@ CSP = '<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="con
 MODEL_REPOSITORY = "https://huggingface.co/onnx-community/wav2vec2-lv-60-espeak-cv-ft-ONNX/"
 MODEL_URL = MODEL_REPOSITORY + "resolve/c69750f5043e5e1f8a71ab95dd3b98338c280c92/onnx/model_quantized.onnx"
 BROWSER_ASSETS = (
+    "app/sound-foundations.js", "app/articulation-images.js", "app/spelling-guide.js", "app/word-audio.js",
     "app/browser-phonetics.js", "app/browser-phonetics-worker.js", "app/browser-phoneme-model.js",
     "app/phonetic-alignment.js", "app/vendor/onnxruntime/ort.wasm.min.js",
     "app/vendor/onnxruntime/ort-wasm-simd-threaded.mjs",
     "app/vendor/onnxruntime/ort-wasm-simd-threaded.wasm",
     "app/vendor/onnxruntime/LICENSE.txt", "app/vendor/onnxruntime/ThirdPartyNotices.txt",
+)
+ARTICULATION_CREDIT_ASSETS = (
+    "app/assets/articulation/ATTRIBUTION.json", "app/assets/articulation/ATTRIBUTION.md",
 )
 # Unmodified ONNX Runtime Web 1.23.2 distribution plus upstream license/notices.
 # Emscripten embeds a virtual /home/web_user and a file:// scheme detector;
@@ -57,6 +62,55 @@ VENDOR_SHA256 = {
 
 def script_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+
+
+def verified_word_assets(root: Path) -> tuple[dict[str, bytes], dict]:
+    """Copy only complete standalone recordings named by the verified manifest."""
+    directory = root / "speech-training/word-audio"
+    if not directory.is_dir() or directory.is_symlink():
+        raise ValueError("Missing or symlinked standalone word audio directory")
+    metadata = {"manifest.json", "ATTRIBUTION.txt", "SHA256SUMS"}
+    for name in metadata:
+        path = directory / name
+        if not path.is_file() or path.is_symlink():
+            raise ValueError(f"Missing or symlinked standalone word metadata: {name}")
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    assert_public(manifest, "standalone word manifest")
+    records = manifest.get("by_word")
+    if not isinstance(records, dict) or not records:
+        raise ValueError("Standalone word manifest requires at least one complete word")
+    lookup = root / "app/word-audio.js"
+    if not lookup.is_file() or lookup.is_symlink():
+        raise ValueError("Missing or symlinked standalone word lookup: app/word-audio.js")
+    assignment = re.fullmatch(
+        r"\s*(?:(?:/\*.*?\*/|//[^\n]*)\s*)*globalThis\.EGL_WORD_AUDIO\s*=\s*(\{.*\})\s*;\s*",
+        lookup.read_text(encoding="utf-8"), re.S)
+    if not assignment or json.loads(assignment[1]) != manifest:
+        raise ValueError("Standalone word lookup differs from its verified manifest")
+    for word, record in records.items():
+        if normalize_word(word) != word or not isinstance(record, dict):
+            raise ValueError("Invalid standalone word record")
+        if normalize_word(record.get("text")) != word:
+            raise ValueError("Standalone word text differs from its lookup key")
+        reference = record.get("reference")
+        words = reference.get("words") if isinstance(reference, dict) else None
+        if (not reference or reference.get("text") != record["text"] or reference.get("accent") != "en-us"
+                or reference.get("analysis_type") != "text_pronunciation_reference" or reference.get("audio_analyzed") is not False
+                or not isinstance(words, list) or len(words) != 1 or not isinstance(words[0], dict)
+                or words[0].get("index") != 0 or normalize_word(words[0].get("text")) != word
+                or not isinstance(words[0].get("phones"), list) or not words[0]["phones"]
+                or any(not isinstance(phone, str) or not phone.strip() for phone in words[0]["phones"])):
+            raise ValueError("Standalone word requires its actual isolated text-pronunciation reference")
+        path = directory / word_filename(word)
+        if not path.is_file() or path.is_symlink() or path.resolve().parent != directory.resolve():
+            raise ValueError("Standalone word audio must remain inside its public directory")
+        actual = wav_info(path.read_bytes())
+        if actual["bits_per_sample"] != 16 or actual["samples"] != record.get("samples"):
+            raise ValueError("Standalone word WAV sample data differs from its metadata")
+    verified = verify_word_audio(directory)
+    names = metadata | {word_filename(word) for word in records}
+    files = {"speech-training/word-audio/" + name: (directory / name).read_bytes() for name in sorted(names)}
+    return files, {"standalone_words": verified["words"], "standalone_audio_bytes": verified["audio_bytes"]}
 
 
 def public_trial_payload(demo: dict) -> dict:
@@ -121,13 +175,16 @@ def validate_files(files: dict[str, bytes]) -> None:
     for name in BROWSER_ASSETS:
         if name not in files:
             raise ValueError(f"Missing browser phoneme runtime asset: {name}")
+    for name in ARTICULATION_CREDIT_ASSETS:
+        if name not in files:
+            raise ValueError(f"Missing public articulation credit asset: {name}")
     for name, raw in files.items():
         if name in VENDOR_SHA256:
             if hashlib.sha256(raw).hexdigest() != VENDOR_SHA256[name]:
                 raise ValueError(f"Vendored runtime integrity check failed: {name}")
             continue
         suffix = Path(name).suffix.lower()
-        if suffix not in {".html", ".js", ".mjs", ".css", ".json", ".txt"}:
+        if suffix not in {".html", ".js", ".mjs", ".css", ".json", ".txt", ".md"}:
             continue
         text = raw.decode("utf-8")
         if PRIVATE_PATH.search(text):
@@ -175,12 +232,17 @@ def build(project_root: Path, output: Path) -> dict:
         raise ValueError("Choose a generated output directory, not a source directory")
     exported = root / "speech-training/demo-assets"
     export_summary = verify_export(exported)
+    word_files, word_summary = verified_word_assets(root)
     demo = json.loads((exported / "demo-data.json").read_text(encoding="utf-8"))
     files = {"index.html": (root / "index.html").read_bytes(), ".nojekyll": b""}
+    files.update(word_files)
     app_source = root / "app"
     for path in sorted(app_source.rglob("*")):
         relative = path.relative_to(app_source)
-        if not path.is_file() or path.suffix.lower() not in RUNTIME_SUFFIXES:
+        if relative.as_posix() == "phone-examples.js":
+            continue
+        public_credit = "app/" + relative.as_posix() in ARTICULATION_CREDIT_ASSETS
+        if not path.is_file() or (path.suffix.lower() not in RUNTIME_SUFFIXES and not public_credit):
             continue
         if path.suffix.lower() == ".txt" and relative.parts[:2] != ("vendor", "onnxruntime"):
             continue
@@ -236,7 +298,7 @@ def build(project_root: Path, output: Path) -> dict:
         name: hashlib.sha256(content).hexdigest() for name, content in sorted(files.items())}}
     (output / MARKER).write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     verify_export(output / "speech-training/demo-assets")
-    return {"mode": "demo", "files": len(files) + 1, "bytes": sum(map(len, files.values())), **export_summary}
+    return {"mode": "demo", "files": len(files) + 1, "bytes": sum(map(len, files.values())), **export_summary, **word_summary}
 
 
 def main() -> None:

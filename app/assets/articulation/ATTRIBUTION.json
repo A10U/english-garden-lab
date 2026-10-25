@@ -1,0 +1,399 @@
+{
+  "schema_version": 1,
+  "notes": "Unmodified published schematic articulation diagrams, not learner measurements. Thai captions are separate project-authored text. The i diagram describes tongue position for iː and does not encode vowel duration; the lateral-l figure compares two l configurations.",
+  "assets": [
+    {
+      "phone": "f",
+      "filename": "f.svg",
+      "title": "Voiceless labiodental fricative articulation.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiceless_labiodental_fricative_articulation.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/8/8b/Voiceless_labiodental_fricative_articulation.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3094,
+      "sha256": "a9d766d8d836dd0028895f6300bbab59521ea04e2aa1d97284680b38f57be458",
+      "commonsSHA1": "52f097dc542319987fc91232320eb07b7ab26a55",
+      "commonsTimestamp": "2020-03-31T22:17:39Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiceless labiodental fricative [f]."
+    },
+    {
+      "phone": "v",
+      "filename": "v.svg",
+      "title": "Voiced labiodental fricative articulation.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_labiodental_fricative_articulation.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Voiced_labiodental_fricative_articulation.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3314,
+      "sha256": "5bdefd22bb42b5ffc270172cebd4c490460c2c953aa4af51b07b91d1cf5399a5",
+      "commonsSHA1": "f8588e046a86192be7656a21aa851d463c6d5d72",
+      "commonsTimestamp": "2020-03-31T22:18:37Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced labiodental fricative [v]."
+    },
+    {
+      "phone": "l",
+      "filename": "l.svg",
+      "title": "Lateral-l-variation.svg",
+      "author": "Tavin",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Lateral-l-variation.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/4/40/Lateral-l-variation.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY 3.0",
+      "licenseURL": "https://creativecommons.org/licenses/by/3.0",
+      "changes": "unmodified",
+      "bytes": 41560,
+      "sha256": "1c8cb58d6e00250c2ee86fae71c98cbc79223320632406d7b14505e38ccdb1f9",
+      "commonsSHA1": "22ac0558598005d691a2e8a22216365d7f2d7e4b",
+      "commonsTimestamp": "2011-11-15T23:19:33Z",
+      "description": "schematic diagram of the lateral l"
+    },
+    {
+      "phone": "iː",
+      "filename": "i.svg",
+      "title": "IPA i Sagittal Section.svg",
+      "author": "Richard Wright, Dan McCloy",
+      "authorURLs": [],
+      "source": "https://commons.wikimedia.org/wiki/File:IPA_i_Sagittal_Section.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/5/57/IPA_i_Sagittal_Section.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC0",
+      "licenseURL": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "changes": "unmodified",
+      "bytes": 15781,
+      "sha256": "4a1d2b3e2abd6da8afe02c74701d70851048720412d204654d475ebcc2d9e96d",
+      "commonsSHA1": "e72fa245b8e3451d821f223f8bcd5f7691cf99d2",
+      "commonsTimestamp": "2024-06-14T03:53:59Z",
+      "description": "Sagittal section of a vocal tract pronouncing the IPA sound i. Note that a wavy w:glottis in this diagram indicates a voiced sound."
+    },
+    {
+      "phone": "ɪ",
+      "filename": "ih.svg",
+      "title": "IPA Ɪ Sagittal Section.svg",
+      "author": "Richard Wright, Dan McCloy",
+      "authorURLs": [],
+      "source": "https://commons.wikimedia.org/wiki/File:IPA_%EA%9E%AE_Sagittal_Section.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/2/2c/IPA_%EA%9E%AE_Sagittal_Section.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC0",
+      "licenseURL": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "changes": "unmodified",
+      "bytes": 15810,
+      "sha256": "1285ca99626c7d9ccde4311fb5e6d3c39d4498de4bf0dab51288737c960b96a4",
+      "commonsSHA1": "f1ee074cc35f7c3bf5585828bfcc636642004fba",
+      "commonsTimestamp": "2024-06-14T03:54:01Z",
+      "description": "Sagittal section of a vocal tract pronouncing the IPA sound Ɪ. Note that a wavy w:glottis in this diagram indicates a voiced sound."
+    },
+    {
+      "phone": "s",
+      "filename": "s.svg",
+      "title": "Voiceless alveolar fricative articulation.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiceless_alveolar_fricative_articulation.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/c/c9/Voiceless_alveolar_fricative_articulation.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3173,
+      "sha256": "3e4cb01401be4363b6a2f1753723376d540fd157419f4f68fa5191278955b99a",
+      "commonsSHA1": "f55b009683da8e689ad05bc525e4d473242a2e75",
+      "commonsTimestamp": "2020-03-31T22:22:37Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiceless alveolar fricative [s]."
+    },
+    {
+      "phone": "z",
+      "filename": "z.svg",
+      "title": "Voiced alveolar fricative.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_alveolar_fricative.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/1/18/Voiced_alveolar_fricative.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3393,
+      "sha256": "31f24c18fb9f4b225942c8591432b29adb3e807fd1436113bd43677f790b0849",
+      "commonsSHA1": "c6b781daecdc62651be5cd2190c75acafbc28bbf",
+      "commonsTimestamp": "2020-03-31T22:23:15Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced alveolar fricative [z]."
+    },
+    {
+      "phone": "θ",
+      "filename": "theta.svg",
+      "title": "Voiceless dental fricative articulation.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiceless_dental_fricative_articulation.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/5/57/Voiceless_dental_fricative_articulation.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3090,
+      "sha256": "b2fa936e01d5067192cb69ed93f2148ac7f237eb17774dfbccb519f7f0a3689a",
+      "commonsSHA1": "cb139f11cd291cbc142ced7cdc38e3c9add54d91",
+      "commonsTimestamp": "2020-03-31T22:19:25Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiceless dental fricative [θ]."
+    },
+    {
+      "phone": "ð",
+      "filename": "eth.svg",
+      "title": "Voiced dental fricative articulation.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_dental_fricative_articulation.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/c/c8/Voiced_dental_fricative_articulation.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3310,
+      "sha256": "972522ad659bf7c3adf2f15765f3efd02018978d630cdca4fa248502d252ff9e",
+      "commonsSHA1": "851bbc731e1db118d70b78c54d8b47205a5a3dd2",
+      "commonsTimestamp": "2020-03-31T22:19:59Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced dental fricative [ð]."
+    },
+    {
+      "phone": "n",
+      "filename": "n.svg",
+      "title": "Voiced alveolar nasal.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_alveolar_nasal.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/0/07/Voiced_alveolar_nasal.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3185,
+      "sha256": "b8373b8216c4c7dbd5d3e2192c31689d0c4f8059b29d2261c6fd2aa6b275f1df",
+      "commonsSHA1": "ea588bd08fc0258ba45291fe32362dfba4da9da4",
+      "commonsTimestamp": "2019-05-29T22:20:18Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced alveolar nasal [n]."
+    },
+    {
+      "phone": "m",
+      "filename": "m.svg",
+      "title": "Voiced bilabial nasal.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_bilabial_nasal.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Voiced_bilabial_nasal.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3144,
+      "sha256": "ca205d092fa98509d5493df6ba58f5d598f37285dd2f2598fd3a51117bed6d20",
+      "commonsSHA1": "edaa4cbc56863e2428741884d99bea7d3e488356",
+      "commonsTimestamp": "2019-05-29T22:05:02Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced bilabial nasal [m]."
+    },
+    {
+      "phone": "p",
+      "filename": "p.svg",
+      "title": "Voiceless bilabial plosive.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiceless_bilabial_plosive.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/3/3f/Voiceless_bilabial_plosive.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3224,
+      "sha256": "baa1a4cdb84faf437c2771da916e3d37b12a964a508d2dc28e0cb66d3f04ca59",
+      "commonsSHA1": "bb5c739ae3fe246f366550cbb8cc8803e5d109f2",
+      "commonsTimestamp": "2019-05-29T22:07:04Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiceless bilabial plosive [p]."
+    },
+    {
+      "phone": "b",
+      "filename": "b.svg",
+      "title": "Voiced bilabial plosive.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_bilabial_plosive.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/d/dd/Voiced_bilabial_plosive.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3444,
+      "sha256": "92617fbae402d25b0e4f0ec55e2a9381b6e258c70031c1586d61eb0f5da11f2d",
+      "commonsSHA1": "29fb839bc87a153194063d5c0d4ebaba16416a9f",
+      "commonsTimestamp": "2019-05-29T22:07:34Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced bilabial plosive [b]."
+    },
+    {
+      "phone": "t",
+      "filename": "t.svg",
+      "title": "Voiceless alveolar plosive.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiceless_alveolar_plosive.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/3/33/Voiceless_alveolar_plosive.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3134,
+      "sha256": "a20170ede87e37c0bcb034839e10c2122b549f1716518c7fbbdcd7f3de9f955a",
+      "commonsSHA1": "9144e43633f2ba83f501a78f30d9287f81dd0287",
+      "commonsTimestamp": "2019-05-29T22:20:41Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiceless alveolar plosive [t]."
+    },
+    {
+      "phone": "d",
+      "filename": "d.svg",
+      "title": "Voiced alveolar plosive.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_alveolar_plosive.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/6/62/Voiced_alveolar_plosive.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3354,
+      "sha256": "b213343373d17aff2b3d77bcaf0277a1d0972ae852c1a2c9c05f5bbf54151e19",
+      "commonsSHA1": "a8ff9946225d43df7293766afd685378d1097c3d",
+      "commonsTimestamp": "2019-05-29T22:20:58Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced alveolar plosive [d]."
+    },
+    {
+      "phone": "k",
+      "filename": "k.svg",
+      "title": "Voiceless velar plosive.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiceless_velar_plosive.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/c/ce/Voiceless_velar_plosive.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3169,
+      "sha256": "bda5279cb8c193fbac0ff8e3ce2b7553b71e81294f4541a69c333ff9d3c8a6d3",
+      "commonsSHA1": "746d79757160b9d6345fdba3a4bc138cbc8d3588",
+      "commonsTimestamp": "2019-05-29T22:30:29Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiceless velar plosive [k]."
+    },
+    {
+      "phone": "ɡ",
+      "filename": "g.svg",
+      "title": "Voiced velar plosive.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_velar_plosive.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Voiced_velar_plosive.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3389,
+      "sha256": "f57e871cdaff77cf2e3b427a36f90a726a0d026de5574c8670a1b654afdde8ab",
+      "commonsSHA1": "9e29557e7869d47515d3c97fafe82a0f7f3e4d17",
+      "commonsTimestamp": "2019-05-29T22:30:49Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced velar plosive [ɡ]."
+    },
+    {
+      "phone": "ŋ",
+      "filename": "ng.svg",
+      "title": "Voiced velar nasal.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_velar_nasal.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/0/06/Voiced_velar_nasal.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3266,
+      "sha256": "8262ad89cadfa3447f5796d884e32b9d738a2aed1db9f6d0c2016b795a99f3d6",
+      "commonsSHA1": "33cb3333a6f7ed50fd7a8a99fcc6a44c9055653d",
+      "commonsTimestamp": "2019-05-29T22:30:11Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced velar nasal [ŋ]."
+    },
+    {
+      "phone": "ʃ",
+      "filename": "sh.svg",
+      "title": "Voiceless palato-alveolar fricative articulation.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiceless_palato-alveolar_fricative_articulation.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Voiceless_palato-alveolar_fricative_articulation.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3091,
+      "sha256": "0f22bdb9c0cfd4b86f9d02176a8b30440a46345d338194d3eb9a45b237582f37",
+      "commonsSHA1": "d63ea047c6453e4b3e96be124fe29e3267965b02",
+      "commonsTimestamp": "2020-03-31T22:42:26Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiceless palato-alveolar fricative [ʃ]."
+    },
+    {
+      "phone": "ʒ",
+      "filename": "zh.svg",
+      "title": "Voiced palato-alveolar fricative articulation.svg",
+      "author": "Tavin, Nardog",
+      "authorURLs": [
+        "https://commons.wikimedia.org/wiki/User:Tavin",
+        "https://commons.wikimedia.org/w/index.php?title=User:Nardog&action=edit&redlink=1"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/File:Voiced_palato-alveolar_fricative_articulation.svg",
+      "originalURL": "https://upload.wikimedia.org/wikipedia/commons/0/03/Voiced_palato-alveolar_fricative_articulation.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0",
+      "changes": "unmodified",
+      "bytes": 3311,
+      "sha256": "18c4c2754b22f7e852cbcc8afcc245aed8884f324279660d25be0ac60fd503b8",
+      "commonsSHA1": "f5f2812220b8da2e56e8c8e59d4d440aafd83f39",
+      "commonsTimestamp": "2020-03-31T22:42:51Z",
+      "description": "A schematic mid-sagittal section of an articulation of a voiced palato-alveolar fricative [ʒ]."
+    }
+  ]
+}

@@ -351,13 +351,14 @@ class PhoneticAnalyzer:
             )
 
     def analyze_waveform(self, waveform16k: Any, text: str, accent: str = "en-us", *,
-                         context_text: str | None = None, context_word_index: int | None = None) -> dict:
+                         context_text: str | None = None, context_word_index: int | None = None,
+                         context_phone_index: int | None = None) -> dict:
         audio, metrics = waveform_metrics(waveform16k)
-        if context_text is not None or context_word_index is not None:
+        if context_text is not None or context_word_index is not None or context_phone_index is not None:
             if context_text is None or context_word_index is None:
                 raise AnalysisError("เลือกคำและประโยคต้นฉบับให้ครบก่อนฝึกคำนี้")
             context = self.annotate_text(context_text, accent)
-            if not 0 <= context_word_index < len(context["words"]):
+            if isinstance(context_word_index, bool) or not isinstance(context_word_index, int) or not 0 <= context_word_index < len(context["words"]):
                 raise AnalysisError("ไม่พบคำที่เลือกในประโยคต้นฉบับ")
             selected = context["words"][context_word_index]
             normalized = lambda value: value.strip().casefold().replace("’", "'")
@@ -371,6 +372,22 @@ class PhoneticAnalyzer:
                 "context": {"text": context_text, "word_index": context_word_index},
                 "notes": ["ใช้คำอ่านตามตำแหน่งในประโยคเดิม รวมรูปเสียงเบาของคำสั้น ๆ"],
             }
+            if context_phone_index is not None:
+                if isinstance(context_phone_index, bool) or not isinstance(context_phone_index, int) or not 0 <= context_phone_index < len(selected["phones"]):
+                    raise AnalysisError("ไม่พบหน่วยเสียงที่เลือกในคำนี้")
+                phone = selected["phones"][context_phone_index]
+                reference.update({
+                    "ipa": phone,
+                    "words": [{"index": 0, "text": selected["text"], "ipa": phone, "phones": [phone]}],
+                    "reference_context": "phone_in_word",
+                    "context": {"text": context_text, "word_index": context_word_index,
+                                "phone_index": context_phone_index},
+                    "notes": [
+                        "ฝึกหน่วยเสียงที่เลือกแยกจากคำ ไม่ใช่คะแนนการออกเสียงทั้งคำ",
+                        "เสียงสั้นอาจตรวจจับยาก ลองยืดเสียงที่ยืดได้หรือออกเสียงซ้ำ ให้คลิปยาวอย่างน้อย 0.3 วินาที",
+                        "เสียงที่ออกซ้ำอาจถูกนับเป็นเสียงเพิ่ม ใช้ผลนี้หาจุดฝึก ไม่ใช่เกรด",
+                    ],
+                })
         else:
             reference = self.annotate_text(text, accent)
         try:

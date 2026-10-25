@@ -2,6 +2,7 @@
 (function (global) {
   'use strict';
   const MAX_BYTES = 10 * 1024 * 1024;
+  const runtimeScriptURL = global.document && global.document.currentScript && global.document.currentScript.src;
   let nextId = 0;
 
   function validPercent(value) {
@@ -127,12 +128,12 @@
     let disposed = false, version = 0, controller = null, busy = false, browserRequest = false;
     let stream = null, recorder = null, recording = false, requestingMic = false, preparing = false;
     let prepareController = null, decodeContext = null;
-    let recordingVersion = 0, recordTimer = null, playbackTimer = null, playbackEnd = null;
+    let recordingVersion = 0, recordTimer = null;
     let clip = null, clipLabel = '', clipURL = null, clipKind = '', clipInfo = null, reference = null;
     let mode = 'own', analysisData = null, wordItems = [], selectedIndex = null, slow = false;
-    let practiceWord = null, sentenceResult = null, referenceFocus = null, inspector = null;
-    let exampleEnd = null, exampleTimer = null, localUtterance = null, exampleVersion = 0, playbackVersion = 0;
-    const listeners = [], referenceListeners = [], observedListeners = [], inspectorListeners = [], objectURLs = new Set();
+    let practiceWord = null, practicePhone = null, sentenceResult = null, referenceFocus = null, inspector = null;
+    let localUtterance = null, exampleVersion = 0, diagramSequence = 0;
+    const listeners = [], referenceListeners = [], observedListeners = [], inspectorListeners = [], soundListeners = [], objectURLs = new Set();
     const sourceButtons = [], listenButtons = [];
 
     function el(tag, className, text) {
@@ -207,7 +208,7 @@
       cancelRequest();
       stopCapture();
       reference = null;
-      practiceWord = null; sentenceResult = null; stopExample(); clearClip();
+      practiceWord = null; practicePhone = null; sentenceResult = null; stopExample(); clearClip();
       referenceListeners.splice(0).forEach(remove => remove());
       phrase.textContent = textarea.value.trim() || 'ใส่ข้อความภาษาอังกฤษใน “แก้ข้อความ / สำเนียง”';
       updateStudyHelp(); updateTarget();
@@ -392,7 +393,7 @@
     function changeMode(nextMode) {
       if (mode === nextMode) return;
       cancelRequest(); stopCapture(); stopExample(); clearClip();
-      if (nextMode === 'ai' && practiceWord) { practiceWord = null; updateTarget(); }
+      if (nextMode === 'ai' && practiceWord) { practiceWord = null; practicePhone = null; updateTarget(); }
       mode = nextMode; updateButtons();
       setStatus(mode === 'own' ? 'บันทึกสั้น ๆ หรือเลือกไฟล์ แล้วกด “ดูผลเสียงของฉัน”' : 'เลือกเสียง AI ที่ต้องการเปรียบเทียบ');
     }
@@ -415,13 +416,25 @@
       form.append('audio', blob, 'speech.' + extension);
       form.append('text', values.text);
       form.append('accent', values.accent);
-      if (practiceWord && Number.isInteger(practiceWord.index) && practiceWord.index >= 0) {
-        form.append('context_text', textarea.value.trim());
-        form.append('context_word_index', String(practiceWord.index));
+      if (practiceWord && Number.isInteger(practiceWord.index) && practiceWord.index >= 0 && (!practiceWord.isolated || practicePhone)) {
+        form.append('context_text', practiceWord.isolated ? values.text : textarea.value.trim());
+        form.append('context_word_index', String(practiceWord.isolated ? 0 : practiceWord.index));
+        if (practicePhone) form.append('context_phone_index', String(practicePhone.index));
       }
       return jsonResponse(await win.fetch(apiBase + '/api/phonetics/analyze', { method: 'POST', body: form, signal: signal }));
     }
     function browserReference(values) {
+      if (practiceWord && practiceWord.isolated) {
+        const isolated = practiceWord.targetReference || isolatedReference(values.text);
+        if (!isolated || isolated.accent !== values.accent) throw friendly('ยังไม่มีคำอ่านของคำเดี่ยวนี้ในสำเนียงที่เลือก ลองใช้คำตัวอย่างและสำเนียง US ครับ');
+        if (!practicePhone) return isolated;
+        const phone = isolated.words[0].phones[practicePhone.index];
+        if (!phone || phone !== practicePhone.phone) throw friendly('เสียงที่เลือกไม่ตรงกับคำอ่านของคำเดี่ยว เลือกเสียงใหม่ครับ');
+        return { ...isolated, ipa: phone, words: [{ ...isolated.words[0], ipa: phone, phones: [phone] }],
+          reference_context: 'phone_in_word', context: { text: values.text, word_index: 0, phone_index: practicePhone.index },
+          notes: ['ฝึกหน่วยเสียงเดียวในคำเดี่ยว ไม่ใช่ผลการออกเสียงทั้งคำ'],
+        };
+      }
       const originalText = textarea.value.trim();
       const bundled = demoData().texts && demoData().texts[originalText];
       const candidates = [reference, options.precomputed, bundled, global.EGL_PHONETIC_DATA && global.EGL_PHONETIC_DATA[originalText]];
@@ -432,6 +445,16 @@
       const normalize = text => String(text).trim().toLowerCase().replace(/’/g, "'");
       if (!selected || normalize(selected.text) !== normalize(values.text) || !Array.isArray(selected.phones) || !selected.phones.length) {
         throw friendly('ยังไม่พบคำอ่านของคำที่เลือกในประโยคเดิม กลับไปเลือกคำอีกครั้งครับ');
+      }
+      if (practicePhone) {
+        const phone = selected.phones[practicePhone.index];
+        if (!phone || phone !== practicePhone.phone) throw friendly('เสียงที่เลือกไม่ตรงกับคำอ่านเดิม เลือกเสียงใหม่อีกครั้งครับ');
+        return { text: values.text, accent: values.accent, ipa: phone,
+          words: [{ ...selected, index: 0, ipa: phone, phones: [phone] }],
+          analysis_type: 'text_pronunciation_reference', audio_analyzed: false,
+          reference_context: 'phone_in_word', context: { text: originalText, word_index: practiceWord.index, phone_index: practicePhone.index },
+          notes: ['ฝึกหน่วยเสียงเดียวในคำนี้ เป็นการทดลอง ไม่ใช่ผลการออกเสียงทั้งคำ'],
+        };
       }
       return {
         text: values.text, accent: values.accent, ipa: selected.ipa,
@@ -505,82 +528,83 @@
       const first = sources[0];
       return first ? { text, url: first.url, words: first.words || [], label: 'เสียงตัวอย่าง ' + String(first.label || 'A') } : null;
     }
-    function exampleWord(example, word) {
-      const normalize = text => String(text).toLowerCase().replace(/[^a-z']/g, '');
-      const words = Array.isArray(example.words) ? example.words : [];
-      return words.find(item => String(item.index) === String(word.index) && normalize(item.text) === normalize(word.text)) || words.find(item => normalize(item.text) === normalize(word.text));
-    }
     function stopExample() {
       exampleVersion++;
-      if (exampleTimer !== null) win.clearTimeout(exampleTimer);
-      exampleTimer = null; exampleEnd = null;
       examplePlayer.pause();
       if (localUtterance && win.speechSynthesis) { win.speechSynthesis.cancel(); localUtterance = null; }
     }
-    function armExampleStop() {
-      if (exampleTimer !== null) win.clearTimeout(exampleTimer);
-      if (exampleEnd != null) exampleTimer = win.setTimeout(stopExample, Math.max(0, exampleEnd - examplePlayer.currentTime) / (slow ? 0.75 : 1) * 1000 + 100);
+    function wordAudioFor(word) {
+      const key = wordKey(typeof word === 'string' ? word : word.text);
+      const catalog = global.EGL_WORD_AUDIO && global.EGL_WORD_AUDIO.by_word;
+      const item = catalog && Object.prototype.hasOwnProperty.call(catalog, key) ? catalog[key] : null;
+      return item && item.standalone === true && typeof item.url === 'string' && wordKey(item.text) === key ? item : null;
     }
-    function playExample(word, wholePhrase) {
-      stopPlayback(); stopExample();
-      const currentExample = exampleVersion;
-      let example = exampleForPhrase();
-      const targetWord = wholePhrase ? null : word || practiceWord;
-      let located = example && targetWord ? exampleWord(example, targetWord) : null;
-      let range = located ? rangeFor(located) : null;
-      if (targetWord && !range) {
-        for (const source of sources) {
-          if (!source || typeof source.url !== 'string') continue;
-          try { portableURL(source.url); } catch (_) { continue; }
-          const candidate = { url: source.url, words: source.words || [], label: 'เสียงตัวอย่าง ' + String(source.label || 'A') };
-          const candidateWord = exampleWord(candidate, targetWord);
-          const candidateRange = candidateWord && rangeFor(candidateWord);
-          if (candidateRange) { example = candidate; located = candidateWord; range = candidateRange; break; }
-        }
+    function isolatedReference(text) {
+      const item = wordAudioFor(text), data = item && item.reference;
+      if (!data || data.accent !== accent.value || !Array.isArray(data.words) || data.words.length !== 1 || !Array.isArray(data.words[0].phones) || !data.words[0].phones.length) return null;
+      return { ...data, text, words: [{ ...data.words[0], index: 0, text, phones: data.words[0].phones.slice() }], reference_context: 'isolated_word' };
+    }
+    function playCompleteExample(url, label) {
+      let resolved;
+      try { resolved = portableURL(url); } catch (error) { showServiceError(error); return; }
+      const current = exampleVersion;
+      const start = () => {
+        if (disposed || current !== exampleVersion) return;
+        examplePlayer.currentTime = 0;
+        examplePlayer.playbackRate = slow ? 0.75 : 1;
+      };
+      if (examplePlayer.src === resolved.href && examplePlayer.readyState >= 1) start();
+      else {
+        examplePlayer.src = resolved.href;
+        on(examplePlayer, 'loadedmetadata', () => { if (examplePlayer.src === resolved.href) start(); }, { once: true });
       }
-      if (example && example.url && (!targetWord || range)) {
-        let url;
-        try { url = portableURL(example.url); } catch (error) { showServiceError(error); return; }
-        if (!/^(https?:|file:|blob:)$/.test(url.protocol)) { setStatus('ยังเปิดเสียงตัวอย่างนี้ไม่ได้', true); return; }
-        exampleCaption.textContent = example.label || 'เสียงตัวอย่าง';
-        const seek = () => {
-          examplePlayer.currentTime = range ? range.start : 0;
-          examplePlayer.playbackRate = slow ? 0.75 : 1;
-          exampleEnd = range ? range.end : null; armExampleStop();
-        };
-        if (examplePlayer.src === url.href && examplePlayer.readyState >= 1) seek();
-        else {
-          examplePlayer.src = url.href;
-          const activeURL = url.href;
-          on(examplePlayer, 'loadedmetadata', () => { if (!disposed && currentExample === exampleVersion && examplePlayer.src === activeURL) seek(); }, { once: true });
-        }
-        const played = examplePlayer.play();
-        if (played && played.catch) played.catch(error => { if (!disposed && currentExample === exampleVersion && error.name !== 'AbortError') setStatus('เปิดเสียงตัวอย่างไม่ได้ ลองเปิดบริการเสียงในเครื่องแล้วกดฟังอีกครั้ง', true); });
-        return;
-      }
-      // This explicit fallback reads the English word, never IPA. Only an
-      // installed local English voice is eligible; no network voice is used.
+      exampleCaption.textContent = label;
+      const played = examplePlayer.play();
+      if (played && played.catch) played.catch(error => { if (!disposed && current === exampleVersion && error.name !== 'AbortError') setStatus('เปิดเสียงตัวอย่างไม่ได้ ลองโหลดหน้าใหม่แล้วกดฟังอีกครั้งครับ', true); });
+    }
+    function speakEnglish(text, label) {
       const synthesis = win.speechSynthesis;
-      const voice = synthesis && synthesis.getVoices().find(item => item.localService === true && /^en([-_]|$)/i.test(item.lang));
-      if (!voice || !win.SpeechSynthesisUtterance) { setStatus('ยังไม่มีเสียงตัวอย่างคำนี้ เปิดหน้าเรียนผ่านบริการเสียงในเครื่องหรือติดตั้งเสียงอังกฤษในเครื่องก่อน', true); return; }
-      const utterance = new win.SpeechSynthesisUtterance(targetWord ? targetWord.text : textarea.value.trim());
+      const novelty = /Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Pipe Organ|Trinoids|Whisper|Zarvox/i;
+      const voices = synthesis ? synthesis.getVoices().filter(item => item.localService === true && /^en([-_]|$)/i.test(item.lang) && !novelty.test(item.name || '')) : [];
+      const desired = accent.value.toLowerCase();
+      const voice = voices.find(item => String(item.lang).toLowerCase() === desired && /Samantha|Alex|Daniel|Serena|Microsoft|Ava|Allison/i.test(item.name || ''))
+        || voices.find(item => String(item.lang).toLowerCase() === desired) || voices[0];
+      if (!voice || !win.SpeechSynthesisUtterance) { setStatus('ยังไม่มีเสียงอ่านคำนี้ในเครื่อง ลองเลือกคำที่มีไฟล์ตัวอย่าง หรือติดตั้งเสียงอังกฤษในเครื่องก่อนครับ', true); return; }
+      const utterance = new win.SpeechSynthesisUtterance(text);
       utterance.voice = voice; utterance.lang = voice.lang; utterance.rate = slow ? 0.75 : 1;
       localUtterance = utterance;
-      utterance.onend = () => { if (localUtterance === utterance) localUtterance = null; };
-      utterance.onerror = utterance.onend;
-      exampleCaption.textContent = 'เสียงอ่านในเครื่อง';
+      utterance.onend = utterance.onerror = () => { if (localUtterance === utterance) localUtterance = null; };
+      exampleCaption.textContent = label;
       synthesis.speak(utterance);
+    }
+    function playExample(word, wholePhrase) {
+      if (recording || requestingMic || preparing) { setStatus('หยุดบันทึกเสียงก่อน แล้วค่อยฟังตัวอย่างครับ', true); return; }
+      stopPlayback(); stopExample();
+      const target = wholePhrase ? null : word || practiceWord;
+      if (target) {
+        const item = wordAudioFor(target);
+        if (item && (!item.reference || item.reference.accent === accent.value)) {
+          playCompleteExample(item.url, 'เสียงคำเดี่ยว: ' + target.text + ' · สร้างเสียงคำนี้แยกต่างหาก');
+        } else speakEnglish(target.text, 'เสียงคำเดี่ยว: ' + target.text + ' · เสียงอังกฤษในเครื่อง');
+        return;
+      }
+      const example = exampleForPhrase();
+      if (example && example.url) playCompleteExample(example.url, 'ตัวอย่างประโยคเต็ม · ' + (example.label || 'เสียง AI'));
+      else speakEnglish(textarea.value.trim(), 'เสียงอ่านประโยคเต็มในเครื่อง');
     }
     function practice(word, focusRecord) {
       cancelRequest(); stopCapture(); stopExample(); clearClip();
-      practiceWord = { index: word.index, text: word.text, phones: word.phones || [] };
+      practicePhone = null;
+      const target = isolatedReference(word.text);
+      practiceWord = { index: word.index, text: word.text, phones: target ? target.words[0].phones.slice() : word.phones || [], isolated: true, targetReference: target };
+      if (referenceFocus && !referenceFocus.hidden) referenceWord({ ...word, phones: practiceWord.phones.slice(), ipa: target ? target.ipa : word.ipa });
       mode = 'own'; updateTarget(); updateButtons();
       setStatus('พร้อมฝึกคำว่า ' + word.text + ' · กดบันทึกเมื่อพร้อม แล้วกดดูผล');
       if (focusRecord !== false) recordButton.focus();
     }
     function backToSentence() {
       cancelRequest(); stopCapture(); stopExample(); clearClip();
-      practiceWord = null; updateTarget(); updateButtons();
+      practiceWord = null; practicePhone = null; updateTarget(); updateButtons();
       if (sentenceResult) {
         const saved = sentenceResult;
         mode = saved.mode === 'ai' ? 'ai' : 'own'; updateButtons();
@@ -589,10 +613,133 @@
       } else setStatus('กลับมาฝึกทั้งประโยคแล้ว กดบันทึกเมื่อพร้อม');
     }
     function updateTarget() {
+      soundListeners.splice(0).forEach(remove => remove());
+      soundTarget.replaceChildren(); soundTarget.hidden = !practicePhone;
       targetBanner.hidden = !practiceWord;
-      targetText.textContent = practiceWord ? 'กำลังฝึกคำ: ' + practiceWord.text : '';
-      recordHint.textContent = practiceWord ? 'พูดเฉพาะคำว่า “' + practiceWord.text + '” แล้วกดหยุด' : 'พูดประโยคด้านบนให้จบ แล้วกดหยุด';
-      selectedPhrase.textContent = practiceWord ? 'กำลังฝึกคำ: ' + practiceWord.text : 'แตะคำเพื่อดูเสียงทีละส่วน';
+      targetText.textContent = practicePhone ? 'กำลังฝึกเสียง /' + practicePhone.phone + '/ · ' + (practicePhone.letters || 'ส่วนหนึ่งของ') + ' ในคำ ' + practiceWord.text : practiceWord ? 'กำลังฝึกคำ: ' + practiceWord.text : '';
+      recordHint.textContent = practicePhone ? 'ออกเสียงเฉพาะ /' + practicePhone.phone + '/ แล้วกดหยุด ไม่ต้องพูดชื่ออักษรหรือทั้งคำ' : practiceWord ? 'พูดเฉพาะคำว่า “' + practiceWord.text + '” แล้วกดหยุด' : 'พูดประโยคด้านบนให้จบ แล้วกดหยุด';
+      selectedPhrase.textContent = practicePhone ? 'ฝึกเสียง /' + practicePhone.phone + '/ ของ ' + practiceWord.text : practiceWord ? 'กำลังฝึกคำ: ' + practiceWord.text : 'แตะคำเพื่อดูเสียงทีละส่วน';
+      if (practicePhone) {
+        const word = { ...practiceWord }, selected = { ...practicePhone }, guide = el('div', 'egl-ph-guide');
+        showPhoneGuide(guide, selected.phone);
+        const actions = el('div', 'egl-ph-actions');
+        actions.append(button('ฟังเสียงตัวอย่าง /' + selected.phone + '/', () => playPhoneExample(word, selected.index), 'egl-ph-button', soundListeners),
+          button('กลับไปฝึกคำ ' + word.text, () => practice(word), 'egl-ph-button', soundListeners));
+        const next = button('ฝึกเสียงถัดไป', () => startPhonePractice(word, (selected.index + 1) % word.phones.length), 'egl-ph-button', soundListeners);
+        next.disabled = word.phones.length < 2; actions.append(next);
+        soundTarget.append(guide, actions, el('p', 'egl-ph-note', singlePhoneHint(selected.phone)));
+      }
+    }
+    function originalWord(word) {
+      const index = practiceWord ? practiceWord.index : word.index;
+      if (practiceWord && practiceWord.isolated && practiceWord.targetReference) {
+        return { ...practiceWord.targetReference.words[0], index: practiceWord.index, text: practiceWord.text };
+      }
+      const text = textarea.value.trim();
+      const choices = [reference, options.precomputed, demoData().texts && demoData().texts[text], global.EGL_PHONETIC_DATA && global.EGL_PHONETIC_DATA[text]];
+      for (const item of choices) {
+        if (!item || item.text !== text || item.accent !== accent.value || !Array.isArray(item.words)) continue;
+        const found = item.words.find(entry => String(entry.index) === String(index) && wordKey(entry.text) === wordKey(word.text));
+        if (found && Array.isArray(found.phones) && found.phones.length) return found;
+      }
+      return null;
+    }
+    function spellingFor(word) {
+      try { return global.EGLSpellingGuide && global.EGLSpellingGuide.forWord(word.text, word.phones); } catch (_) { return null; }
+    }
+    function singlePhoneHint(phone) {
+      const stop = /^(p|b|t|d|k|ɡ|g|tʃ|dʒ)$/.test(phone);
+      return (stop ? 'เสียงนี้ปล่อยสั้น ๆ อย่าเติมสระตาม หากระบบตรวจไม่พบ ให้ฝึกในคำเต็มแทน' : 'ลองค้างเสียงที่ลากได้ประมาณ 1 วินาที โดยไม่เติมสระหรือชื่ออักษร') + ' · ผลเสียงเดี่ยวเป็นการทดลอง โดยเฉพาะเสียงสั้น ระบบอาจประเมินไม่ได้ ไม่ได้แปลว่าคุณออกเสียงผิด';
+    }
+    function startPhonePractice(word, phoneIndex, letters) {
+      const source = originalWord(word);
+      if (!source || !Number.isInteger(phoneIndex) || !source.phones[phoneIndex]) { setStatus('ยังไม่พบคำอ่านของเสียงที่เลือก กลับไปเลือกคำอีกครั้งครับ', true); return; }
+      if (Array.isArray(word.phones) && word.phones[phoneIndex] !== source.phones[phoneIndex]) { setStatus('รูปเสียงเปลี่ยนจากในประโยคเป็นคำเดี่ยวแล้ว กรุณาเลือกเสียงจากช่องที่อัปเดตใหม่ครับ', true); return; }
+      const isolated = Boolean(practiceWord && practiceWord.isolated);
+      const targetReference = isolated ? practiceWord.targetReference : null;
+      cancelRequest(); stopCapture(); stopExample(); clearClip();
+      const spelling = spellingFor(source);
+      const group = spelling && spelling.available && spelling.groups.find(item => item.phoneIndices.includes(phoneIndex));
+      practiceWord = { ...source, phones: source.phones.slice(), isolated, targetReference };
+      practicePhone = { index: phoneIndex, phone: source.phones[phoneIndex], letters: letters || group && group.letters || '' };
+      mode = 'own'; updateTarget(); updateButtons();
+      setStatus('พร้อมฝึกเฉพาะเสียง /' + practicePhone.phone + '/ ของ ' + source.text + ' · ฟังตัวอย่าง แล้วกดบันทึกเมื่อพร้อม');
+      recordButton.focus();
+    }
+    function playLetterName(letter) {
+      if (recording || requestingMic || preparing) { setStatus('หยุดบันทึกเสียงก่อน แล้วค่อยฟังชื่ออักษรครับ', true); return; }
+      stopPlayback(); stopExample();
+      const synthesis = win.speechSynthesis;
+      const voice = synthesis && synthesis.getVoices().find(item => item.localService === true && /^en([-_]|$)/i.test(item.lang));
+      if (!voice || !win.SpeechSynthesisUtterance) { setStatus('ยังไม่มีเสียงอ่านชื่ออักษรในเครื่อง ติดตั้งเสียงอังกฤษก่อน หรือใช้ตัวอย่างเสียงในคำด้านล่าง', true); return; }
+      const utterance = new win.SpeechSynthesisUtterance(letter.toUpperCase());
+      utterance.voice = voice; utterance.lang = voice.lang; utterance.rate = 0.8;
+      localUtterance = utterance; utterance.onend = utterance.onerror = () => { if (localUtterance === utterance) localUtterance = null; };
+      exampleCaption.textContent = 'ชื่ออักษร ' + letter.toUpperCase() + ' ใช้สะกดคำ · ต่างจากเสียงในคำ';
+      synthesis.speak(utterance);
+    }
+    function playPhoneExample(word, phoneIndex) {
+      if (recording || requestingMic || preparing) { setStatus('หยุดบันทึกเสียงก่อน แล้วค่อยฟังตัวอย่างครับ', true); return; }
+      const source = originalWord(word);
+      if (!source || !source.phones[phoneIndex]) return;
+      const phone = source.phones[phoneIndex], isolated = isolatedReference(source.text);
+      // Weak forms can differ from a separately spoken word. Keep the whole
+      // sentence as the example in that case, without inventing a phone cut.
+      if (isolated && !isolated.words[0].phones.includes(phone)) {
+        playExample(null, true);
+        exampleCaption.textContent = 'ฟัง /' + phone + '/ ในประโยคเต็ม · คำเดี่ยว ' + source.text + ' ใช้รูปเต็ม /' + isolated.ipa + '/ ซึ่งอาจต่างจากรูปเบาในประโยค';
+      } else {
+        playExample(source);
+        exampleCaption.textContent += ' · ฟังเสียง /' + phone + '/ ภายในคำเต็มนี้';
+      }
+    }
+    function spellingSection(word, bucket) {
+      const source = originalWord(word);
+      if (!source) return null;
+      const section = el('section', 'egl-ph-spelling');
+      section.setAttribute('aria-label', 'แยกตัวสะกดและฝึกเสียงของ ' + source.text);
+      section.append(el('h4', 'egl-ph-heading', 'แกะตัวสะกด · ' + source.text), el('p', 'egl-ph-note', 'ตัวอักษรกับเสียงไม่จำเป็นต้องมีจำนวนเท่ากัน แตะส่วนตัวสะกดเพื่อฟังและฝึก'));
+      const alphabet = el('details', 'egl-ph-letter-names');
+      alphabet.append(el('summary', '', 'ชื่ออักษรที่ใช้สะกด ' + source.text.toUpperCase().split('').join('–')));
+      const letters = el('div', 'egl-ph-letter-strip');
+      [...source.text].filter(letter => /[a-z]/i.test(letter)).forEach(letter => {
+        const name = button(letter.toUpperCase(), () => playLetterName(letter), 'egl-ph-letter-name', bucket);
+        name.setAttribute('aria-label', 'ฟังชื่ออักษร ' + letter.toUpperCase()); letters.append(name);
+      });
+      alphabet.append(letters, el('p', 'egl-ph-note', 'ส่วนนี้อ่านชื่ออักษรเพื่อสะกดคำ ไม่ใช่ตัวอย่างเสียงที่ตัวอักษรทำในคำ'));
+      section.append(alphabet);
+      const spelling = spellingFor(source);
+      const groups = spelling && spelling.available ? spelling.groups : source.phones.map((phone, index) => ({ letters: '', phoneIndices: [index], phones: [phone], silent: false }));
+      if (!spelling || !spelling.available) section.append(el('p', 'egl-ph-note', 'คำนี้ยังไม่ได้ตรวจการจับคู่ตัวสะกดกับเสียง จึงแสดงหน่วยเสียงให้ฝึกโดยไม่เดาว่าตัวอักษรใดออกเสียงอะไร'));
+      const strip = el('div', 'egl-ph-spelling-groups'), panel = el('div', 'egl-ph-spelling-detail'), buttons = [], detailListeners = [];
+      bucket.push(() => detailListeners.splice(0).forEach(remove => remove()));
+      function choose(group, phoneIndex) {
+        detailListeners.splice(0).forEach(remove => remove());
+        buttons.forEach(item => item.node.setAttribute('aria-pressed', String(item.group === group)));
+        panel.replaceChildren();
+        if (group.silent) { panel.append(el('strong', '', 'ตัวสะกด ' + group.letters + ' ไม่ออกเสียงแยกในคำนี้'), el('p', 'egl-ph-note', 'ไม่ต้องเติมเสียงให้ตัวอักษรนี้ ลองฟังคำเต็มเพื่อเชื่อมเสียงเข้าด้วยกัน')); return; }
+        const index = phoneIndex == null ? group.phoneIndices[0] : phoneIndex, phone = source.phones[index];
+        panel.append(el('strong', 'egl-ph-spelling-focus', (group.letters ? group.letters + ' → ' : '') + '/' + phone + '/'));
+        if (group.phoneIndices.length > 1) {
+          const parts = el('div', 'egl-ph-actions');
+          group.phoneIndices.forEach(at => parts.append(button('/' + source.phones[at] + '/', () => choose(group, at), 'egl-ph-button', detailListeners)));
+          panel.append(parts);
+        }
+        const guide = el('div', 'egl-ph-guide'); showPhoneGuide(guide, phone); panel.append(guide);
+        const actions = el('div', 'egl-ph-actions');
+        actions.append(button('ฟังเสียง /' + phone + '/ ในคำ', () => playPhoneExample(source, index), 'egl-ph-button', detailListeners),
+          button('ฝึกเฉพาะเสียง /' + phone + '/', () => startPhonePractice(source, index, group.letters), 'egl-ph-button egl-ph-primary', detailListeners),
+          button('ฟังรวมเป็นคำ', () => playExample(source), 'egl-ph-button', detailListeners));
+        panel.append(actions, el('p', 'egl-ph-note', singlePhoneHint(phone)));
+      }
+      groups.forEach(group => {
+        const node = button('', () => choose(group), 'egl-ph-spelling-group' + (group.silent ? ' egl-ph-silent' : ''), bucket);
+        node.append(el('strong', 'egl-ph-grapheme', group.letters || group.phones.join(' ')), el('span', 'egl-ph-grapheme-sound', group.silent ? 'ไม่ออกเสียง' : '/' + group.phones.join(' ') + '/'));
+        node.setAttribute('aria-pressed', 'false'); strip.append(node); buttons.push({ node, group });
+      });
+      section.append(strip, panel);
+      if (groups.length) choose(groups[0]);
+      return section;
     }
     function updateStudyHelp() {
       translation.textContent = ''; translation.hidden = true; chunks.replaceChildren(); chunks.hidden = true;
@@ -616,6 +763,101 @@
       if (explanation) holder.append(el('p', 'egl-ph-note', explanation));
       if (guide.tip) holder.append(el('p', 'egl-ph-guide-tip', guide.tip));
       if (guide.example) holder.append(el('p', 'egl-ph-note', 'ตัวอย่าง: ' + guide.example));
+      let foundation;
+      try { foundation = global.EGLSoundFoundations && global.EGLSoundFoundations.describe(phone); } catch (_) {}
+      if (foundation && foundation.known) holder.append(soundFoundation(foundation));
+    }
+    function mouthDiagram(foundation) {
+      const visual = foundation.visual || {}, namespace = 'http://www.w3.org/2000/svg';
+      function node(tag, attrs, text) {
+        const item = doc.createElementNS(namespace, tag);
+        Object.entries(attrs || {}).forEach(([key, value]) => item.setAttribute(key, String(value)));
+        if (text) item.textContent = text;
+        return item;
+      }
+      const svg = node('svg', { viewBox: '0 0 310 220', role: 'img', class: 'egl-ph-mouth-diagram' });
+      svg.append(node('title', {}, 'แผนภาพตำแหน่งโดยย่อของเสียง /' + foundation.symbol + '/ · ' + foundation.place + ' · ' + foundation.airflow));
+      const markerId = id + '-air-' + (++diagramSequence), defs = node('defs'), marker = node('marker', { id: markerId, markerWidth: 7, markerHeight: 7, refX: 5, refY: 3, orient: 'auto' });
+      marker.append(node('path', { d: 'M0 0L6 3L0 6', fill: 'none', stroke: '#43859a', 'stroke-width': 1.5 })); defs.append(marker); svg.append(defs);
+      svg.append(node('path', { d: 'M66 171L66 139Q70 87 100 65Q158 34 213 63L231 88L247 91M247 116Q242 148 210 165Q140 192 82 174', fill: '#fffdf6', stroke: '#b6c4ac', 'stroke-width': 3, 'stroke-linecap': 'round' }));
+      svg.append(node('path', { d: 'M83 58Q147 14 218 33L251 49L241 60L219 60', fill: 'none', stroke: '#c7d1be', 'stroke-width': 3 }));
+      svg.append(node('path', { d: 'M224 84L224 100L232 100L232 91M232 121L226 121L226 131', fill: '#fff', stroke: '#b8b18a', 'stroke-width': 2 }));
+      const positions = { lips: [247, 106], teeth: [229, 102], ridge: [211, 72], palate: [161, 53], velum: [105, 62], throat: [69, 152] };
+      const vowels = { 'front-high': [196, 88], 'front-mid': [192, 113], 'front-low': [186, 145], central: [148, 122], 'back-high': [109, 87], 'back-mid': [111, 111], 'back-low': [115, 143] };
+      const point = visual.place === 'vowel' ? vowels[visual.tongue] : positions[visual.place];
+      const tonguePlace = point && ['ridge', 'palate', 'velum'].includes(visual.place);
+      const crest = tonguePlace ? [point[0], point[1] + (visual.contact === true ? 0 : 15)] : visual.place === 'vowel' && point ? point : [176, 137];
+      svg.append(node('path', { d: 'M91 164Q112 144 ' + crest[0] + ' ' + crest[1] + 'Q219 142 223 155Q182 179 91 174Z', fill: '#d4c3bd', stroke: '#ad9288', 'stroke-width': 2 }));
+      const airPath = visual.nasal ? 'M72 153Q85 107 92 66Q150 26 245 45' : 'M76 153Q119 115 162 108Q212 109 266 106';
+      svg.append(node('path', { d: airPath, fill: 'none', stroke: '#43859a', 'stroke-width': 2.5, 'stroke-dasharray': '5 5', 'marker-end': 'url(#' + markerId + ')' }));
+      if (point) { svg.append(node('circle', { cx: point[0], cy: point[1], r: 12, fill: '#b8d1a0', opacity: 0.45 })); svg.append(node('circle', { cx: point[0], cy: point[1], r: 5, fill: '#3b6e43' })); }
+      svg.append(node('circle', { cx: 68, cy: 161, r: 15, fill: visual.voiced ? '#e1d6ec' : '#eef0e8', stroke: visual.voiced ? '#9379ad' : '#bdc6b5', 'stroke-width': 2 }));
+      if (visual.voiced) svg.append(node('path', { d: 'M57 162q4-10 8 0t8 0t7 0', fill: 'none', stroke: '#80619e', 'stroke-width': 2 }));
+      svg.append(node('text', { x: 43, y: 201, fill: '#63735c', 'font-size': 12 }, visual.voiced ? 'คอสั่น' : 'คอไม่สั่น'));
+      svg.append(node('text', { x: 179, y: 21, fill: '#63735c', 'font-size': 12 }, 'จมูก'));
+      svg.append(node('text', { x: 250, y: 143, fill: '#63735c', 'font-size': 12 }, 'ปาก'));
+      svg.append(node('text', { x: 133, y: 180, fill: '#8b7168', 'font-size': 12 }, 'ลิ้น'));
+      return svg;
+    }
+    function soundFoundation(foundation) {
+      const section = el('section', 'egl-ph-foundation');
+      section.setAttribute('aria-label', 'วิธีสร้างเสียง /' + foundation.symbol + '/ ตั้งแต่พื้นฐาน');
+      section.append(el('h5', 'egl-ph-heading', 'สร้างเสียง /' + foundation.symbol + '/ ทีละขั้น'));
+      const facts = el('div', 'egl-ph-sound-facts');
+      [['ประเภทเสียง', foundation.category], ['ตำแหน่ง', foundation.place], ['การปล่อยลม', foundation.manner], ['สังเกตที่คอ', foundation.voice]].forEach(([label, value]) => {
+        if (!value) return;
+        const fact = el('div', 'egl-ph-sound-fact'); fact.append(el('small', '', label), el('span', '', value)); facts.append(fact);
+      });
+      section.append(facts);
+      const steps = el('ol', 'egl-ph-mouth-steps');
+      (Array.isArray(foundation.steps) ? foundation.steps : []).forEach(step => steps.append(el('li', '', step)));
+      section.append(steps);
+      if (foundation.commonMistake) section.append(el('p', 'egl-ph-sound-caution', 'จุดที่ต้องระวัง: ' + foundation.commonMistake));
+      const anatomy = el('details', 'egl-ph-anatomy');
+      anatomy.append(el('summary', '', 'ดูตำแหน่งลิ้น–ปาก และทางเดินลม'));
+      const layout = el('div', 'egl-ph-anatomy-layout'), notes = el('dl', 'egl-ph-anatomy-notes');
+      [['ริมฝีปาก', foundation.lips], ['ลิ้น', foundation.tongue], ['ทางออกของลม', foundation.airflow], ['ลากเสียงได้ไหม', foundation.canSustain ? 'ค้างเสียงสั้น ๆ ได้ โดยไม่เติมสระตาม' : 'เป็นเสียงปล่อยสั้นหรือเสียงเลื่อน อย่าฝืนลากส่วนที่กั้นลม']].forEach(([label, value]) => {
+        if (!value) return; notes.append(el('dt', '', label), el('dd', '', value));
+      });
+      const image = articulationImage(foundation);
+      anatomy.open = Boolean(image);
+      layout.append(image || mouthDiagram(foundation), notes); anatomy.append(layout);
+      if (image) {
+        const schematic = el('details', 'egl-ph-air-schematic');
+        schematic.append(el('summary', '', 'ดูแผนภาพย่อของทางเดินลมและคอสั่น'), mouthDiagram(foundation)); anatomy.append(schematic);
+      }
+      anatomy.append(el('p', 'egl-ph-note', 'แผนภาพย่อ: จุดสีเขียวชี้ตำแหน่งที่ใช้สร้างเสียง ลูกศรสีฟ้าชี้ทางลม · รูปปากเปลี่ยนได้ตามสำเนียงและเสียงข้างเคียง ไม่ใช่ภาพการเคลื่อนไหวจริง'));
+      if (foundation.compare && foundation.compare.phone) anatomy.append(el('p', 'egl-ph-note', 'ลองเทียบ /' + foundation.compare.phone + '/' + (foundation.compare.word ? ' ในคำ ' + foundation.compare.word : '') + ' · ' + (foundation.compare.note || '')));
+      if (Array.isArray(foundation.sources) && foundation.sources.length) {
+        const sources = el('p', 'egl-ph-note', 'แหล่งอ้างอิงวิธีสร้างเสียง: ');
+        foundation.sources.forEach((url, index) => { try { const parsed = new win.URL(url); if (parsed.protocol !== 'https:') return; const link = el('a', '', '[' + (index + 1) + ']'); link.href = parsed.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; sources.append(link, doc.createTextNode(' ')); } catch (_) {} });
+        anatomy.append(sources);
+      }
+      section.append(anatomy);
+      return section;
+    }
+    function articulationImage(foundation) {
+      let asset;
+      try { asset = global.EGLArticulationImages && global.EGLArticulationImages.describe(foundation.symbol); } catch (_) {}
+      if (!asset || !/^assets\/articulation\/[a-z0-9._-]+\.svg$/i.test(asset.src)) return null;
+      const base = runtimeScriptURL || new win.URL(location.pathname.includes('/speech-training/') ? '../app/phonetics.js' : 'phonetics.js', doc.baseURI).href;
+      const figure = el('figure', 'egl-ph-articulation-figure'), img = el('img', 'egl-ph-articulation-image');
+      img.src = new win.URL(asset.src, base).href;
+      img.alt = asset.altThai || 'ภาพตำแหน่งอวัยวะในช่องปากสำหรับเสียง /' + foundation.symbol + '/';
+      img.width = 400; img.height = 400; img.loading = 'lazy'; img.decoding = 'async';
+      const caption = el('figcaption', 'egl-ph-articulation-caption', asset.captionThai || 'ภาพตำแหน่งช่องปากของเสียงนี้');
+      const credit = el('p', 'egl-ph-image-credit', (asset.author || 'ผู้สร้างตามแหล่งภาพ') + ' · ภาพต้นฉบับไม่ดัดแปลง · ');
+      [[asset.source, 'แหล่งภาพ'], [asset.licenseURL, asset.license || 'สิทธิ์การใช้ภาพ']].forEach(([url, label]) => {
+        try { const parsed = new win.URL(url); if (parsed.protocol !== 'https:') return; const link = el('a', '', label); link.href = parsed.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; credit.append(link, doc.createTextNode(' ')); } catch (_) {}
+      });
+      figure.append(img, caption, credit);
+      img.addEventListener('error', () => {
+        if (disposed) return;
+        img.replaceWith(mouthDiagram(foundation));
+        caption.textContent = 'โหลดภาพต้นฉบับไม่สำเร็จ จึงแสดงแผนภาพตำแหน่งแบบย่อของแอป';
+        credit.replaceChildren();
+      }, { once: true });
+      return figure;
     }
     function referenceWord(word) {
       if (practiceWord && String(practiceWord.index) !== String(word.index)) practice(word, false);
@@ -633,6 +875,7 @@
       referenceFocus.replaceChildren(el('h4', 'egl-ph-heading', 'แยกเสียงคำว่า ' + word.text));
       const meaning = wordMeaning(word);
       if (meaning) referenceFocus.append(el('p', 'egl-ph-word-meaning', meaning));
+      if (practiceWord && practiceWord.isolated) referenceFocus.append(el('p', 'egl-ph-note', 'กำลังแสดงคำอ่านแบบคำเดี่ยว รูปเสียงอาจต่างจากคำเบาในประโยค'));
       const chips = el('div', 'egl-ph-phone-chips');
       const guide = el('div', 'egl-ph-guide');
       const phones = Array.isArray(word.phones) ? word.phones : [];
@@ -641,7 +884,9 @@
       phones.forEach(phone => chips.append(button(phone, () => {
         showPhoneGuide(guide, phone, 'นี่คือเสียงอ้างอิงจากข้อความ ยังไม่ได้ฟังจากไฟล์เสียง');
       }, 'egl-ph-phone', referenceListeners)));
-      referenceFocus.append(actions, chips, guide);
+      const spelling = spellingSection(word, referenceListeners);
+      if (spelling) referenceFocus.append(spelling, actions);
+      else referenceFocus.append(actions, chips, guide);
       if (phones.length) showPhoneGuide(guide, phones[0]);
       else guide.append(el('p', 'egl-ph-note', 'ดูคำอ่าน IPA ในรายละเอียดด้านล่างได้ครับ'));
       referenceFocus.hidden = false;
@@ -673,60 +918,10 @@
       expected.append(words, referenceFocus, raw);
       expected.hidden = false;
     }
-    function rangeFor(word) {
-      const start = Number(word.start), end = Number(word.end);
-      return word.start != null && word.end != null && Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start ? { start: start, end: end } : null;
-    }
-    function stopPlayback() {
-      playbackVersion++;
-      if (playbackTimer !== null) win.clearTimeout(playbackTimer);
-      playbackTimer = null;
-      playbackEnd = null;
-      player.pause();
-    }
-    function armPlaybackStop() {
-      if (playbackTimer !== null) win.clearTimeout(playbackTimer);
-      if (playbackEnd == null) return;
-      const remaining = Math.max(0, playbackEnd - player.currentTime);
-      playbackTimer = win.setTimeout(stopPlayback, remaining / (slow ? 0.75 : 1) * 1000 + 100);
-    }
-    function playRange(range) {
-      stopPlayback();
-      stopExample();
-      if (!clipURL || disposed) return;
-      const currentPlayback = playbackVersion;
-      const play = () => {
-        if (disposed || currentPlayback !== playbackVersion) return;
-        try {
-          player.currentTime = range.start;
-          player.playbackRate = slow ? 0.75 : 1;
-          playbackEnd = range.end;
-          const result = player.play();
-          if (result && result.catch) result.catch(error => { if (!disposed && currentPlayback === playbackVersion && error.name !== 'AbortError') setStatus('กดเล่นที่แถบเสียง แล้วลองฟังช่วงคำอีกครั้ง', true); });
-          armPlaybackStop();
-        } catch (_) { setStatus('ยังเล่นช่วงคำนี้ไม่ได้ ลองเล่นจากแถบเสียงก่อน', true); }
-      };
-      if (player.readyState >= 1) play();
-      else {
-        const currentURL = clipURL;
-        const ready = () => { if (clipURL === currentURL) play(); };
-        on(player, 'loadedmetadata', ready, { once: true });
-        player.load();
-      }
-    }
+    function stopPlayback() { player.pause(); }
     function wordOperations(word) {
       const operations = analysisData && analysisData.alignment && analysisData.alignment.operations;
       return Array.isArray(operations) ? operations.filter(op => String(op.word_index) === String(word.index)) : [];
-    }
-    function phoneRange(operation, word) {
-      const time = rangeFor(operation);
-      if (!time) return null;
-      const bounds = rangeFor(word);
-      const duration = Number.isFinite(player.duration) ? player.duration : Infinity;
-      return {
-        start: Math.max(bounds ? bounds.start : 0, time.start - 0.07),
-        end: Math.min(bounds ? bounds.end : duration, duration, time.end + 0.07),
-      };
     }
     function selectWord(index) {
       if (!wordItems[index] || !analysisData) return;
@@ -740,14 +935,13 @@
       if (meaning) inspector.append(el('p', 'egl-ph-word-meaning', meaning));
       inspector.append(el('p', 'egl-ph-counts', countsText(word, operations) + ' จับคู่กับอ้างอิง'));
       const controls = el('div', 'egl-ph-actions');
-      const range = rangeFor(word);
-      const replay = button('ฟังคำนี้', () => { if (range) playRange(range); }, 'egl-ph-button egl-ph-primary', inspectorListeners);
-      replay.disabled = !range;
+      const replay = button(mode === 'own' ? 'ฟังเสียงของฉันทั้งคลิป' : 'ฟังเสียง AI ทั้งคลิป', () => { playOwn(true); player.playbackRate = slow ? 0.75 : 1; }, 'egl-ph-button egl-ph-primary', inspectorListeners);
+      replay.disabled = !clip;
       const slower = button(slow ? 'ช้า 0.75× ✓' : 'ช้า 0.75×', () => {
         slow = !slow; player.playbackRate = slow ? 0.75 : 1;
         slower.textContent = slow ? 'ช้า 0.75× ✓' : 'ช้า 0.75×';
-        slower.setAttribute('aria-pressed', String(slow)); armPlaybackStop();
-        examplePlayer.playbackRate = slow ? 0.75 : 1; armExampleStop();
+        slower.setAttribute('aria-pressed', String(slow));
+        examplePlayer.playbackRate = slow ? 0.75 : 1;
       }, 'egl-ph-button egl-ph-slow', inspectorListeners);
       slower.setAttribute('aria-pressed', String(slow));
       const different = wordItems.map((entry, i) => ({ entry, i })).filter(x => x.entry.percent != null && x.entry.percent < 100 || x.entry.word.status === 'difference');
@@ -759,7 +953,9 @@
       controls.append(button('ฟังคำตัวอย่าง', () => playExample(practiceWord || word), 'egl-ph-button', inspectorListeners), replay, slower,
         button('ฝึกคำนี้', () => practice(practiceWord || word), 'egl-ph-button egl-ph-primary', inspectorListeners), next);
       inspector.append(controls);
-      inspector.append(el('p', 'egl-ph-note', 'แตะหน่วยเสียงเพื่อฟังช่วงสั้น ๆ ในคำนี้ และดูวิธีวางปาก'));
+      const spelling = spellingSection(practiceWord || word, inspectorListeners);
+      if (spelling) inspector.append(spelling);
+      inspector.append(el('p', 'egl-ph-note', 'แตะเสียงอ้างอิงเพื่อฟังตัวอย่างคำเดี่ยว หรือแตะเสียงที่ตรวจพบเพื่อฟังคลิปที่วิเคราะห์เต็มคลิป'));
       const pairs = el('div', 'egl-ph-phone-pairs');
       const headers = el('div', 'egl-ph-phone-row egl-ph-phone-head');
       headers.append(el('span', '', 'อ้างอิง'), el('span', '', 'เสียงที่ตรวจพบ')); pairs.append(headers);
@@ -772,18 +968,18 @@
       };
       operations.forEach(op => {
         const row = el('div', 'egl-ph-phone-row egl-ph-op-' + (['match', 'substitute', 'delete', 'insert'].includes(op.type) ? op.type : 'unresolved'));
-        const time = phoneRange(op, word);
         ['expected', 'observed'].forEach(side => {
           const phone = op[side];
           if (!phone) { row.append(el('span', 'egl-ph-phone-missing', '—')); return; }
           const chip = button('', () => {
             showPhoneGuide(guide, phone, messages[op.type] || 'การจับคู่หน่วยเสียงเป็นการประมาณจากไฟล์เสียง');
-            if (time && time.end > time.start) playRange(time);
+            if (side === 'expected') playExample(practiceWord || word);
+            else playOwn(true);
           }, 'egl-ph-phone', inspectorListeners);
           chip.append(el('span', 'egl-ph-phone-symbol', phone));
           const descriptor = guideFor(phone);
           if (descriptor.label && descriptor.label !== phone) chip.append(el('span', 'egl-ph-phone-label', descriptor.label));
-          chip.setAttribute('aria-label', (side === 'expected' ? 'อ้างอิง ' : 'ตรวจพบ ') + phone + (time ? ' ฟังในบริบทของคำ' : ' ดูคำแนะนำ'));
+          chip.setAttribute('aria-label', (side === 'expected' ? 'อ้างอิง ' : 'ตรวจพบ ') + phone + (side === 'expected' ? ' ฟังตัวอย่างคำเดี่ยว' : ' ฟังคลิปที่วิเคราะห์เต็มคลิป'));
           row.append(chip);
         });
         pairs.append(row);
@@ -799,6 +995,10 @@
     }
     function renderAnalysis(data) {
       clearObserved();
+      if (practiceWord && practiceWord.isolated && !practicePhone && data.reference && data.reference.text === practiceWord.text && data.reference.accent === accent.value && Array.isArray(data.reference.words) && data.reference.words.length === 1) {
+        practiceWord.targetReference = data.reference;
+        practiceWord.phones = data.reference.words[0].phones.slice();
+      }
       if (data.reference && !practiceWord) renderReference(data.reference);
       analysisData = data;
       if (!practiceWord) sentenceResult = { data, blob: clip, label: clipLabel, kind: clipKind, info: clipInfo, mode };
@@ -810,7 +1010,8 @@
       const score = el('div', 'egl-ph-agreement egl-ph-' + percentLevel(overall));
       score.append(el('strong', 'egl-ph-percent', percentText(overall)), el('span', 'egl-ph-agreement-label', 'หน่วยเสียงจับคู่กับอ้างอิง'));
       score.append(el('span', 'egl-ph-counts', countsText(summary, operations)));
-      observed.replaceChildren(el('h3', 'egl-ph-step-title', practiceWord ? '3 · ผลคำว่า ' + practiceWord.text : '3 · ดูผลทีละคำ'), score);
+      observed.replaceChildren(el('h3', 'egl-ph-step-title', practicePhone ? '3 · ผลเฉพาะเสียง /' + practicePhone.phone + '/ ในคำ ' + practiceWord.text : practiceWord ? '3 · ผลคำว่า ' + practiceWord.text : '3 · ดูผลทีละคำ'), score);
+      if (practicePhone) observed.append(el('p', 'egl-ph-note', 'ผลนี้เปรียบเทียบเฉพาะเสียงที่เลือก ไม่ใช่ผลของทั้งคำ · เสียงเดี่ยวที่สั้นมากอาจตรวจไม่พบ'));
       if (demoMode && data.precomputed === true) observed.append(el('p', 'egl-ph-note egl-ph-demo-result', 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · ไม่ใช่ผลจากเสียงที่คุณบันทึก'));
       observed.append(el('p', 'egl-ph-note', 'เปอร์เซ็นต์นับการจับคู่หน่วยเสียง ไม่ใช่คะแนนความสามารถหรือระดับเจ้าของภาษา'));
       observed.append(el('p', 'egl-ph-note', 'ไฟล์ที่เปรียบเทียบ: ' + clipLabel));
@@ -917,6 +1118,7 @@
     const targetBanner = el('div', 'egl-ph-target'); targetBanner.hidden = true;
     const targetText = el('strong');
     targetBanner.append(targetText, button('กลับไปฝึกทั้งประโยค', backToSentence, 'egl-ph-button egl-ph-return'));
+    const soundTarget = el('div', 'egl-ph-sound-target'); soundTarget.hidden = true; targetBanner.append(soundTarget);
     const recordHint = el('p', 'egl-ph-record-hint', 'พูดประโยคด้านบนให้จบ แล้วกดหยุด');
     const audioControls = el('div', 'egl-ph-actions');
     const sources = Array.isArray(options.audioSources) ? options.audioSources : [];
@@ -924,7 +1126,7 @@
       if (!source || typeof source.url !== 'string') return;
       const sourceLabel = String(source.label || String.fromCharCode(65 + index));
       const node = button('วิเคราะห์เสียง ' + sourceLabel, () => {
-        if (practiceWord) { practiceWord = null; updateTarget(); }
+        if (practiceWord) { practiceWord = null; practicePhone = null; updateTarget(); }
         changeMode('ai');
         if (demoMode) clearClip();
         request(async (values, signal, current) => {
@@ -1100,8 +1302,6 @@
         updateButtons(); showServiceError(error);
       }
     });
-    on(player, 'timeupdate', () => { if (playbackEnd != null && player.currentTime >= playbackEnd) stopPlayback(); });
-    on(examplePlayer, 'timeupdate', () => { if (exampleEnd != null && examplePlayer.currentTime >= exampleEnd) stopExample(); });
     on(root, 'toggle', event => {
       if (event.target === root && !root.open) {
         cancelRequest(); stopCapture(); stopPlayback(); stopExample();
@@ -1125,6 +1325,8 @@
       stopCapture(); stopPlayback(); stopExample();
       referenceListeners.splice(0).forEach(remove => remove());
       observedListeners.splice(0).forEach(remove => remove());
+      inspectorListeners.splice(0).forEach(remove => remove());
+      soundListeners.splice(0).forEach(remove => remove());
       listeners.forEach(remove => remove());
       player.removeAttribute('src');
       examplePlayer.removeAttribute('src');

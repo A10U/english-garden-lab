@@ -10,10 +10,10 @@ function setup(options = {}) {
   const window = dom.window;
   const calls = [], revoked = [];
   let objectId = 0, plays = 0;
-  const playedElements = [], loadedElements = [];
+  const playedElements = [], loadedElements = [], pausedElements = [];
   window.URL.createObjectURL = () => 'blob:test-' + (++objectId);
   window.URL.revokeObjectURL = url => revoked.push(url);
-  window.HTMLMediaElement.prototype.pause = function () {};
+  window.HTMLMediaElement.prototype.pause = function () { pausedElements.push(this); };
   window.HTMLMediaElement.prototype.play = function () { plays++; playedElements.push(this); return Promise.resolve(); };
   window.HTMLMediaElement.prototype.load = function () { loadedElements.push(this); };
   window.fetch = async (...args) => { calls.push(args); return options.fetch ? options.fetch(...args) : Promise.reject(new TypeError('Failed to fetch')); };
@@ -24,13 +24,34 @@ function setup(options = {}) {
   window.eval(source);
   const container = window.document.getElementById('widget');
   const cleanup = window.EGLPhonetics.mount(container, { text: 'Hello, leaf.', ...(options.mount || {}) });
-  return { dom, window, container, cleanup, calls, revoked, playedElements, loadedElements, plays: () => plays, button: text => [...container.querySelectorAll('button')].find(node => node.textContent === text) };
+  return { dom, window, container, cleanup, calls, revoked, playedElements, loadedElements, pausedElements, plays: () => plays, button: text => [...container.querySelectorAll('button')].find(node => node.textContent === text) };
 }
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function reference(text = 'Hello, leaf.', accent = 'en-us') {
   return { text, accent, ipa: 'həˈloʊ liːf', words: [{ index: 0, text: 'Hello', ipa: 'həˈloʊ', phones: ['h', 'ə', 'l', 'oʊ'] }], analysis_type: 'text_pronunciation_reference', audio_analyzed: false };
 }
 const ok = data => ({ ok: true, status: 200, json: async () => data });
+
+function standaloneWord(text, phones) {
+  return { text, url: '../speech-training/word-audio/' + text.toLowerCase() + '.wav', standalone: true,
+    duration_seconds: .7,
+    reference: { text, accent: 'en-us', ipa: phones.join(''), words: [{ index: 0, text, ipa: phones.join(''), phones }],
+      analysis_type: 'text_pronunciation_reference', audio_analyzed: false } };
+}
+function wordCatalog(...words) {
+  return { by_word: Object.fromEntries(words.map(word => [word.text.toLowerCase(), word])) };
+}
+function monitorCompletePlayback(app, media, initial = .6) {
+  const writes = [], timers = [];
+  let position = initial;
+  Object.defineProperty(media, 'currentTime', { configurable: true,
+    get: () => position, set: value => { writes.push(value); position = value; } });
+  // Playback must run until the file ends naturally, rather than scheduling
+  // a timeout/interval that stops at an old word or phone alignment boundary.
+  app.window.setTimeout = (_callback, delay) => { timers.push(['timeout', delay]); return -1; };
+  app.window.setInterval = (_callback, delay) => { timers.push(['interval', delay]); return -1; };
+  return { writes, timers, advance: value => { position = value; } };
+}
 
 function pcmFixture() {
   const rate = 16000, frames = 8000, bytes = new ArrayBuffer(44 + frames * 2), view = new DataView(bytes);
@@ -185,7 +206,7 @@ test('recording stops tracks, creates a preview, and uploads only after explicit
   app.dom.window.close();
 });
 
-test('AI audio uploads bytes, keeps A/B labels blind, and replays actual aligned word ranges', async () => {
+test('AI audio uploads bytes, keeps A/B labels blind, and replays the analyzed whole clip from zero', async () => {
   let app;
   app = setup({ mount: { audioSources: [{ label: 'A', url: '../speech-training/runs/secret-baseline/tts.wav' }] }, fetch: async (url, init) => {
     if (!init.method) return { ok: true, headers: { get: () => '12' }, blob: async () => new app.window.Blob(['actual audio'], { type: 'audio/wav' }) };
@@ -202,10 +223,16 @@ test('AI audio uploads bytes, keeps A/B labels blind, and replays actual aligned
   assert.equal(app.container.querySelector('.egl-ph-detected').textContent, 'hɛlo');
   const player = app.container.querySelector('audio');
   Object.defineProperty(player, 'readyState', { value: 1, configurable: true });
+  const playback = monitorCompletePlayback(app, player);
   app.container.querySelector('button.egl-ph-compare').click();
-  app.button('ฟังคำนี้').click();
-  assert.equal(player.currentTime, .1);
+  app.button('ฟังเสียง AI ทั้งคลิป').click();
+  assert.equal(player.currentTime, 0);
+  assert.deepEqual(playback.writes, [0]);
+  assert.deepEqual(playback.timers, []);
   assert.equal(app.plays(), 1);
+  const paused = app.pausedElements.length;
+  playback.advance(.95); player.dispatchEvent(new app.window.Event('timeupdate'));
+  assert.equal(app.pausedElements.length, paused, 'the old .8s alignment end must not stop whole-clip playback');
   app.cleanup(); app.dom.window.close();
 });
 
@@ -319,20 +346,40 @@ test('legacy statuses alone and explicit null fields never fabricate percentages
   other.cleanup(); other.dom.window.close();
 });
 
-test('word inspector pairs phones, replays actual context, slows playback, and navigates differences', async () => {
+test('word inspector keeps reference whole words separate from the complete learner clip and still slows/navigates', async () => {
   const data = analysis();
+  data.reference.words.push({ index: 1, text: 'leaf', ipa: 'liːf', phones: ['l', 'iː', 'f'] });
   data.alignment.words.push({ index: 1, text: 'leaf', ipa: 'liːf', status: 'difference', start: .4, end: .9, match_percent: 50, matched_phones: 1, compared_phones: 2 });
   data.alignment.operations.push({ type: 'substitute', expected: 'iː', observed: 'ɪ', word_index: 1, start: .55, end: .65 });
-  const app = await analyzeFixture(data);
+  const word = standaloneWord('leaf', ['l', 'iː', 'f']);
+  const app = await analyzeFixture(data, { globals: { EGL_WORD_AUDIO: wordCatalog(word) } });
   app.window.EGLPhoneGuide = { describe: phone => ({ symbol: phone, label: 'เสียง ' + phone, tip: 'ผ่อนริมฝีปาก', example: 'leaf' }) };
   const player = app.container.querySelector('.egl-ph-player');
+  const example = app.container.querySelector('.egl-ph-example-player');
+  const ownPlayback = monitorCompletePlayback(app, player, .62);
+  const examplePlayback = monitorCompletePlayback(app, example);
   Object.defineProperty(player, 'readyState', { value: 1, configurable: true });
   app.button('คำที่มีเสียงต่างถัดไป').click();
   assert.match(app.container.querySelector('.egl-ph-inspector-title').textContent, /leaf/);
   assert.equal(app.container.querySelectorAll('.egl-ph-phone-pairs .egl-ph-phone').length, 2);
-  app.container.querySelector('.egl-ph-phone-pairs .egl-ph-phone').click();
-  assert.ok(Math.abs(player.currentTime - .48) < .0001);
+  const chips = [...app.container.querySelectorAll('.egl-ph-phone-pairs .egl-ph-phone')];
+  chips[0].click(); example.dispatchEvent(new app.window.Event('loadedmetadata'));
+  assert.equal(app.playedElements.at(-1), example);
+  assert.match(example.src, /word-audio\/leaf\.wav$/);
+  assert.equal(example.currentTime, 0);
+  assert.equal(player.currentTime, .62, 'reference playback must not seek the learner recording');
+  assert.deepEqual(ownPlayback.writes, []);
+  assert.deepEqual(examplePlayback.writes, [0]);
+  chips[1].click();
   assert.equal(app.playedElements.at(-1), player);
+  assert.equal(player.currentTime, 0);
+  assert.deepEqual(ownPlayback.writes, [0]);
+  assert.match(player.src, /^blob:/);
+  assert.deepEqual(ownPlayback.timers, []);
+  assert.deepEqual(examplePlayback.timers, []);
+  const paused = app.pausedElements.length;
+  ownPlayback.advance(.95); player.dispatchEvent(new app.window.Event('timeupdate'));
+  assert.equal(app.pausedElements.length, paused, 'the .55–.65 phone range must not stop learner replay');
   assert.match(app.container.querySelector('.egl-ph-inspector .egl-ph-guide').textContent, /ผ่อนริมฝีปาก/);
   app.button('ช้า 0.75×').click();
   assert.equal(player.playbackRate, .75);
@@ -340,30 +387,46 @@ test('word inspector pairs phones, replays actual context, slows playback, and n
   app.cleanup(); app.dom.window.close();
 });
 
-test('reference words can be selected and played on a separate audio element before analysis', async () => {
+test('reference playback uses a standalone whole-word WAV from zero despite available sentence crop times', async () => {
   const precomputed = reference();
-  const app = setup({ mount: { precomputed, referenceExample: { text: precomputed.text, url: '../speech-training/examples/phrase.wav', label: 'เสียงตัวอย่าง A', words: [{ index: 0, text: 'Hello', start: .3, end: .9 }] } } });
+  const word = standaloneWord('Hello', ['h', 'ə', 'l', 'oʊ']);
+  const app = setup({ globals: { EGL_WORD_AUDIO: wordCatalog(word) }, mount: { precomputed, referenceExample: { text: precomputed.text, url: '../speech-training/examples/phrase.wav', label: 'เสียงตัวอย่าง A', words: [{ index: 0, text: 'Hello', start: .3, end: .9 }] } } });
+  const example = app.container.querySelector('.egl-ph-example-player');
+  const playback = monitorCompletePlayback(app, example);
   app.container.querySelector('.egl-ph-ref-word').click();
   assert.match(app.container.querySelector('.egl-ph-selected').textContent, /Hello/);
+  assert.equal(app.plays(), 0);
   app.button('ฟังคำตัวอย่าง').click();
-  const example = app.container.querySelector('.egl-ph-example-player');
   example.dispatchEvent(new app.window.Event('loadedmetadata'));
   assert.equal(app.playedElements.at(-1), example);
-  assert.equal(example.currentTime, .3);
+  assert.match(example.src, /word-audio\/hello\.wav$/);
+  assert.equal(example.currentTime, 0);
+  assert.deepEqual(playback.writes, [0]);
+  assert.deepEqual(playback.timers, []);
   assert.equal(app.container.querySelector('.egl-ph-player').getAttribute('src'), null);
   assert.equal(app.calls.length, 0);
-  assert.match(app.container.querySelector('.egl-ph-example-caption').textContent, /เสียงตัวอย่าง A/);
+  assert.match(app.container.querySelector('.egl-ph-example-caption').textContent, /เสียงคำเดี่ยว: Hello.*แยกต่างหาก/);
+  const paused = app.pausedElements.length;
+  playback.advance(1.1); example.dispatchEvent(new app.window.Event('timeupdate'));
+  assert.equal(app.pausedElements.length, paused, 'sentence word end .9 is not a playback boundary');
   app.cleanup(); app.dom.window.close();
 });
 
-test('missing reference word times can use another labeled source, never invent ranges', async () => {
-  const app = setup({ mount: { precomputed: reference(), referenceExample: { text: 'Hello, leaf.', url: 'a.wav', words: [{ index: 0, text: 'Hello', start: null, end: null }] }, audioSources: [{ label: 'B', url: 'b.wav', words: [{ index: 0, text: 'Hello', start: .4, end: .7 }] }] } });
+test('phrase timestamps never substitute for a missing standalone word recording', async () => {
+  const spoken = [];
+  const notAWord = { ...standaloneWord('Hello', ['h', 'ə', 'l', 'oʊ']), standalone: false };
+  const app = setup({ globals: { EGL_WORD_AUDIO: wordCatalog(notAWord) }, mount: { precomputed: reference(), referenceExample: { text: 'Hello, leaf.', url: 'a.wav', words: [{ index: 0, text: 'Hello', start: null, end: null }] }, audioSources: [{ label: 'B', url: 'b.wav', words: [{ index: 0, text: 'Hello', start: .4, end: .7 }] }] } });
+  app.window.speechSynthesis = { getVoices: () => [{ lang: 'en-US', localService: true, name: 'Samantha' }], speak: utterance => spoken.push(utterance), cancel() {} };
+  app.window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
   app.container.querySelector('.egl-ph-ref-word').click(); app.button('ฟังคำตัวอย่าง').click();
   const example = app.container.querySelector('.egl-ph-example-player');
   example.dispatchEvent(new app.window.Event('loadedmetadata'));
-  assert.match(example.src, /b\.wav$/);
-  assert.equal(example.currentTime, .4);
-  assert.equal(app.container.querySelector('.egl-ph-example-caption').textContent, 'เสียงตัวอย่าง B');
+  assert.equal(spoken.length, 1);
+  assert.equal(spoken[0].text, 'Hello');
+  assert.equal(example.getAttribute('src'), null);
+  assert.equal(app.plays(), 0);
+  assert.match(app.container.querySelector('.egl-ph-example-caption').textContent, /เสียงคำเดี่ยว: Hello.*เสียงอังกฤษในเครื่อง/);
+  assert.equal(app.calls.length, 0);
   app.cleanup(); app.dom.window.close();
 });
 
@@ -378,7 +441,11 @@ test('explicit browser voice fallback uses local English words and clearly label
   app.button('ฟังคำตัวอย่าง').click();
   assert.equal(spoken[0].text, 'Hello');
   assert.equal(spoken[0].voice, local);
-  assert.equal(app.container.querySelector('.egl-ph-example-caption').textContent, 'เสียงอ่านในเครื่อง');
+  assert.match(app.container.querySelector('.egl-ph-example-caption').textContent, /เสียงคำเดี่ยว: Hello.*เสียงอังกฤษในเครื่อง/);
+  app.button('ฟังเสียง /h/ ในคำ').click();
+  assert.equal(spoken.length, 2);
+  assert.equal(spoken[1].text, 'Hello', 'a phone example reads the complete English word, never the IPA symbol or letter name');
+  assert.match(app.container.querySelector('.egl-ph-example-caption').textContent, /ฟังเสียง \/h\/ ภายในคำเต็ม/);
   assert.equal(app.calls.length, 0);
   app.cleanup(); app.dom.window.close();
 });
@@ -386,7 +453,7 @@ test('explicit browser voice fallback uses local English words and clearly label
 test('word practice posts the selected word with new audio and returning restores sentence result', async () => {
   const precomputed = reference();
   precomputed.words.push({ index: 1, text: 'leaf', ipa: 'liːf', phones: ['l', 'iː', 'f'] });
-  const app = setup({ mount: { precomputed }, fetch: async (_url, init) => {
+  const app = setup({ globals: { EGL_WORD_AUDIO: wordCatalog(standaloneWord('leaf', ['l', 'iː', 'f'])) }, mount: { precomputed }, fetch: async (_url, init) => {
     const target = init.body.get('text');
     const data = analysis();
     data.reference = target === 'leaf' ? { ...reference('leaf'), words: [{ index: 0, text: 'leaf', ipa: 'liːf', phones: ['l', 'iː', 'f'] }] } : precomputed;
@@ -407,8 +474,8 @@ test('word practice posts the selected word with new audio and returning restore
   assert.equal(app.calls.length, 1);
   selectFile(app, 'word audio'); app.button('ดูผลเสียงของฉัน').click(); await flush();
   assert.equal(app.calls[1][1].body.get('text'), 'leaf');
-  assert.equal(app.calls[1][1].body.get('context_text'), 'Hello, leaf.');
-  assert.equal(app.calls[1][1].body.get('context_word_index'), '1');
+  assert.equal(app.calls[1][1].body.has('context_text'), false, 'a separately spoken word must not inherit sentence weak forms');
+  assert.equal(app.calls[1][1].body.has('context_word_index'), false);
   assert.match(app.container.querySelector('.egl-ph-step-title').textContent, /อ่านและฟัง/);
   assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '40.0%');
   assert.equal(app.container.querySelector('textarea').value, 'Hello, leaf.');
@@ -442,21 +509,29 @@ test('closing the widget or changing voice mode stops capture and blocks deferre
   app.cleanup(); app.dom.window.close();
 });
 
-test('closing before loadedmetadata prevents an old word replay from starting later', async () => {
-  const app = await analyzeFixture(analysis(), { mount: { expanded: true } });
-  app.button('ฟังคำนี้').click();
-  assert.equal(app.plays(), 0);
+test('closing stops complete-word playback and stale metadata cannot seek or restart it', async () => {
+  const app = setup({ globals: { EGL_WORD_AUDIO: wordCatalog(standaloneWord('Hello', ['h', 'ə', 'l', 'oʊ'])) }, mount: { expanded: true, precomputed: reference() } });
+  const example = app.container.querySelector('.egl-ph-example-player');
+  const playback = monitorCompletePlayback(app, example);
+  app.container.querySelector('.egl-ph-ref-word').click(); app.button('ฟังคำตัวอย่าง').click();
+  assert.equal(app.plays(), 1);
+  assert.deepEqual(playback.writes, [], 'the source has not received metadata yet');
+  const paused = app.pausedElements.length;
   const root = app.container.querySelector('.egl-phonetics'); root.open = false;
   root.dispatchEvent(new app.window.Event('toggle'));
-  app.container.querySelector('.egl-ph-player').dispatchEvent(new app.window.Event('loadedmetadata'));
-  assert.equal(app.plays(), 0);
+  assert.ok(app.pausedElements.length > paused);
+  assert.ok(app.pausedElements.slice(paused).includes(example));
+  example.dispatchEvent(new app.window.Event('loadedmetadata'));
+  assert.equal(app.plays(), 1);
+  assert.deepEqual(playback.writes, [], 'late metadata must not re-arm a closed widget playback');
+  assert.deepEqual(playback.timers, []);
   app.cleanup(); app.dom.window.close();
 });
 
 test('switching reference words cannot reuse word-only index zero results or the previous example', async () => {
   const precomputed = reference();
   precomputed.words.push({ index: 1, text: 'leaf', ipa: 'liːf', phones: ['l', 'iː', 'f'] });
-  const app = setup({ mount: { precomputed, referenceExample: { text: precomputed.text, url: 'example.wav', words: [{ index: 0, text: 'Hello', start: .1, end: .35 }, { index: 1, text: 'leaf', start: .5, end: .9 }] } }, fetch: async () => {
+  const app = setup({ globals: { EGL_WORD_AUDIO: wordCatalog(standaloneWord('Hello', ['h', 'ə', 'l', 'oʊ']), standaloneWord('leaf', ['l', 'iː', 'f'])) }, mount: { precomputed, referenceExample: { text: precomputed.text, url: 'example.wav', words: [{ index: 0, text: 'Hello', start: .1, end: .35 }, { index: 1, text: 'leaf', start: .5, end: .9 }] } }, fetch: async () => {
     const data = analysis();
     data.reference = { ...reference('leaf'), words: [{ index: 0, text: 'leaf', ipa: 'liːf', phones: ['l', 'iː', 'f'] }] };
     data.alignment.words[0].text = 'leaf';
@@ -469,7 +544,7 @@ test('switching reference words cannot reuse word-only index zero results or the
   app.button('ฝึกคำนี้').click();
   selectFile(app); app.button('ดูผลเสียงของฉัน').click(); await flush();
   assert.equal(app.container.querySelector('.egl-ph-inspector .egl-ph-word-meaning').textContent, 'ใบไม้');
-  assert.equal(app.calls[0][1].body.get('context_word_index'), '1');
+  assert.equal(app.calls[0][1].body.has('context_word_index'), false);
   select('Hello');
   assert.equal(app.container.querySelector('.egl-ph-observed').hidden, true);
   assert.equal(app.container.querySelector('.egl-ph-player').getAttribute('src'), null);
@@ -479,7 +554,8 @@ test('switching reference words cannot reuse word-only index zero results or the
   app.button('ฟังคำตัวอย่าง').click();
   const example = app.container.querySelector('.egl-ph-example-player');
   example.dispatchEvent(new app.window.Event('loadedmetadata'));
-  assert.equal(example.currentTime, .1);
+  assert.match(example.src, /word-audio\/hello\.wav$/);
+  assert.equal(example.currentTime, 0);
   assert.equal(app.calls.length, 1);
   app.cleanup(); app.dom.window.close();
 });
@@ -795,7 +871,7 @@ test('hosted cancel and cleanup abort the worker request and ignore late progres
   app.dom.window.close();
 });
 
-test('hosted word practice preserves the selected word sentence-context phones and resets its result index', async () => {
+test('hosted word practice uses the separately spoken word full form rather than sentence weak-form phones', async () => {
   const expected = { ...reference('This is a leaf.'), words: [
     { index: 0, text: 'This', ipa: 'ðɪs', phones: ['ð', 'ɪ', 's'] },
     { index: 1, text: 'is', ipa: 'ɪz', phones: ['ɪ', 'z'] },
@@ -803,7 +879,9 @@ test('hosted word practice preserves the selected word sentence-context phones a
     { index: 3, text: 'leaf', ipa: 'liːf', phones: ['l', 'iː', 'f'] },
   ] };
   let args;
+  const isolated = standaloneWord('a', ['eɪ']);
   const app = setup({ url: 'https://garden.example/app/index.html', mount: { text: expected.text, precomputed: expected }, globals: {
+    EGL_WORD_AUDIO: wordCatalog(isolated),
     EGLBrowserPhonetics: { supported: () => true, analyze: options => { args = options; return Promise.resolve(analysis({ analysis_type: 'acoustic_phone_comparison', reference: options.reference })); } },
   } });
   [...app.container.querySelectorAll('.egl-ph-ref-word')].find(node => node.querySelector('.egl-ph-token').textContent === 'a').click();
@@ -811,13 +889,14 @@ test('hosted word practice preserves the selected word sentence-context phones a
   assert.equal(args, undefined);
   selectFile(app, pcmFixture()); app.button('ดูผลเสียงของฉัน').click(); await flush();
   assert.equal(args.text, 'a');
-  assert.equal(args.reference.ipa, 'ə');
-  assert.deepEqual([...args.reference.words[0].phones], ['ə']);
+  assert.equal(args.reference.ipa, 'eɪ');
+  assert.deepEqual([...args.reference.words[0].phones], ['eɪ']);
   assert.equal(args.reference.words[0].index, 0);
-  assert.equal(args.reference.context.text, expected.text);
-  assert.equal(args.reference.context.word_index, 2);
-  assert.equal(args.reference.reference_context, 'word_in_sentence');
+  assert.equal(args.reference.context, undefined);
+  assert.equal(args.reference.reference_context, 'isolated_word');
   assert.equal(expected.words[2].index, 2, 'the shared sentence reference must not be mutated');
+  assert.deepEqual(expected.words[2].phones, ['ə'], 'sentence weak forms must remain available for full-sentence practice');
+  assert.equal(isolated.reference.words[0].index, 0);
   assert.equal(app.calls.length, 0);
   app.cleanup(); app.dom.window.close();
 });
