@@ -1,0 +1,25 @@
+English Garden Lab — prerecorded AI speech demo
+
+The demo WAV files are generated AI speech of original project-authored English
+prompts. They are not user microphone recordings or copies of the source corpus.
+The candidate voice was adapted using a bounded clean subset of speaker 92
+(Cori Samuel) from the following dataset:
+
+Hi-Fi Multi-Speaker English TTS Dataset (Hi-Fi TTS), 2021
+Evelina Bakhturina, Vitaly Lavrukhin, Boris Ginsburg and Yang Zhang.
+Official resource: https://www.openslr.org/109/
+Paper: https://arxiv.org/abs/2104.01497
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License text: https://creativecommons.org/licenses/by/4.0/
+Source corpus: public LibriVox audiobooks and Project Gutenberg texts.
+Authoring modifications: selection of one speaker; bounded clean audio subset;
+resampling to 24 kHz; model adaptation; synthesis of newly authored prompts.
+No dataset source recordings or model weights are included in this export.
+
+Text IPA was generated with phonemizer/eSpeak NG. Acoustic phone observations
+were precomputed using Meta's wav2vec2 phoneme-recognition checkpoint (Apache 2.0).
+These cached observations concern only the included generated AI recordings.
+They do not analyze visitors' microphones and are not learner pronunciation grades.
+Word times are approximate CTC-derived playback ranges, not expert alignments.
+Naturalness improvement requires listening evaluation; it is not established by
+an automatic transcript match, a phone comparison, or training loss alone.
