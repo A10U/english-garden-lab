@@ -2,6 +2,8 @@
 
 เครื่องมือฝึกภาษาอังกฤษสำหรับผู้เริ่มต้น มีคำแปลและตัวช่วยภาษาไทย
 
+**[เปิดเดโมออนไลน์](https://a10u.github.io/english-garden-lab/)** · [GitHub repository](https://github.com/A10U/english-garden-lab)
+
 - **[Learning App](app/index.html)** — 3 บทเรียน สวนคำศัพท์ และความก้าวหน้าที่บันทึกในเบราว์เซอร์
 - **[Speech Training](speech-training/listen.html)** — 24 ประโยค ตัวอย่างเสียง AI, IPA, ฟังรายคำ และบันทึกเสียงตัวเอง
 

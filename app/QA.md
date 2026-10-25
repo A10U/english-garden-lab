@@ -3,7 +3,7 @@
 Checks for the portable App and Speech demo:
 
 - JavaScript unit and DOM integration suite: 107 passed.
-- Python engine, API, reference-audio and exporter tests: 40 passed before the static-builder tests were added.
+- Full Python engine, API, reference-audio, exporter and static-builder suite: 44 passed.
 - Static-builder and exporter focused suite: 10 passed.
 - All 62 curated WAV files verified against SHA256SUMS.
 - Landing page, App, Speech, demo data script and a sample WAV served successfully over local HTTP.
