@@ -1,0 +1,6 @@
+{
+  "repo_id": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit",
+  "revision": "50f45ef0047cde7e84c2ef04326acb8ada2436a7",
+  "upstream": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+  "license": "Apache-2.0"
+}

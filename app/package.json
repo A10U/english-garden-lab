@@ -1,0 +1,16 @@
+{
+  "name": "english-garden-lab-local-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local English learning prototype; dependencies are for tests only.",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "test:unit": "node --test tests/core.test.cjs tests/storage.test.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
+}

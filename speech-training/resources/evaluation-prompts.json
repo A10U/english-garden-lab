@@ -1,0 +1,253 @@
+{
+  "schema_version": 1,
+  "created_on": "2026-10-24",
+  "timezone": "Asia/Bangkok",
+  "language": "en",
+  "project": "English Garden Lab",
+  "purpose": "Text-only held-out prompts for comparing the naturalness of AI spoken replies before and after a TTS change.",
+  "provenance": "Newly authored for this project; not excerpts from the external speech corpora.",
+  "use_for_training": false,
+  "prompts": [
+    {
+      "id": "tts-001",
+      "text": "Hi! I'm Mali. Ready to spend a little time in the garden?",
+      "category": "greeting",
+      "style_hint": "warm",
+      "listen_for": [
+        "friendly greeting",
+        "contraction",
+        "inviting question"
+      ]
+    },
+    {
+      "id": "tts-002",
+      "text": "Welcome back. Let's start with one small step.",
+      "category": "greeting",
+      "style_hint": "calm",
+      "listen_for": [
+        "gentle pause",
+        "unhurried pacing"
+      ]
+    },
+    {
+      "id": "tts-003",
+      "text": "What would you like to practice today: plants, or talking with AI?",
+      "category": "greeting",
+      "style_hint": "conversational",
+      "listen_for": [
+        "natural choice question",
+        "AI spoken as letter names"
+      ]
+    },
+    {
+      "id": "tts-004",
+      "text": "It's good to see you. How has your day been?",
+      "category": "greeting",
+      "style_hint": "warm",
+      "listen_for": [
+        "contraction",
+        "natural question intonation"
+      ]
+    },
+    {
+      "id": "tts-005",
+      "text": "This is a leaf. It's green and soft.",
+      "category": "garden",
+      "style_hint": "clear",
+      "listen_for": [
+        "clear leaf consonants",
+        "short sentence boundaries"
+      ]
+    },
+    {
+      "id": "tts-006",
+      "text": "Can you see the new leaves near the top of the plant?",
+      "category": "garden",
+      "style_hint": "curious",
+      "listen_for": [
+        "leaves pronunciation",
+        "question intonation"
+      ]
+    },
+    {
+      "id": "tts-007",
+      "text": "The soil looks dry, but let's check it before we add any water.",
+      "category": "garden",
+      "style_hint": "conversational",
+      "listen_for": [
+        "comma pause",
+        "coherent full-sentence rhythm"
+      ]
+    },
+    {
+      "id": "tts-008",
+      "text": "Oh, look! There's a tiny flower beside the pot.",
+      "category": "garden",
+      "style_hint": "interested",
+      "listen_for": [
+        "restrained surprise",
+        "natural stress on tiny flower"
+      ]
+    },
+    {
+      "id": "tts-009",
+      "text": "Nice work! You remembered that word without a hint.",
+      "category": "encouragement",
+      "style_hint": "encouraging",
+      "listen_for": [
+        "warm encouragement",
+        "no exaggerated shouting"
+      ]
+    },
+    {
+      "id": "tts-010",
+      "text": "That's okay. Take your time, and try again when you're ready.",
+      "category": "encouragement",
+      "style_hint": "reassuring",
+      "listen_for": [
+        "reassuring tone",
+        "comfortable pauses"
+      ]
+    },
+    {
+      "id": "tts-011",
+      "text": "You don't have to get every word right. Let's try one sentence together.",
+      "category": "encouragement",
+      "style_hint": "warm",
+      "listen_for": [
+        "contractions",
+        "gentle emphasis"
+      ]
+    },
+    {
+      "id": "tts-012",
+      "text": "Would you like to hear it again, or would you rather take a short break?",
+      "category": "encouragement",
+      "style_hint": "calm",
+      "listen_for": [
+        "natural alternatives",
+        "no abrupt phrase endings"
+      ]
+    },
+    {
+      "id": "tts-013",
+      "text": "Listen first: This is a leaf. Now, say it at your own pace.",
+      "category": "teaching",
+      "style_hint": "enunciated",
+      "listen_for": [
+        "pause before example",
+        "clear but natural articulation"
+      ]
+    },
+    {
+      "id": "tts-014",
+      "text": "One leaf. Two leaves. Can you hear the difference?",
+      "category": "teaching",
+      "style_hint": "clear",
+      "listen_for": [
+        "leaf versus leaves",
+        "counting rhythm"
+      ]
+    },
+    {
+      "id": "tts-015",
+      "text": "You can say, Could you help me, please? Let's try that together.",
+      "category": "teaching",
+      "style_hint": "conversational",
+      "listen_for": [
+        "embedded example question",
+        "transition back to tutor voice"
+      ]
+    },
+    {
+      "id": "tts-016",
+      "text": "A little slower this time. Could you say that again, please?",
+      "category": "teaching",
+      "style_hint": "gentle",
+      "listen_for": [
+        "slower rhythm without distorted vowels",
+        "polite question"
+      ]
+    },
+    {
+      "id": "tts-017",
+      "text": "Really? What do you like most about growing plants?",
+      "category": "conversation",
+      "style_hint": "interested",
+      "listen_for": [
+        "brief response followed by question",
+        "natural curiosity"
+      ]
+    },
+    {
+      "id": "tts-018",
+      "text": "Hmm, let me think. We could start with basil, or choose something easier.",
+      "category": "conversation",
+      "style_hint": "thoughtful",
+      "listen_for": [
+        "short thoughtful hesitation",
+        "continuous voice identity"
+      ]
+    },
+    {
+      "id": "tts-019",
+      "text": "I see what you mean. Could you give me a small example?",
+      "category": "conversation",
+      "style_hint": "conversational",
+      "listen_for": [
+        "acknowledgment",
+        "natural handoff to question"
+      ]
+    },
+    {
+      "id": "tts-020",
+      "text": "Before we finish, tell me one thing you'd like to remember from today.",
+      "category": "conversation",
+      "style_hint": "warm",
+      "listen_for": [
+        "clause boundary",
+        "inviting tone"
+      ]
+    },
+    {
+      "id": "tts-021",
+      "text": "Let's practice for 5 minutes, then take a break.",
+      "category": "normalization",
+      "style_hint": "clear",
+      "listen_for": [
+        "5 spoken as five",
+        "natural numeral normalization"
+      ]
+    },
+    {
+      "id": "tts-022",
+      "text": "AI can help us practice, but you can always ask me to slow down.",
+      "category": "normalization",
+      "style_hint": "clear",
+      "listen_for": [
+        "AI spoken as letter names",
+        "no skipped conjunction"
+      ]
+    },
+    {
+      "id": "tts-023",
+      "text": "You've learned three words today: leaf, root, and flower.",
+      "category": "normalization",
+      "style_hint": "conversational",
+      "listen_for": [
+        "contraction",
+        "clear list rhythm"
+      ]
+    },
+    {
+      "id": "tts-024",
+      "text": "The garden doesn't need to be perfect. We can notice one new thing, talk about it, and come back tomorrow.",
+      "category": "conversation",
+      "style_hint": "calm",
+      "listen_for": [
+        "steady pacing across longer reply",
+        "no repetition or truncation"
+      ]
+    }
+  ]
+}

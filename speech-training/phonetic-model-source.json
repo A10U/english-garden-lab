@@ -1,0 +1,7 @@
+{
+  "repo_id": "facebook/wav2vec2-lv-60-espeak-cv-ft",
+  "revision": "ae45363bf3413b374fecd9dc8bc1df0e24c3b7f4",
+  "license": "Apache-2.0",
+  "sample_rate_hz": 16000,
+  "purpose": "Acoustic phone sequence recognition, not a calibrated pronunciation grade"
+}

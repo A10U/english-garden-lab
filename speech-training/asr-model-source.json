@@ -1,0 +1,5 @@
+{
+  "repo_id": "mlx-community/whisper-base.en-mlx",
+  "revision": "aa0678c3466ed62c5c6114ec600a0e1f96820089",
+  "purpose": "Generated speech transcription sanity check, not a naturalness score"
+}
