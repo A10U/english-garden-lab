@@ -14,8 +14,10 @@ import argparse
 import hashlib
 from html.parser import HTMLParser
 import json
+import math
 from pathlib import Path
 import re
+import struct
 from urllib.parse import unquote, urlsplit
 
 from export_demo_assets import assert_public, verify_export, wav_info
@@ -38,7 +40,8 @@ CSP = '<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="con
 MODEL_REPOSITORY = "https://huggingface.co/onnx-community/wav2vec2-lv-60-espeak-cv-ft-ONNX/"
 MODEL_URL = MODEL_REPOSITORY + "resolve/c69750f5043e5e1f8a71ab95dd3b98338c280c92/onnx/model_quantized.onnx"
 BROWSER_ASSETS = (
-    "app/sound-foundations.js", "app/articulation-images.js", "app/spelling-guide.js", "app/spelling-feedback.js", "app/word-audio.js",
+    "app/sound-foundations.js", "app/vowel-pairs.js", "app/vowel-audio.js", "app/pronunciation-videos.js",
+    "app/articulation-images.js", "app/spelling-guide.js", "app/spelling-feedback.js", "app/word-audio.js",
     "app/browser-phonetics.js", "app/browser-phonetics-worker.js", "app/browser-phoneme-model.js",
     "app/phonetic-alignment.js", "app/vendor/onnxruntime/ort.wasm.min.js",
     "app/vendor/onnxruntime/ort-wasm-simd-threaded.mjs",
@@ -48,6 +51,11 @@ BROWSER_ASSETS = (
 ARTICULATION_CREDIT_ASSETS = (
     "app/assets/articulation/ATTRIBUTION.json", "app/assets/articulation/ATTRIBUTION.md",
 )
+VOWEL_AUDIO_FILES = {
+    "vowel-i.ogg", "vowel-ih.ogg", "vowel-u.ogg", "vowel-uh.ogg", "vowel-epsilon.ogg",
+    "vowel-ae.ogg", "vowel-strut.ogg", "vowel-alpha.ogg", "vowel-schwa.ogg", "vowel-open-o.ogg",
+    "vowel-open-back-rounded.ogg", "vowel-open-central.ogg",
+}
 # Unmodified ONNX Runtime Web 1.23.2 distribution plus upstream license/notices.
 # Emscripten embeds a virtual /home/web_user and a file:// scheme detector;
 # these upstream literals are allowed only when the complete file hash matches.
@@ -111,6 +119,95 @@ def verified_word_assets(root: Path) -> tuple[dict[str, bytes], dict]:
     names = metadata | {word_filename(word) for word in records}
     files = {"speech-training/word-audio/" + name: (directory / name).read_bytes() for name in sorted(names)}
     return files, {"standalone_words": verified["words"], "standalone_audio_bytes": verified["audio_bytes"]}
+
+
+def ogg_vorbis_info(data: bytes) -> dict:
+    """Read complete Ogg pages and Vorbis timing without a playback dependency."""
+    offset = 0
+    rate = channels = serial = None
+    final_granule = 0
+    ended = False
+    while offset < len(data):
+        if offset + 27 > len(data) or data[offset:offset + 5] != b"OggS\x00":
+            raise ValueError("Incomplete Ogg Vorbis page")
+        segments = data[offset + 26]
+        body_start = offset + 27 + segments
+        if body_start > len(data):
+            raise ValueError("Truncated Ogg page segment table")
+        body_end = body_start + sum(data[offset + 27:body_start])
+        if body_end > len(data):
+            raise ValueError("Truncated Ogg page data")
+        current_serial = struct.unpack_from("<I", data, offset + 14)[0]
+        if serial is not None and serial != current_serial:
+            raise ValueError("Expected one Vorbis stream")
+        serial = current_serial
+        if rate is None:
+            body = data[body_start:body_end]
+            if len(body) < 30 or body[:7] != b"\x01vorbis" or struct.unpack_from("<I", body, 7)[0] != 0:
+                raise ValueError("Expected an Ogg Vorbis identification packet")
+            channels = body[11]
+            rate = struct.unpack_from("<I", body, 12)[0]
+            if not channels or not rate:
+                raise ValueError("Invalid Vorbis channel count or sample rate")
+        granule = struct.unpack_from("<Q", data, offset + 6)[0]
+        if granule != 0xffffffffffffffff:
+            final_granule = max(final_granule, granule)
+        ended = ended or bool(data[offset + 5] & 4)
+        offset = body_end
+    if not ended or not final_granule or not rate:
+        raise ValueError("Missing complete Vorbis audio duration")
+    return {"sample_rate": rate, "channels": channels, "duration_seconds": final_granule / rate}
+
+
+def verified_vowel_assets(root: Path) -> tuple[dict[str, bytes], dict]:
+    directory = root / "app/assets/vowels"
+    names = {"manifest.json", "ATTRIBUTION.md"}
+    if not directory.is_dir() or directory.is_symlink():
+        raise ValueError("Missing or symlinked human vowel audio directory")
+    for name in names:
+        path = directory / name
+        if not path.is_file() or path.is_symlink():
+            raise ValueError(f"Missing or symlinked vowel audio metadata: {name}")
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    assert_public(manifest, "human vowel audio manifest")
+    recordings = manifest.get("recordings")
+    if manifest.get("schema_version") != 1 or not isinstance(recordings, list) or not recordings:
+        raise ValueError("Human vowel audio manifest requires recordings")
+    symbols = set()
+    total = 0
+    for record in recordings:
+        if not isinstance(record, dict) or record.get("filename") not in VOWEL_AUDIO_FILES or record["filename"] in names:
+            raise ValueError("Invalid or duplicate human vowel recording filename")
+        symbol = record.get("symbol")
+        if not isinstance(symbol, str) or not symbol or symbol in symbols:
+            raise ValueError("Invalid or duplicate human vowel symbol")
+        symbols.add(symbol)
+        name = record["filename"]
+        path = directory / name
+        if not path.is_file() or path.is_symlink() or path.resolve().parent != directory.resolve():
+            raise ValueError("Human vowel audio must remain inside its public directory")
+        audio = path.read_bytes()
+        if len(audio) != record.get("bytes") or hashlib.sha256(audio).hexdigest() != record.get("sha256"):
+            raise ValueError("Human vowel audio hash or byte length mismatch")
+        actual = ogg_vorbis_info(audio)
+        duration = record.get("duration_seconds")
+        if (not isinstance(duration, (int, float)) or isinstance(duration, bool) or not math.isfinite(duration)
+                or not 0 < duration <= 30 or abs(duration - actual["duration_seconds"]) > max(1 / actual["sample_rate"], 1e-5)
+                or actual["sample_rate"] != record.get("sample_rate") or actual["channels"] != record.get("channels")):
+            raise ValueError("Human vowel Vorbis timing or format metadata mismatch")
+        if (record.get("changes") != "unmodified" or not record.get("author") or not record.get("license")
+                or any(not isinstance(record.get(key), str) or not record[key].startswith("https://") for key in ("source", "licenseURL"))):
+            raise ValueError("Human vowel audio requires original source and license credits")
+        names.add(name)
+        total += len(audio)
+    module = root / "app/vowel-audio.js"
+    if not module.is_file() or module.is_symlink():
+        raise ValueError("Missing or symlinked human vowel audio module")
+    linked = set(re.findall(r"assets/vowels/([a-z0-9_-]+\.ogg)", module.read_text(encoding="utf-8")))
+    if linked != names - {"manifest.json", "ATTRIBUTION.md"}:
+        raise ValueError("Human vowel module differs from its recording manifest")
+    files = {"app/assets/vowels/" + name: (directory / name).read_bytes() for name in sorted(names)}
+    return files, {"human_vowels": len(recordings), "human_vowel_audio_bytes": total}
 
 
 def public_trial_payload(demo: dict) -> dict:
@@ -233,13 +330,17 @@ def build(project_root: Path, output: Path) -> dict:
     exported = root / "speech-training/demo-assets"
     export_summary = verify_export(exported)
     word_files, word_summary = verified_word_assets(root)
+    vowel_files, vowel_summary = verified_vowel_assets(root)
     demo = json.loads((exported / "demo-data.json").read_text(encoding="utf-8"))
     files = {"index.html": (root / "index.html").read_bytes(), ".nojekyll": b""}
     files.update(word_files)
+    files.update(vowel_files)
     app_source = root / "app"
     for path in sorted(app_source.rglob("*")):
         relative = path.relative_to(app_source)
         if relative.as_posix() == "phone-examples.js":
+            continue
+        if relative.parts[:2] == ("assets", "vowels"):
             continue
         public_credit = "app/" + relative.as_posix() in ARTICULATION_CREDIT_ASSETS
         if not path.is_file() or (path.suffix.lower() not in RUNTIME_SUFFIXES and not public_credit):
@@ -298,7 +399,7 @@ def build(project_root: Path, output: Path) -> dict:
         name: hashlib.sha256(content).hexdigest() for name, content in sorted(files.items())}}
     (output / MARKER).write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     verify_export(output / "speech-training/demo-assets")
-    return {"mode": "demo", "files": len(files) + 1, "bytes": sum(map(len, files.values())), **export_summary, **word_summary}
+    return {"mode": "demo", "files": len(files) + 1, "bytes": sum(map(len, files.values())), **export_summary, **word_summary, **vowel_summary}
 
 
 def main() -> None:

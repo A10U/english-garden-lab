@@ -130,7 +130,7 @@ class PhoneticAPITests(unittest.TestCase):
             (public / 'demo-data.json').write_text('{"schema_version": 1, "pairs": []}')
             (public / 'demo-data.js').write_text('globalThis.EGL_DEMO_DATA = {"schema_version": 1};')
             (root / 'app').mkdir()
-            for name in ['sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js']:
+            for name in ['sound-foundations.js', 'vowel-pairs.js', 'vowel-audio.js', 'pronunciation-videos.js', 'articulation-images.js', 'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js']:
                 (root / 'app' / name).write_text('globalThis.TEST_PUBLIC_HELPER = true;')
             self.assertFalse((root / 'speech-training/runs').exists())
             with patch.object(server, 'ROOT', root):
@@ -150,7 +150,7 @@ class PhoneticAPITests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertIn('javascript', response.headers['content-type'])
                 self.assertIn('EGL_DEMO_DATA', response.text)
-                for name in ['sound-foundations.js', 'articulation-images.js', 'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js']:
+                for name in ['sound-foundations.js', 'vowel-pairs.js', 'vowel-audio.js', 'pronunciation-videos.js', 'articulation-images.js', 'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js']:
                     response = self.client.get('/app/' + name)
                     self.assertEqual(response.status_code, 200)
                     self.assertIn('javascript', response.headers['content-type'])
@@ -181,6 +181,31 @@ class PhoneticAPITests(unittest.TestCase):
                 for name in ['private.json', 'escape.wav', 'WORD.wav', 'nested/word-valid.wav', '../private.wav']:
                     self.assertEqual(self.client.get('/speech-training/word-audio/' + name).status_code, 404, name)
                 self.assertEqual(self.client.get('/app/phone-examples.js').status_code, 404)
+
+    def test_human_vowel_routes_allow_only_known_files_and_contained_metadata(self):
+        with tempfile.TemporaryDirectory(prefix='egl-vowel-assets-') as temporary:
+            root = Path(temporary).resolve()
+            vowels = root / 'app/assets/vowels'
+            vowels.mkdir(parents=True)
+            content = b'OggS\x00 public fixture bytes'
+            (vowels / 'vowel-i.ogg').write_bytes(content)
+            (vowels / 'manifest.json').write_text('{"schema_version":1}')
+            (vowels / 'ATTRIBUTION.md').write_text('# Human vowel credits')
+            private = root / 'private.ogg'
+            private.write_bytes(content)
+            (vowels / 'vowel-ih.ogg').symlink_to(private)
+            with patch.object(server, 'ROOT', root):
+                response = self.client.get('/app/assets/vowels/vowel-i.ogg')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content, content)
+                self.assertIn('ogg', response.headers['content-type'])
+                ranged = self.client.get('/app/assets/vowels/vowel-i.ogg', headers={'Range': 'bytes=0-3'})
+                self.assertEqual(ranged.status_code, 206)
+                self.assertEqual(ranged.content, b'OggS')
+                for name in ['manifest.json', 'ATTRIBUTION.md']:
+                    self.assertEqual(self.client.get('/app/assets/vowels/' + name).status_code, 200)
+                for name in ['vowel-ih.ogg', 'unknown.ogg', 'private.json', 'nested/vowel-i.ogg', '../private.ogg']:
+                    self.assertEqual(self.client.get('/app/assets/vowels/' + name).status_code, 404, name)
 
     def test_demo_asset_allowlist_rejects_traversal_private_files_and_symlink_escape(self):
         with tempfile.TemporaryDirectory(prefix='egl-static-boundary-') as temporary:

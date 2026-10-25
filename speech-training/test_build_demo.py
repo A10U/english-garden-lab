@@ -10,7 +10,7 @@ import tempfile
 import unittest
 import wave
 
-from build_demo import build, PRIVATE_PATH, LOOPBACK_URL, MODEL_URL
+from build_demo import build, PRIVATE_PATH, LOOPBACK_URL, MODEL_URL, ogg_vorbis_info
 from build_listen import build as build_listen
 from build_word_audio import filename as word_filename, write_public as write_word_audio
 
@@ -31,6 +31,9 @@ class StaticDemoBuildTests(unittest.TestCase):
 <script src="phonetic-data.js" defer></script>
 <script src="phone-guide.js" defer></script>
 <script src="sound-foundations.js" defer></script>
+<script src="vowel-pairs.js" defer></script>
+<script src="vowel-audio.js" defer></script>
+<script src="pronunciation-videos.js" defer></script>
 <script src="articulation-images.js" defer></script>
 <script src="browser-phonetics.js" defer></script>
 <script src="spelling-guide.js" defer></script>
@@ -49,6 +52,8 @@ class StaticDemoBuildTests(unittest.TestCase):
         (app / 'phonetic-alignment.js').write_text('globalThis.EGLPhoneticAlignment={};')
         (app / 'phone-guide.js').write_text('globalThis.EGLPhoneGuide={};')
         (app / 'sound-foundations.js').write_text('globalThis.EGLSoundFoundations={};')
+        (app / 'vowel-pairs.js').write_text('globalThis.EGLVowelPairs={};')
+        (app / 'pronunciation-videos.js').write_text('globalThis.EGLPronunciationVideos={};')
         (app / 'articulation-images.js').write_text('globalThis.EGLArticulationImages={};')
         credits = app / 'assets/articulation'
         credits.mkdir(parents=True)
@@ -71,6 +76,9 @@ class StaticDemoBuildTests(unittest.TestCase):
 <script id="trial-data" type="application/json">{"model":"/Users/private/model","pairs":[]}</script>
 <script src="../app/phone-guide.js"></script>
 <script src="../app/sound-foundations.js"></script>
+<script src="../app/vowel-pairs.js"></script>
+<script src="../app/vowel-audio.js"></script>
+<script src="../app/pronunciation-videos.js"></script>
 <script src="../app/articulation-images.js"></script>
 <script src="../app/browser-phonetics.js"></script>
 <script src="../app/spelling-guide.js"></script>
@@ -95,15 +103,30 @@ class StaticDemoBuildTests(unittest.TestCase):
                 'analysis_type': 'text_pronunciation_reference', 'audio_analyzed': False},
         }}
         self.write_words()
+        self.vowels = app / 'assets/vowels'
+        self.vowels.mkdir()
+        actual_vowel = (Path(__file__).resolve().parent.parent / 'app/assets/vowels/vowel-ih.ogg').read_bytes()
+        (self.vowels / 'vowel-ih.ogg').write_bytes(actual_vowel)
+        self.vowel_record = {'symbol': 'ɪ', 'filename': 'vowel-ih.ogg', 'author': 'Fixture creator',
+            'source': 'https://commons.wikimedia.org/wiki/File:Vowel.ogg', 'license': 'CC BY-SA 3.0',
+            'licenseURL': 'https://creativecommons.org/licenses/by-sa/3.0/', 'changes': 'unmodified',
+            'bytes': len(actual_vowel), 'sha256': hashlib.sha256(actual_vowel).hexdigest(), **ogg_vorbis_info(actual_vowel)}
+        self.write_vowels()
 
     def write_words(self):
         write_word_audio(self.words, self.root / 'app/word-audio.js', self.word_records)
+
+    def write_vowels(self):
+        (self.vowels / 'manifest.json').write_text(json.dumps({'schema_version': 1, 'recordings': [self.vowel_record]}))
+        (self.vowels / 'ATTRIBUTION.md').write_text('# Human vowel credits\n')
+        (self.root / 'app/vowel-audio.js').write_text('globalThis.EGLVowelAudio={url:"assets/vowels/vowel-ih.ogg"};')
 
     def test_build_requires_only_public_subtrees_and_generates_demo_globals(self):
         summary = build(self.root, self.output)
         self.assertEqual(summary['pairs'], 24)
         self.assertEqual(summary['recordings'], 62)
         self.assertEqual(summary['standalone_words'], 1)
+        self.assertEqual(summary['human_vowels'], 1)
         self.assertEqual((self.output / 'index.html').read_text(), self.landing)
         self.assertTrue((self.output / 'speech-training/demo-assets/demo-data.js').is_file())
         self.assertIn('globalThis.EGL_DEMO_DATA=', (self.output / 'speech-training/demo-assets/demo-data.js').read_text())
@@ -113,6 +136,11 @@ class StaticDemoBuildTests(unittest.TestCase):
             self.assertLess(text.index('demo-data.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
             self.assertLess(text.index('browser-phonetics.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
             self.assertLess(text.index('phone-guide.js'), text.index('sound-foundations.js'))
+            self.assertLess(text.index('sound-foundations.js'), text.index('vowel-pairs.js'))
+            self.assertLess(text.index('vowel-pairs.js'), text.index('vowel-audio.js'))
+            self.assertLess(text.index('vowel-audio.js'), text.index('pronunciation-videos.js'))
+            self.assertLess(text.index('pronunciation-videos.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
+            self.assertLess(text.index('vowel-pairs.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
             self.assertLess(text.index('sound-foundations.js'), text.index('articulation-images.js'))
             self.assertLess(text.index('articulation-images.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
             self.assertLess(text.index('sound-foundations.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
@@ -127,7 +155,9 @@ class StaticDemoBuildTests(unittest.TestCase):
             self.assertIn("worker-src 'self' blob:;", text)
             self.assertIn('318 MB', text)
             self.assertNotRegex(text, LOOPBACK_URL)
-        for name in ('sound-foundations.js', 'articulation-images.js', 'assets/articulation/ATTRIBUTION.json', 'assets/articulation/ATTRIBUTION.md',
+        for name in ('sound-foundations.js', 'vowel-pairs.js', 'vowel-audio.js', 'pronunciation-videos.js',
+                     'assets/vowels/manifest.json', 'assets/vowels/ATTRIBUTION.md', 'assets/vowels/vowel-ih.ogg',
+                     'articulation-images.js', 'assets/articulation/ATTRIBUTION.json', 'assets/articulation/ATTRIBUTION.md',
                      'spelling-guide.js', 'spelling-feedback.js', 'word-audio.js', 'browser-phonetics.js', 'browser-phonetics-worker.js', 'browser-phoneme-model.js', 'phonetic-alignment.js',
                      'vendor/onnxruntime/ort.wasm.min.js', 'vendor/onnxruntime/ort-wasm-simd-threaded.mjs',
                      'vendor/onnxruntime/ort-wasm-simd-threaded.wasm', 'vendor/onnxruntime/LICENSE.txt',
@@ -261,6 +291,65 @@ class StaticDemoBuildTests(unittest.TestCase):
             build(self.root, self.output)
         self.assertFalse(self.output.exists())
 
+    def test_missing_vowel_pairs_fails_before_writing(self):
+        (self.root / 'app/vowel-pairs.js').unlink()
+        with self.assertRaisesRegex(ValueError, 'Missing browser phoneme runtime asset: app/vowel-pairs.js'):
+            build(self.root, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_missing_video_module_fails_before_writing(self):
+        (self.root / 'app/pronunciation-videos.js').unlink()
+        with self.assertRaisesRegex(ValueError, 'Missing browser phoneme runtime asset: app/pronunciation-videos.js'):
+            build(self.root, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_missing_human_vowel_module_and_invalid_ogg_fail_before_writing(self):
+        module = self.root / 'app/vowel-audio.js'
+        module.unlink()
+        with self.assertRaisesRegex(ValueError, 'human vowel audio module'):
+            build(self.root, self.output)
+        self.write_vowels()
+        audio = self.vowels / 'vowel-ih.ogg'
+        corrupt = b'NOPE' + audio.read_bytes()[4:]
+        audio.write_bytes(corrupt)
+        self.vowel_record['sha256'] = hashlib.sha256(corrupt).hexdigest()
+        self.write_vowels()
+        with self.assertRaisesRegex(ValueError, 'Incomplete Ogg Vorbis page'):
+            build(self.root, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_human_vowels_require_hash_format_duration_inventory_and_credits(self):
+        audio = self.vowels / 'vowel-ih.ogg'
+        original = audio.read_bytes()
+        audio.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
+        with self.assertRaisesRegex(ValueError, 'hash or byte length mismatch'):
+            build(self.root, self.output)
+        audio.write_bytes(original)
+        self.vowel_record['duration_seconds'] += .5
+        self.write_vowels()
+        with self.assertRaisesRegex(ValueError, 'Vorbis timing or format'):
+            build(self.root, self.output)
+        self.vowel_record['duration_seconds'] -= .5
+        self.write_vowels()
+        (self.root / 'app/vowel-audio.js').write_text('globalThis.EGLVowelAudio={url:"assets/vowels/vowel-i.ogg"};')
+        with self.assertRaisesRegex(ValueError, 'module differs from its recording manifest'):
+            build(self.root, self.output)
+        self.write_vowels()
+        (self.vowels / 'ATTRIBUTION.md').unlink()
+        with self.assertRaisesRegex(ValueError, 'vowel audio metadata: ATTRIBUTION.md'):
+            build(self.root, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_unlisted_human_audio_is_excluded_and_symlinked_audio_is_rejected(self):
+        (self.vowels / 'unverified.ogg').write_bytes(b'not approved')
+        build(self.root, self.output)
+        self.assertFalse((self.output / 'app/assets/vowels/unverified.ogg').exists())
+        outside = self.root / 'private.ogg'
+        actual = self.vowels / 'vowel-ih.ogg'
+        outside.write_bytes(actual.read_bytes()); actual.unlink(); actual.symlink_to(outside)
+        with self.assertRaisesRegex(ValueError, 'inside its public directory'):
+            build(self.root, self.output)
+
     def test_missing_articulation_image_module_fails_before_writing(self):
         (self.root / 'app/articulation-images.js').unlink()
         with self.assertRaisesRegex(ValueError, 'Missing browser phoneme runtime asset: app/articulation-images.js'):
@@ -291,6 +380,11 @@ class StaticDemoBuildTests(unittest.TestCase):
         html = build_listen(*paths, self.output / 'listen.html', phonetics_data=missing, reference_data=missing)
         scripts = [url.rsplit('/', 1)[-1] for url in re.findall(r'<script src="([^"]+)"', html)]
         self.assertLess(scripts.index('phone-guide.js'), scripts.index('sound-foundations.js'))
+        self.assertLess(scripts.index('sound-foundations.js'), scripts.index('vowel-pairs.js'))
+        self.assertLess(scripts.index('vowel-pairs.js'), scripts.index('vowel-audio.js'))
+        self.assertLess(scripts.index('vowel-audio.js'), scripts.index('pronunciation-videos.js'))
+        self.assertLess(scripts.index('pronunciation-videos.js'), scripts.index('phonetics.js'))
+        self.assertLess(scripts.index('vowel-pairs.js'), scripts.index('phonetics.js'))
         self.assertLess(scripts.index('sound-foundations.js'), scripts.index('articulation-images.js'))
         self.assertLess(scripts.index('articulation-images.js'), scripts.index('phonetics.js'))
         self.assertLess(scripts.index('sound-foundations.js'), scripts.index('phonetics.js'))
@@ -303,6 +397,9 @@ class StaticDemoBuildTests(unittest.TestCase):
         self.assertNotIn('__SPELLING_FEEDBACK_JS__', html)
         self.assertNotIn('__WORD_AUDIO_JS__', html)
         self.assertNotIn('__SOUND_FOUNDATIONS_JS__', html)
+        self.assertNotIn('__VOWEL_PAIRS_JS__', html)
+        self.assertNotIn('__VOWEL_AUDIO_JS__', html)
+        self.assertNotIn('__PRONUNCIATION_VIDEOS_JS__', html)
         self.assertNotIn('__ARTICULATION_IMAGES_JS__', html)
 
     def test_vendor_private_literal_exception_requires_exact_upstream_hash(self):

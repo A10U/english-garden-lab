@@ -241,6 +241,9 @@ def build(baseline_path: Path, candidate_path: Path, result_path: Path, output: 
 <script id="trial-data" type="application/json">__DATA__</script>
 <script src="__PHONE_GUIDE_JS__"></script>
 <script src="__SOUND_FOUNDATIONS_JS__"></script>
+<script src="__VOWEL_PAIRS_JS__"></script>
+<script src="__VOWEL_AUDIO_JS__"></script>
+<script src="__PRONUNCIATION_VIDEOS_JS__"></script>
 <script src="__ARTICULATION_IMAGES_JS__"></script>
 <script src="__STUDY_HELP_JS__"></script>
 <script src="__BROWSER_PHONETICS_JS__"></script>
@@ -325,6 +328,9 @@ renderList();renderCurrent();updateProgress();
             .replace("__PHONETICS_CSS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/phonetics.css", output), quote=True))
             .replace("__PHONE_GUIDE_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/phone-guide.js", output), quote=True))
             .replace("__SOUND_FOUNDATIONS_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/sound-foundations.js", output), quote=True))
+            .replace("__VOWEL_PAIRS_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/vowel-pairs.js", output), quote=True))
+            .replace("__VOWEL_AUDIO_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/vowel-audio.js", output), quote=True))
+            .replace("__PRONUNCIATION_VIDEOS_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/pronunciation-videos.js", output), quote=True))
             .replace("__ARTICULATION_IMAGES_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/articulation-images.js", output), quote=True))
             .replace("__STUDY_HELP_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/study-help.js", output), quote=True))
             .replace("__BROWSER_PHONETICS_JS__", html.escape(local_url(Path(__file__).resolve().parent.parent / "app/browser-phonetics.js", output), quote=True))

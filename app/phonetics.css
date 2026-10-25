@@ -140,6 +140,21 @@
 @media(max-width:560px) { .egl-ph-sound-facts,.egl-ph-anatomy-layout { grid-template-columns: 1fr; } .egl-ph-spelling { padding: 10px; } }
 .egl-ph-guide { display: grid; gap: 5px; padding: 12px; border-left: 3px solid #9eb58e; border-radius: 3px 10px 10px 3px; background: #edf4e6; }
 .egl-ph-guide-label { font-size: 15px; color: #345a3b; }
+.egl-ph-vowel-comparison { display: grid; gap: 14px; margin: 9px 0; padding: 14px; border: 1px solid #b7cdb1; border-radius: 12px; background: #f9fcf5; }
+.egl-ph-vowel-audio { display: grid; gap: 10px; }
+.egl-ph-vowel-cards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.egl-ph-vowel-card { display: grid; align-content: start; gap: 8px; padding: 12px; border: 1px solid #c7d8bd; border-radius: 10px; background: #fffefa; min-width: 0; }
+.egl-ph-vowel-card > strong { color: #285b40; font-size: 19px; }
+.egl-ph-vowel-card .egl-ph-button { white-space: normal; min-height: 44px; }
+.egl-ph-vowel-difference { margin: 0; color: #355d43; font-size: 14px; line-height: 1.85; }
+.egl-ph-vowel-progress { min-height: 24px; margin: 0; }
+.egl-ph-videos { display: grid; gap: 10px; padding: 13px; border: 1px solid #cfdbc9; border-radius: 12px; background: #fffefa; }
+.egl-ph-video-card { display: grid; gap: 7px; }
+.egl-ph-video-card > strong { font-size: 14px; color: #375a3c; }
+.egl-ph-video-card a.egl-ph-button { display: inline-flex; align-items: center; text-decoration: none; }
+.egl-ph-video-player:empty { display: none; }
+.egl-ph-video-player iframe { display: block; width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 8px; }
+@media(max-width:560px) { .egl-ph-vowel-cards { grid-template-columns: 1fr; } .egl-ph-vowel-comparison { padding: 10px; } }
 .egl-ph-guide-tip { font-size: 14px; color: #415d43; }
 .egl-ph-technical { padding: 10px 12px; border: 1px dashed #d2dccb; border-radius: 10px; background: #fcfdf9; }
 .egl-ph-technical > summary { min-height: 24px; color: #64775d; font-size: 12px; cursor: pointer; }

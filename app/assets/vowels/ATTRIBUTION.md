@@ -1,0 +1,34 @@
+# Isolated vowel recording credits
+
+These are **whole, unmodified OGG recordings** published on Wikimedia Commons. No sentence extraction, trimming, time stretching, transcoding or normalization was applied. Bytes match Commons SHA1 metadata; local SHA256, duration, channels and sample rate are in `manifest.json`.
+
+The Commons pages offer CC BY-SA 3.0 alongside GFDL terms. This distribution selects **CC BY-SA 3.0** (https://creativecommons.org/licenses/by-sa/3.0/). Retain attribution and license; adaptations must follow its ShareAlike requirements. No endorsement is implied. The audio license is separate from the application code license.
+
+## Interpretation
+
+These recordings illustrate IPA vowel qualities, not a controlled English minimal-pair experiment. They do not establish English vowel length. In particular /i,u/ do not establish /iː,uː/ duration, and /ʌ/ does not represent every English STRUT accent. Different speakers, levels and durations must not be confused with the intended vowel contrast.
+
+- **`vowel-ih.ogg` — /ɪ/**, Near-close near-front unrounded vowel.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Near-close_near-front_unrounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `3c07d0a3b413821a926d46286c7631de22119e5dff24f1971bb46b577cb5cbee`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.
+- **`vowel-i.ogg` — /i/**, Close front unrounded vowel.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Close_front_unrounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `b56dd3aaa59b5a7b1dc61892d1386652d5937fb0eccca8fe8e7faaea6b90b69d`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.
+- **`vowel-uh.ogg` — /ʊ/**, Near-close near-back rounded vowel.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Near-close_near-back_rounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `63673408c8fee51b24023fa10a0728e3e2f2a1cbb2c6492f59bcdb7824ba0b92`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.
+- **`vowel-u.ogg` — /u/**, Close back rounded vowel.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Close_back_rounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `3597a60cbf5197882365d58a4251db925f9f6855ba8c612e870817cb9eab8bac`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.
+- **`vowel-epsilon.ogg` — /ɛ/**, Open-mid front unrounded vowel.ogg. Author/credit: **Terfili; Denelson83 (original file credit)**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Open-mid_front_unrounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `c18949bd345ce21779e756757692feef628bd8120f8cddc67b200170491af4d4`.
+  Attribution detail: Current recording is credited to Terfili in the description and 2011 upload history; legacy Artist metadata also credits Denelson83. A hash-matching archived copy of the current recording was downloaded.
+- **`vowel-ae.ogg` — /æ/**, Near-open front unrounded vowel.ogg. Author/credit: **Denelson83 (file-page credit); Fête (current-version upload)**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Near-open_front_unrounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `f95bf6b3f9ad1daba7c056d46e5fb1920885ddccb68cb4af19eb19ca36d033d7`.
+  Attribution detail: File description credits Denelson83; file history identifies the current-version upload by Fête in 2012, restored later.
+- **`vowel-strut.ogg` — /ʌ/**, Open-mid back unrounded vowel.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Open-mid_back_unrounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `768b07b16b80e6f6f3ddd58a7ab0f45d47ab720db7942638249b4f39a4976980`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.
+- **`vowel-alpha.ogg` — /ɑ/**, Open back unrounded vowel.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Open_back_unrounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `a944c747247ad150890afaefb0f3fdc6ddb00e97e770dab32fac76a728f3e562`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.
+- **`vowel-schwa.ogg` — /ə/**, Schwa.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Schwa.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `e091d43230d0e9c4e4d85310fea4b52d06456632b82179aab94c9578e08c6c31`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.
+- **`vowel-open-o.ogg` — /ɔ/**, Open-mid back rounded vowel.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Open-mid_back_rounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `0021391dffa482c797d5a56f8083b3552214a3b8938c64ea36f7fae2689d6228`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.
+- **`vowel-open-back-rounded.ogg` — /ɒ/**, Open back rounded vowel.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Open_back_rounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `98e84f27a4dc6a46d5e83a6666e1f7220864c5cf97d4264d3e994f5a7abcea16`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.
+- **`vowel-open-central.ogg` — /ɜ/**, Open-mid central unrounded vowel.ogg. Author/credit: **Denelson83**. [Published file and creator credits](https://commons.wikimedia.org/wiki/File:Open-mid_central_unrounded_vowel.ogg). [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Changes: **unmodified**. SHA256: `61ef6ef9a16f9b24a3238e13a06d38292bf07b32d8845f962ae5e8480de3e6e3`.
+  Attribution detail: Recording credited to Denelson83 in the Commons file description.

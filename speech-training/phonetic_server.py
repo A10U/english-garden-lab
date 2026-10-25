@@ -219,7 +219,7 @@ def favicon():
 @app.get("/{asset:path}")
 def static_asset(asset: str):
     allowed_app = {"index.html", "app.js", "content.js", "core.js", "storage.js", "garden.js",
-        "styles.css", "phonetics.js", "phonetics.css", "phonetic-data.js", "phone-guide.js", "sound-foundations.js", "articulation-images.js",
+        "styles.css", "phonetics.js", "phonetics.css", "phonetic-data.js", "phone-guide.js", "sound-foundations.js", "vowel-pairs.js", "vowel-audio.js", "pronunciation-videos.js", "articulation-images.js",
         "study-help.js", "reference-audio.js", "spelling-guide.js", "spelling-feedback.js", "word-audio.js", "browser-phonetics.js",
         "browser-phonetics-worker.js", "browser-phoneme-model.js", "phonetic-alignment.js",
         "vendor/onnxruntime/ort.wasm.min.js", "vendor/onnxruntime/ort-wasm-simd-threaded.mjs",
@@ -239,7 +239,12 @@ def static_asset(asset: str):
         "k.svg", "l.svg", "m.svg", "n.svg", "ng.svg", "p.svg", "s.svg", "sh.svg", "t.svg",
         "theta.svg", "v.svg", "z.svg", "zh.svg", "ATTRIBUTION.json", "ATTRIBUTION.md"}
     allowed_articulation = asset.startswith("app/assets/articulation/") and asset[len("app/assets/articulation/"):] in articulation_assets
-    allowed = allowed or allowed_demo or allowed_word or allowed_articulation
+    vowel_assets = {"vowel-i.ogg", "vowel-ih.ogg", "vowel-u.ogg", "vowel-uh.ogg", "vowel-epsilon.ogg",
+        "vowel-ae.ogg", "vowel-strut.ogg", "vowel-alpha.ogg", "vowel-schwa.ogg", "vowel-open-o.ogg",
+        "vowel-open-back-rounded.ogg", "vowel-open-central.ogg",
+        "manifest.json", "ATTRIBUTION.md"}
+    allowed_vowel = asset.startswith("app/assets/vowels/") and asset[len("app/assets/vowels/"):] in vowel_assets
+    allowed = allowed or allowed_demo or allowed_word or allowed_articulation or allowed_vowel
     if not allowed:
         raise HTTPException(404, "ไม่พบหน้านี้")
     path = (ROOT / asset).resolve()
@@ -253,6 +258,10 @@ def static_asset(asset: str):
             raise HTTPException(404, "ไม่พบไฟล์นี้")
     if allowed_articulation and not path.is_relative_to((ROOT / "app/assets/articulation").resolve()):
         raise HTTPException(404, "ไม่พบไฟล์นี้")
+    if allowed_vowel:
+        vowel_directory = ROOT / "app/assets/vowels"
+        if vowel_directory.is_symlink() or not path.is_relative_to(vowel_directory.resolve()):
+            raise HTTPException(404, "ไม่พบไฟล์นี้")
     return FileResponse(path)
 
 
