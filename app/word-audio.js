@@ -121,6 +121,42 @@ globalThis.EGL_WORD_AUDIO = {
       "text": "about",
       "url": "../speech-training/word-audio/word-a4262e1c9bcbc172.wav"
     },
+    "above": {
+      "audio_sha256": "28d55a3d43b05e7d3f8d89d01574474351862abfd676e21048e619d86b3f54ef",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.96,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "əbˈʌv",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "above",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "əbˈʌv",
+            "phones": [
+              "ə",
+              "b",
+              "ʌ",
+              "v"
+            ],
+            "text": "above"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 23040,
+      "standalone": true,
+      "text": "above",
+      "url": "../speech-training/word-audio/word-88c7f08d0be5407e.wav"
+    },
     "add": {
       "audio_sha256": "f8cb9bcd9912a40a17c77c75cc2f2409ca25f2e5ad4620acb1a780fdc706e2fb",
       "bits_per_sample": 16,
@@ -436,6 +472,41 @@ globalThis.EGL_WORD_AUDIO = {
       "text": "back",
       "url": "../speech-training/word-audio/word-3c482346f3750276.wav"
     },
+    "bad": {
+      "audio_sha256": "0b7ad86595a8d856d3540c03833d77737aaa85a02962d06dd4859aa3894b3e96",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.8,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "bˈæd",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "bad",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "bˈæd",
+            "phones": [
+              "b",
+              "æ",
+              "d"
+            ],
+            "text": "bad"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 19200,
+      "standalone": true,
+      "text": "bad",
+      "url": "../speech-training/word-audio/word-2f05d4b689d270ca.wav"
+    },
     "basil": {
       "audio_sha256": "d1c36c9bc43a5fdb3573d9b2cdb5edb30e83ef05001e06a30ea2b5602bb11055",
       "bits_per_sample": 16,
@@ -696,6 +767,76 @@ globalThis.EGL_WORD_AUDIO = {
       "text": "bird",
       "url": "../speech-training/word-audio/word-7a5179eecc0fe187.wav"
     },
+    "bit": {
+      "audio_sha256": "2813962e5b58371836dc3185ff28f4f5aeebfd92f02ded3168e42ea109b59f91",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.8,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "bˈɪt",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "bit",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "bˈɪt",
+            "phones": [
+              "b",
+              "ɪ",
+              "t"
+            ],
+            "text": "bit"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 19200,
+      "standalone": true,
+      "text": "bit",
+      "url": "../speech-training/word-audio/word-d0013c2e0a387e4c.wav"
+    },
+    "bite": {
+      "audio_sha256": "59793502fdad7e451a2ff9b3813c557d73e8ac94da1a4eb12b2088d64e4cb9a4",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.8,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "bˈaɪt",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "bite",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "bˈaɪt",
+            "phones": [
+              "b",
+              "aɪ",
+              "t"
+            ],
+            "text": "bite"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 19200,
+      "standalone": true,
+      "text": "bite",
+      "url": "../speech-training/word-audio/word-8420c85c2aadaeba.wav"
+    },
     "book": {
       "audio_sha256": "5fa6c6399ce00f0bcf6fb271861fcd89de95e364dafc4fb4b941cb2db4a7a327",
       "bits_per_sample": 16,
@@ -907,6 +1048,40 @@ globalThis.EGL_WORD_AUDIO = {
       "standalone": true,
       "text": "button",
       "url": "../speech-training/word-audio/word-c3e2d78f3ff33572.wav"
+    },
+    "buy": {
+      "audio_sha256": "fb90c81d8332c25d3a5fe741ed32ceefda7e2b60fb33c5f50fb2d2edec7d9ab4",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.88,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "bˈaɪ",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "buy",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "bˈaɪ",
+            "phones": [
+              "b",
+              "aɪ"
+            ],
+            "text": "buy"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 21120,
+      "standalone": true,
+      "text": "buy",
+      "url": "../speech-training/word-audio/word-e8197b20f8e71e42.wav"
     },
     "can": {
       "audio_sha256": "0a17b92f03be6fe7fc536a7dd4d5702c90abc67a2c71f385ddc3fe67f47e5850",
@@ -1150,6 +1325,41 @@ globalThis.EGL_WORD_AUDIO = {
       "standalone": true,
       "text": "come",
       "url": "../speech-training/word-audio/word-9c19636ddea25f0a.wav"
+    },
+    "cop": {
+      "audio_sha256": "f3f3add0291caac61b538f9dce76d51e2083b7efcf242487bf7dad49b9bdbfc1",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.8,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "kˈɑːp",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "cop",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "kˈɑːp",
+            "phones": [
+              "k",
+              "ɑː",
+              "p"
+            ],
+            "text": "cop"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 19200,
+      "standalone": true,
+      "text": "cop",
+      "url": "../speech-training/word-audio/word-b1c02b717c94bd42.wav"
     },
     "could": {
       "audio_sha256": "a5fc929dc271cd98730cdaf81e89989d234a7e87be9c010de2d6da9799d83679",
@@ -2877,6 +3087,41 @@ globalThis.EGL_WORD_AUDIO = {
       "text": "key",
       "url": "../speech-training/word-audio/word-2c70e12b7a0646f9.wav"
     },
+    "late": {
+      "audio_sha256": "67706b79ec9fa1c106a87946007c1b2735b9f2de5dec379bfd24688ac6155f7a",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.72,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "lˈeɪt",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "late",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "lˈeɪt",
+            "phones": [
+              "l",
+              "eɪ",
+              "t"
+            ],
+            "text": "late"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 17280,
+      "standalone": true,
+      "text": "late",
+      "url": "../speech-training/word-audio/word-089001a35679a33e.wav"
+    },
     "leaf": {
       "audio_sha256": "cf0f034be5a636f4e3d2ac0074b31fb950d8e168a06e6efbcb54000054845328",
       "bits_per_sample": 16,
@@ -3760,6 +4005,76 @@ globalThis.EGL_WORD_AUDIO = {
       "text": "no",
       "url": "../speech-training/word-audio/word-9390298f3fb0c5b1.wav"
     },
+    "not": {
+      "audio_sha256": "ee66bbf790c097ed1595584aac05d952f166cd3aab42cdbfde61d215368adc91",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.72,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "nˈɑːt",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "not",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "nˈɑːt",
+            "phones": [
+              "n",
+              "ɑː",
+              "t"
+            ],
+            "text": "not"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 17280,
+      "standalone": true,
+      "text": "not",
+      "url": "../speech-training/word-audio/word-254bb97b57f12e16.wav"
+    },
+    "note": {
+      "audio_sha256": "3447165c800cd5745c9237c3dea0bb985c4ac4d836697865390d89583d7311b6",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.88,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "nˈoʊt",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "note",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "nˈoʊt",
+            "phones": [
+              "n",
+              "oʊ",
+              "t"
+            ],
+            "text": "note"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 21120,
+      "standalone": true,
+      "text": "note",
+      "url": "../speech-training/word-audio/word-edb465624291e405.wav"
+    },
     "notice": {
       "audio_sha256": "a41cd8085a065028e235786ca29adc31795d1c4057d138ae7e87210e8745c69f",
       "bits_per_sample": 16,
@@ -4254,6 +4569,41 @@ globalThis.EGL_WORD_AUDIO = {
       "text": "please",
       "url": "../speech-training/word-audio/word-56ccc4dcfc96534b.wav"
     },
+    "pool": {
+      "audio_sha256": "c99a145f25037fe2bb755b29d2e7a6f57ccb408448316474159120f264f8d30d",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.8,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "pˈuːl",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "pool",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "pˈuːl",
+            "phones": [
+              "p",
+              "uː",
+              "l"
+            ],
+            "text": "pool"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 19200,
+      "standalone": true,
+      "text": "pool",
+      "url": "../speech-training/word-audio/word-27cac5503836765c.wav"
+    },
     "pot": {
       "audio_sha256": "8eef584cbc3db8036860e1fdf3aa215ce2d335485fb7f86ea010e1815237f9b5",
       "bits_per_sample": 16,
@@ -4327,6 +4677,41 @@ globalThis.EGL_WORD_AUDIO = {
       "standalone": true,
       "text": "practice",
       "url": "../speech-training/word-audio/word-ada750e3f8464e9e.wav"
+    },
+    "pull": {
+      "audio_sha256": "432846ee95f144def824c5b4e5f55525897d50decac46165f50d2c3689c12d52",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.88,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "pˈʊl",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "pull",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "pˈʊl",
+            "phones": [
+              "p",
+              "ʊ",
+              "l"
+            ],
+            "text": "pull"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 21120,
+      "standalone": true,
+      "text": "pull",
+      "url": "../speech-training/word-audio/word-c5f5571c2c9c4374.wav"
     },
     "pure": {
       "audio_sha256": "e776514d465dc158d190d69e13b9c37b973383dfc33d9221b260fdbdfb9284bf",
@@ -4688,6 +5073,41 @@ globalThis.EGL_WORD_AUDIO = {
       "standalone": true,
       "text": "say",
       "url": "../speech-training/word-audio/word-a0b967fc60136d2e.wav"
+    },
+    "seat": {
+      "audio_sha256": "5e45d87c06163a5eb1f1bd5025f1ebd4061ba35825aa3a305015dd71492d64a5",
+      "bits_per_sample": 16,
+      "channels": 1,
+      "duration_seconds": 0.8,
+      "generation_variant": "lora_icl",
+      "reference": {
+        "accent": "en-us",
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "ipa": "sˈiːt",
+        "notes": [
+          "IPA อ้างอิงของคำที่ออกเสียงเดี่ยว อาจต่างจากเสียงลดรูปเมื่ออยู่ในประโยค"
+        ],
+        "reference_context": "isolated_word",
+        "text": "seat",
+        "words": [
+          {
+            "index": 0,
+            "ipa": "sˈiːt",
+            "phones": [
+              "s",
+              "iː",
+              "t"
+            ],
+            "text": "seat"
+          }
+        ]
+      },
+      "sample_rate": 24000,
+      "samples": 19200,
+      "standalone": true,
+      "text": "seat",
+      "url": "../speech-training/word-audio/word-5d2c13d6f9fa4211.wav"
     },
     "see": {
       "audio_sha256": "4e65abd72f7be525f6c962484de49747fbf4c799187d838c850c7d351677d768",

@@ -133,6 +133,7 @@
     let mode = 'own', analysisData = null, wordItems = [], selectedIndex = null, slow = false;
     let practiceWord = null, practicePhone = null, sentenceResult = null, referenceFocus = null, inspector = null;
     let localUtterance = null, exampleVersion = 0, diagramSequence = 0;
+    let exampleEndCleanup = null, comparisonTimer = null, comparisonOwner = null;
     const listeners = [], referenceListeners = [], observedListeners = [], inspectorListeners = [], soundListeners = [], objectURLs = new Set();
     const spellingRefreshers = new Set();
     const sourceButtons = [], listenButtons = [];
@@ -152,6 +153,11 @@
       node.type = 'button';
       on(node, 'click', action, undefined, bucket);
       return node;
+    }
+    function listeningControl(node, bucket) {
+      listenButtons.push(node);
+      node.disabled = busy || preparing || recording || requestingMic;
+      bucket.push(() => { const index = listenButtons.indexOf(node); if (index >= 0) listenButtons.splice(index, 1); });
     }
     function friendly(message) { const error = new Error(message); error.userMessage = message; return error; }
     function setStatus(message, error) {
@@ -532,6 +538,14 @@
     }
     function stopExample() {
       exampleVersion++;
+      root.querySelectorAll('.egl-ph-video-card').forEach(card => {
+        card.querySelector('.egl-ph-video-player').replaceChildren();
+        card.querySelector('.egl-ph-video-load').hidden = false;
+        card.querySelector('.egl-ph-video-close').hidden = true;
+      });
+      if (comparisonTimer !== null) { win.clearTimeout(comparisonTimer); comparisonTimer = null; }
+      if (exampleEndCleanup) { exampleEndCleanup(); exampleEndCleanup = null; }
+      if (comparisonOwner) { comparisonOwner.dataset.playing = 'false'; comparisonOwner = null; }
       examplePlayer.pause();
       if (localUtterance && win.speechSynthesis) { win.speechSynthesis.cancel(); localUtterance = null; }
     }
@@ -546,14 +560,27 @@
       if (!data || data.accent !== accent.value || !Array.isArray(data.words) || data.words.length !== 1 || !Array.isArray(data.words[0].phones) || !data.words[0].phones.length) return null;
       return { ...data, text, words: [{ ...data.words[0], index: 0, text, phones: data.words[0].phones.slice() }], reference_context: 'isolated_word' };
     }
-    function playCompleteExample(url, label) {
+    function playCompleteExample(url, label, finished, rate) {
       let resolved;
       try { resolved = portableURL(url); } catch (error) { showServiceError(error); return; }
       const current = exampleVersion;
+      if (exampleEndCleanup) { exampleEndCleanup(); exampleEndCleanup = null; }
+      if (finished) {
+        const ended = () => {
+          if (disposed || current !== exampleVersion || examplePlayer.src !== resolved.href) return;
+          if (exampleEndCleanup) { exampleEndCleanup(); exampleEndCleanup = null; }
+          finished();
+        };
+        const failed = () => { stopExample(); setStatus('เปิดเสียงคู่เทียบไม่ได้ ลองโหลดหน้าใหม่แล้วกดฟังอีกครั้งครับ', true); };
+        examplePlayer.addEventListener('ended', ended);
+        examplePlayer.addEventListener('error', failed);
+        exampleEndCleanup = () => { examplePlayer.removeEventListener('ended', ended); examplePlayer.removeEventListener('error', failed); };
+      }
       const start = () => {
         if (disposed || current !== exampleVersion) return;
         examplePlayer.currentTime = 0;
-        examplePlayer.playbackRate = slow ? 0.75 : 1;
+        examplePlayer.playbackRate = rate || (slow ? 0.75 : 1);
+        examplePlayer.preservesPitch = true;
       };
       if (examplePlayer.src === resolved.href && examplePlayer.readyState >= 1) start();
       else {
@@ -561,8 +588,26 @@
         on(examplePlayer, 'loadedmetadata', () => { if (examplePlayer.src === resolved.href) start(); }, { once: true });
       }
       exampleCaption.textContent = label;
+      doc.querySelectorAll('audio').forEach(audio => { if (audio !== examplePlayer) audio.pause(); });
       const played = examplePlayer.play();
-      if (played && played.catch) played.catch(error => { if (!disposed && current === exampleVersion && error.name !== 'AbortError') setStatus('เปิดเสียงตัวอย่างไม่ได้ ลองโหลดหน้าใหม่แล้วกดฟังอีกครั้งครับ', true); });
+      if (played && played.catch) played.catch(error => { if (!disposed && current === exampleVersion && error.name !== 'AbortError') { stopExample(); setStatus('เปิดเสียงตัวอย่างไม่ได้ ลองโหลดหน้าใหม่แล้วกดฟังอีกครั้งครับ', true); } });
+    }
+    function playTeachingSequence(items, owner, progress, rate) {
+      if (recording || requestingMic || preparing) { setStatus('หยุดบันทึกเสียงก่อน แล้วค่อยฟังตัวอย่างครับ', true); return; }
+      stopPlayback(); stopExample();
+      const current = exampleVersion;
+      comparisonOwner = owner; owner.dataset.playing = 'true';
+      function next(index) {
+        if (disposed || current !== exampleVersion || !owner.isConnected) return;
+        comparisonTimer = null;
+        if (index >= items.length) { owner.dataset.playing = 'false'; comparisonOwner = null; progress.textContent = 'ฟังครบแล้ว ลองพูดตามทีละเสียงครับ'; return; }
+        const item = items[index];
+        progress.textContent = 'กำลังฟัง ' + item.label;
+        playCompleteExample(item.url, item.label, () => {
+          if (current === exampleVersion && owner.isConnected) comparisonTimer = win.setTimeout(() => next(index + 1), 450);
+        }, rate);
+      }
+      next(0);
     }
     function speakEnglish(text, label) {
       const synthesis = win.speechSynthesis;
@@ -623,7 +668,7 @@
       selectedPhrase.textContent = practicePhone ? 'ฝึกเสียง /' + practicePhone.phone + '/ ของ ' + practiceWord.text : practiceWord ? 'กำลังฝึกคำ: ' + practiceWord.text : 'แตะคำเพื่อดูเสียงทีละส่วน';
       if (practicePhone) {
         const word = { ...practiceWord }, selected = { ...practicePhone }, guide = el('div', 'egl-ph-guide');
-        showPhoneGuide(guide, selected.phone);
+        showPhoneGuide(guide, selected.phone, null, soundListeners);
         const actions = el('div', 'egl-ph-actions');
         actions.append(button('ฟังเสียงตัวอย่าง /' + selected.phone + '/', () => playPhoneExample(word, selected.index), 'egl-ph-button', soundListeners),
           button('กลับไปฝึกคำ ' + word.text, () => practice(word), 'egl-ph-button', soundListeners));
@@ -759,6 +804,7 @@
         return assessedPhones().filter(item => item.match_percent < 95).sort((a, b) => a.match_percent - b.match_percent || a.phoneIndex - b.phoneIndex);
       }
       function choose(group, phoneIndex) {
+        stopExample();
         detailListeners.splice(0).forEach(remove => remove());
         currentGroup = group;
         currentPhone = phoneIndex == null ? group.phoneIndices[0] : phoneIndex;
@@ -782,7 +828,7 @@
         if (result && result.counts && percent != null) resultBox.append(el('small', 'egl-ph-part-counts', countsText(result.counts, result.operations)));
         const advice = el('p', 'egl-ph-part-advice', phoneResultText(result, phone));
         resultBox.append(advice, el('p', 'egl-ph-part-method', 'วิธีฝึก: ' + recommendedMethod(phone, source.text))); panel.append(resultBox);
-        const guide = el('div', 'egl-ph-guide'); showPhoneGuide(guide, phone); panel.append(guide);
+        const guide = el('div', 'egl-ph-guide'); showPhoneGuide(guide, phone, null, detailListeners); panel.append(guide);
         const actions = el('div', 'egl-ph-actions');
         actions.append(button('ฟังเสียง /' + phone + '/ ในคำ', () => playPhoneExample(source, index), 'egl-ph-button', detailListeners),
           button('ฝึกเฉพาะเสียง /' + phone + '/', () => startPhonePractice(source, index, group.letters), 'egl-ph-button egl-ph-primary', detailListeners),
@@ -852,15 +898,137 @@
         chunks.hidden = false;
       }
     }
-    function showPhoneGuide(holder, phone, explanation) {
+    function showPhoneGuide(holder, phone, explanation, bucket) {
+      stopExample();
+      if (holder.eglGuideCleanup) holder.eglGuideCleanup();
+      const controls = [];
+      const clear = () => { controls.splice(0).forEach(remove => remove()); };
+      holder.eglGuideCleanup = clear;
+      (bucket || listeners).push(clear);
       const guide = guideFor(phone);
       holder.replaceChildren(el('strong', 'egl-ph-guide-label', guide.label || phone));
       if (explanation) holder.append(el('p', 'egl-ph-note', explanation));
       if (guide.tip) holder.append(el('p', 'egl-ph-guide-tip', guide.tip));
       if (guide.example) holder.append(el('p', 'egl-ph-note', 'ตัวอย่าง: ' + guide.example));
+      const comparison = vowelComparison(phone, controls);
+      if (comparison) holder.append(comparison);
+      const videos = pronunciationVideos(phone, controls);
+      if (videos) holder.append(videos);
       let foundation;
       try { foundation = global.EGLSoundFoundations && global.EGLSoundFoundations.describe(phone); } catch (_) {}
       if (foundation && foundation.known) holder.append(soundFoundation(foundation));
+    }
+    function vowelAsset(phone) {
+      let asset;
+      try { asset = global.EGLVowelAudio && global.EGLVowelAudio.forPhone(phone); } catch (_) {}
+      if (!asset || !/^assets\/vowels\/[a-z0-9._-]+\.ogg$/i.test(asset.url)) return null;
+      const base = runtimeScriptURL || new win.URL(location.pathname.includes('/speech-training/') ? '../app/phonetics.js' : 'phonetics.js', doc.baseURI).href;
+      return { ...asset, url: new win.URL(asset.url, base).href };
+    }
+    function teachingAudio(section, heading, entries, bucket, className) {
+      const box = el('section', 'egl-ph-vowel-audio ' + className);
+      box.setAttribute('aria-label', heading);
+      box.append(el('h5', 'egl-ph-heading', heading));
+      const cards = el('div', 'egl-ph-vowel-cards');
+      const progress = el('p', 'egl-ph-note egl-ph-vowel-progress', 'กดฟังทีละช่อง แล้วลองฟังสลับกัน');
+      progress.setAttribute('role', 'status'); progress.setAttribute('aria-live', 'polite');
+      let slower = false;
+      const available = entries.filter(entry => entry && entry.url);
+      entries.filter(Boolean).forEach((entry, index) => {
+        const card = el('div', 'egl-ph-vowel-card');
+        card.append(el('strong', 'egl-ph-small-ipa', (index ? 'B' : 'A') + ' · ' + entry.label));
+        if (entry.meaning) card.append(el('span', 'egl-ph-note', entry.meaning));
+        const listen = button('ฟัง ' + entry.label, () => playTeachingSequence([entry], section, progress, slower ? .75 : 1), 'egl-ph-button egl-ph-primary', bucket);
+        listen.disabled = !entry.url; card.append(listen);
+        if (entry.url) listeningControl(listen, bucket);
+        if (!entry.url) card.append(el('p', 'egl-ph-note', 'ยังไม่มีไฟล์ตัวอย่างที่ตรงกับคำอ่านและสำเนียงนี้'));
+        if (entry.note) card.append(el('p', 'egl-ph-note', entry.note));
+        if (entry.credit) card.append(entry.credit);
+        cards.append(card);
+      });
+      const actions = el('div', 'egl-ph-actions');
+      if (entries.filter(Boolean).length > 1) {
+        const alternate = button('ฟังสลับ A → B → A → B', () => playTeachingSequence([available[0], available[1], available[0], available[1]], section, progress, slower ? .75 : 1), 'egl-ph-button', bucket);
+        alternate.disabled = available.length !== 2; actions.append(alternate);
+        if (available.length === 2) listeningControl(alternate, bucket);
+      }
+      const speed = button('ฟังช้า 0.75×', () => {
+        slower = !slower; stopExample(); speed.setAttribute('aria-pressed', String(slower));
+        speed.textContent = slower ? 'ฟังช้า 0.75× ✓' : 'ฟังช้า 0.75×';
+        progress.textContent = slower ? 'เลือกโหมดช้าแล้ว กดฟังอีกครั้งได้เลย' : 'เลือกความเร็วปกติแล้ว กดฟังอีกครั้งได้เลย';
+      }, 'egl-ph-button', bucket); speed.setAttribute('aria-pressed', 'false');
+      actions.append(speed, button('หยุดเสียงคู่เทียบ', () => { stopExample(); progress.textContent = 'หยุดแล้ว กดฟังใหม่ได้ครับ'; }, 'egl-ph-button', bucket));
+      box.append(cards, actions, progress); return box;
+    }
+    function vowelComparison(phone, bucket) {
+      let pair;
+      try { pair = global.EGLVowelPairs && global.EGLVowelPairs.forPhone(phone); } catch (_) {}
+      const target = vowelAsset(phone);
+      if (!pair && !target) return null;
+      const section = el('section', 'egl-ph-vowel-comparison');
+      section.append(el('h5', 'egl-ph-heading', 'ฟังให้รู้ว่าเสียงนี้ต่างอย่างไร'));
+      function pureEntry(asset) {
+        if (!asset) return null;
+        const credit = el('p', 'egl-ph-image-credit', (asset.author || '') + ' · ');
+        [[asset.source, 'แหล่งเสียง'], [asset.licenseURL, asset.license]].forEach(([url, label]) => {
+          try { const parsed = new win.URL(url); if (parsed.protocol !== 'https:') return; const link = el('a', '', label || 'สิทธิ์การใช้'); link.href = parsed.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; credit.append(link, doc.createTextNode(' ')); } catch (_) {}
+        });
+        return {url: asset.url, label: '/' + (asset.audioSymbol || asset.symbol) + '/', note: [asset.caption, asset.note].filter(Boolean).join(' · '), credit};
+      }
+      const other = pair && vowelAsset(pair.other.phone);
+      if (target) {
+        section.append(teachingAudio(section, '1 · ฟังเสียงสระเดี่ยวจากผู้สาธิต', [pureEntry(target), other && other.url !== target.url ? pureEntry(other) : null], bucket, 'egl-ph-pure-vowels'));
+        section.append(el('p', 'egl-ph-note', 'ไฟล์สาธิตเสียงสระเต็ม ไม่ตัดจากประโยค · ใช้ฟังคุณภาพและตำแหน่งของสระ ความยาวและสำเนียงในคำอังกฤษอาจต่างกัน'));
+      }
+      if (pair) {
+        const sameSound = value => String(value).replace(/ː/g, '').replace(/^e$/, 'ɛ');
+        const entries = [pair.targetWord, pair.other].map(item => {
+          const asset = wordAudioFor(item.word);
+          const ref = asset && asset.reference;
+          const matches = ref && ref.accent === pair.accent && ref.words && ref.words[0] && ref.words[0].phones.some(value => sameSound(value) === sameSound(item.phone));
+          return {label: item.word + ' /' + item.phone + '/', meaning: item.meaning, url: matches ? asset.url : null};
+        });
+        section.append(teachingAudio(section, (target ? '2' : '1') + ' · ฟังสระในคำเต็ม · เสียง AI ' + (pair.accent === 'en-gb' ? 'อังกฤษ' : 'อเมริกัน'), entries, bucket, 'egl-ph-vowel-words'));
+        section.append(el('p', 'egl-ph-note', 'เสียง AI สร้างทีละคำ ไม่ตัดจากประโยค · ใช้ฝึกรวมเสียงเป็นคำ ส่วนเสียงสระเดี่ยวและวิดีโอผู้สอนใช้เทียบตำแหน่งเสียง'));
+        section.append(el('p', 'egl-ph-vowel-difference', pair.difference));
+        const steps = el('ol', 'egl-ph-mouth-steps'); pair.steps.forEach(step => steps.append(el('li', '', step))); section.append(steps);
+        if (pair.note) section.append(el('p', 'egl-ph-note', pair.note));
+      }
+      return section;
+    }
+    function pronunciationVideos(phone, bucket) {
+      let items;
+      try { items = global.EGLPronunciationVideos && global.EGLPronunciationVideos.forPhone(phone); } catch (_) {}
+      if (!Array.isArray(items) || !items.length) return null;
+      const section = el('section', 'egl-ph-videos');
+      section.append(el('h5', 'egl-ph-heading', 'ดูรูปปากและฟังผู้สอนในวิดีโอ'));
+      items.slice(0, 2).forEach(item => {
+        if (!/^[A-Za-z0-9_-]{11}$/.test(item.id)) return;
+        const card = el('div', 'egl-ph-video-card');
+        card.append(el('strong', '', item.title), el('p', 'egl-ph-note', item.creator + ' · ' + item.focusThai));
+        const actions = el('div', 'egl-ph-actions'), playerHost = el('div', 'egl-ph-video-player');
+        const load = button('ดูวิดีโอในหน้านี้', () => {
+          if (busy || recording || requestingMic || preparing) { setStatus('รอให้บันทึกหรือประมวลผลเสร็จก่อน แล้วค่อยดูวิดีโอครับ', true); return; }
+          stopExample(); stopPlayback();
+          doc.querySelectorAll('audio').forEach(audio => audio.pause());
+          const frame = el('iframe'); frame.title = item.title;
+          frame.src = 'https://www.youtube-nocookie.com/embed/' + item.id + '?autoplay=0&rel=0';
+          frame.allow = 'encrypted-media; picture-in-picture; fullscreen'; frame.allowFullscreen = true;
+          frame.referrerPolicy = 'strict-origin-when-cross-origin';
+          playerHost.replaceChildren(frame); load.hidden = true; closeVideo.hidden = false;
+        }, 'egl-ph-button egl-ph-video-load', bucket);
+        listeningControl(load, bucket);
+        const closeVideo = button('ปิดวิดีโอ', () => { playerHost.replaceChildren(); load.hidden = false; closeVideo.hidden = true; }, 'egl-ph-button egl-ph-video-close', bucket); closeVideo.hidden = true;
+        const link = el('a', 'egl-ph-button', 'เปิดใน YouTube'); link.href = 'https://www.youtube.com/watch?v=' + item.id; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        actions.append(load, closeVideo, link); card.append(actions, playerHost); section.append(card);
+        try {
+          const source = new win.URL(item.source);
+          if (source.protocol === 'https:') { const original = el('a', 'egl-ph-note', 'บทเรียนต้นฉบับของผู้สอน'); original.href = source.href; original.target = '_blank'; original.rel = 'noopener noreferrer'; card.append(original); }
+        } catch (_) {}
+        bucket.push(() => playerHost.replaceChildren());
+      });
+      section.append(el('p', 'egl-ph-note', 'วิดีโอเป็นภาษาอังกฤษ ดูรูปปากประกอบคำอธิบายไทยด้านบน · กดดูจึงเชื่อมต่อ YouTube หากเล่นฝังไม่ได้ให้เปิดใน YouTube'));
+      return section;
     }
     function mouthDiagram(foundation) {
       const visual = foundation.visual || {}, namespace = 'http://www.w3.org/2000/svg';
@@ -955,6 +1123,7 @@
       return figure;
     }
     function referenceWord(word) {
+      stopExample();
       if (practiceWord && String(practiceWord.index) !== String(word.index)) practice(word, false);
       selectedPhrase.textContent = 'คำที่เลือก: ' + word.text;
       let matching = -1;
@@ -977,18 +1146,19 @@
       const actions = el('div', 'egl-ph-actions');
       actions.append(button('ฟังคำตัวอย่าง', () => playExample(word), 'egl-ph-button', referenceListeners), button('ฝึกคำนี้', () => practice(word), 'egl-ph-button egl-ph-primary', referenceListeners));
       phones.forEach(phone => chips.append(button(phone, () => {
-        showPhoneGuide(guide, phone, 'นี่คือเสียงอ้างอิงจากข้อความ ยังไม่ได้ฟังจากไฟล์เสียง');
+        showPhoneGuide(guide, phone, 'นี่คือเสียงอ้างอิงจากข้อความ ยังไม่ได้ฟังจากไฟล์เสียง', referenceListeners);
       }, 'egl-ph-phone', referenceListeners)));
       const spelling = spellingSection(word, referenceListeners);
       if (spelling) referenceFocus.append(spelling, actions);
       else referenceFocus.append(actions, chips, guide);
-      if (phones.length) showPhoneGuide(guide, phones[0]);
+      if (phones.length) showPhoneGuide(guide, phones[0], null, referenceListeners);
       else guide.append(el('p', 'egl-ph-note', 'ดูคำอ่าน IPA ในรายละเอียดด้านล่างได้ครับ'));
       referenceFocus.hidden = false;
     }
     function renderReference(data) {
       if (!data || !Array.isArray(data.words)) throw new Error('Invalid pronunciation reference');
       if (practiceWord && data.text !== textarea.value.trim()) return;
+      stopExample();
       referenceListeners.splice(0).forEach(remove => remove());
       reference = data;
       expected.replaceChildren(el('p', 'egl-ph-note', 'แตะคำที่อยากฝึก เพื่อแยกดูหน่วยเสียง'));
@@ -1020,6 +1190,7 @@
     }
     function selectWord(index) {
       if (!wordItems[index] || !analysisData) return;
+      stopExample();
       inspectorListeners.splice(0).forEach(remove => remove());
       selectedIndex = index;
       const item = wordItems[index], word = item.word, operations = wordOperations(word);
@@ -1067,7 +1238,7 @@
           const phone = op[side];
           if (!phone) { row.append(el('span', 'egl-ph-phone-missing', '—')); return; }
           const chip = button('', () => {
-            showPhoneGuide(guide, phone, messages[op.type] || 'การจับคู่หน่วยเสียงเป็นการประมาณจากไฟล์เสียง');
+            showPhoneGuide(guide, phone, messages[op.type] || 'การจับคู่หน่วยเสียงเป็นการประมาณจากไฟล์เสียง', inspectorListeners);
             if (side === 'expected') playExample(practiceWord || word);
             else playOwn(true);
           }, 'egl-ph-phone', inspectorListeners);
@@ -1084,7 +1255,7 @@
       }
       inspector.append(pairs, guide);
       const firstPhone = operations.find(op => op.expected || op.observed);
-      if (firstPhone) showPhoneGuide(guide, firstPhone.expected || firstPhone.observed, messages[firstPhone.type]);
+      if (firstPhone) showPhoneGuide(guide, firstPhone.expected || firstPhone.observed, messages[firstPhone.type], inspectorListeners);
       else guide.append(el('p', 'egl-ph-note', 'ผลนี้ยังไม่พอสำหรับอธิบายตำแหน่งเสียงแต่ละหน่วย'));
       inspector.hidden = false;
     }
@@ -1412,6 +1583,9 @@
     on(player, 'error', () => {
       if (clip && !disposed) setStatus('เบราว์เซอร์ยังเปิดไฟล์เสียงนี้ไม่ได้ ลองบันทึกใหม่หรือเปิดหน้าเรียนในเบราว์เซอร์อีกครั้ง', true);
     });
+    on(doc, 'play', event => {
+      if (event.target !== examplePlayer && event.target && event.target.tagName === 'AUDIO') stopExample();
+    }, true);
 
     function cleanup() {
       if (disposed) return;
