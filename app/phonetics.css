@@ -89,6 +89,45 @@
 .egl-ph-phone-symbol { font: 23px/1.4 "Charis SIL","Doulos SIL","Noto Sans",Arial,system-ui,sans-serif; }
 .egl-ph-phone-label { color: #60745c; font-size: 11px; line-height: 1.5; }
 .egl-ph-phone-missing { display: flex; align-items: center; justify-content: center; min-height: 44px; color: #859080; }
+.egl-ph-spelling { display: grid; gap: 10px; padding: 14px; border: 1px solid #cbdcc2; border-radius: 13px; background: #f5f9ef; }
+.egl-ph-spelling-groups,.egl-ph-letter-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.egl-ph-spelling-group { flex: 1 0 65px; display: grid; gap: 3px; justify-items: center; padding: 10px 14px; min-height: 72px; border: 1px solid #b9cdb0; border-radius: 11px; color: #244c37; background: #fffefa; cursor: pointer; font: inherit; }
+.egl-ph-spelling-group[aria-pressed=true] { border-color: #315f46; background: #e1edda; box-shadow: inset 0 0 0 1px #315f46; }
+.egl-ph-grapheme { font-size: 26px; font-weight: 650; line-height: 1.25; }
+.egl-ph-grapheme-sound { font-size: 13px; }
+.egl-ph-silent { color: #7b8274; border-style: dashed; }
+.egl-ph-silent .egl-ph-grapheme { text-decoration: underline dotted; text-underline-offset: 5px; }
+.egl-ph-spelling-detail { display: grid; gap: 10px; padding-top: 5px; }
+.egl-ph-spelling-focus { font-size: 20px; color: #31563d; }
+.egl-ph-letter-names { color: #5a7054; font-size: 12px; }
+.egl-ph-letter-names > summary { cursor: pointer; min-height: 30px; }
+.egl-ph-letter-strip { margin: 6px 0; }
+.egl-ph-letter-name { width: 44px; min-height: 44px; border: 1px solid #d3ddce; border-radius: 8px; font: 650 16px system-ui,sans-serif; background: #fffefa; color: #3e6247; cursor: pointer; }
+.egl-ph-sound-target { flex-basis: 100%; display: grid; gap: 10px; margin-top: 8px; }
+.egl-ph-target:has(.egl-ph-sound-target:not([hidden])) { flex-wrap: wrap; }
+.egl-ph-foundation { display: grid; gap: 12px; margin-top: 8px; padding-top: 12px; border-top: 1px solid #cad9c0; }
+.egl-ph-sound-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.egl-ph-sound-fact { display: grid; gap: 4px; padding: 9px 11px; border: 1px solid #d1dfc8; border-radius: 9px; background: #f9fcf4; }
+.egl-ph-sound-fact small { color: #708366; font-size: 11px; }
+.egl-ph-sound-fact span { color: #3c5f3e; font-size: 13px; }
+.egl-ph-mouth-steps { display: grid; gap: 9px; margin: 0; padding-left: 24px; color: #35583b; font-size: 14px; }
+.egl-ph-mouth-steps li::marker { color: #7c9b69; font-weight: 700; }
+.egl-ph-sound-caution { margin: 0; padding: 9px 11px; background: #faf4e6; border-radius: 8px; color: #775b30; font-size: 12px; }
+.egl-ph-anatomy { padding: 10px 12px; border: 1px solid #d1dfc8; border-radius: 10px; background: #fbfdf8; }
+.egl-ph-anatomy > summary { font-size: 13px; color: #4b7049; cursor: pointer; min-height: 28px; }
+.egl-ph-anatomy-layout { display: grid; grid-template-columns: minmax(180px,.9fr) 1.1fr; align-items: center; gap: 15px; margin-top: 8px; }
+.egl-ph-mouth-diagram { display: block; width: 100%; max-width: 330px; margin: auto; }
+.egl-ph-anatomy-notes { margin: 0; font-size: 12px; }
+.egl-ph-anatomy-notes dt { color: #79906a; font-size: 11px; margin-top: 7px; }
+.egl-ph-anatomy-notes dd { color: #3c5e3b; margin: 2px 0 0; }
+.egl-ph-articulation-figure { margin: 0; padding: 10px; border: 1px solid #dce4d6; border-radius: 10px; background: #fff; }
+.egl-ph-articulation-image { display: block; width: 100%; height: auto; max-height: 310px; object-fit: contain; }
+.egl-ph-articulation-caption { margin-top: 9px; color: #50664b; font-size: 12px; line-height: 1.7; }
+.egl-ph-image-credit { margin: 6px 0 0; color: #819077; font-size: 10px; line-height: 1.7; }
+.egl-ph-image-credit a { color: #637b58; text-underline-offset: 2px; }
+.egl-ph-air-schematic { margin-top: 10px; color: #6c805f; font-size: 12px; }
+.egl-ph-air-schematic > summary { min-height: 26px; cursor: pointer; }
+@media(max-width:560px) { .egl-ph-sound-facts,.egl-ph-anatomy-layout { grid-template-columns: 1fr; } .egl-ph-spelling { padding: 10px; } }
 .egl-ph-guide { display: grid; gap: 5px; padding: 12px; border-left: 3px solid #9eb58e; border-radius: 3px 10px 10px 3px; background: #edf4e6; }
 .egl-ph-guide-label { font-size: 15px; color: #345a3b; }
 .egl-ph-guide-tip { font-size: 14px; color: #415d43; }

@@ -1,0 +1,19 @@
+Standalone AI word recordings — English Garden Lab
+
+These are complete newly synthesized words, not cuts from sentences or copies
+of the original training recordings. Voice: Qwen3-TTS 0.6B Base using Cori Samuel (Hi-Fi TTS speaker 92) as the
+speaker reference. Most words use this project's LoRA; selected words use the
+base voice clone. Each record identifies its generation_variant.
+
+Training voice data: Hi-Fi Multi-Speaker English TTS Dataset (2021), by Evelina
+Bakhturina, Vitaly Lavrukhin, Boris Ginsburg, and Yang Zhang.
+Source: https://www.openslr.org/109/
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License URL: https://creativecommons.org/licenses/by/4.0/
+Changes: selected speaker 92, selected training subset, resampled to 24 kHz,
+trained a LoRA adapter, and synthesized these separate word utterances.
+
+Base model Qwen3-TTS: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base
+Base model license: Apache-2.0. Generation uses local MLX Audio / MLX-Tune.
+The files have automatic waveform checks, not a human naturalness endorsement.
+Pronunciation, stress, vowel quality and rhoticity depend on the generated voice.
