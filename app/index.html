@@ -17,15 +17,16 @@
   <script src="phone-guide.js" defer></script>
   <script src="study-help.js" defer></script>
   <script src="reference-audio.js" defer></script>
+  <script src="browser-phonetics.js" defer></script>
   <script id="egl-demo-runtime">globalThis.EGL_DEMO_RUNTIME={mode:"demo",apiBase:null};</script>
 <script src="../speech-training/demo-assets/demo-data.js" defer></script>
 <script src="phonetics.js" defer></script>
   <script src="app.js" defer></script>
-<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="connect-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'">
+<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="connect-src 'self' https://huggingface.co https://*.hf.co; worker-src 'self' blob:; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'">
 </head>
 <body>
 <aside id="egl-hosted-demo-notice" role="note" style="margin:16px auto;padding:12px 16px;max-width:1120px;border:1px solid #c7d8bd;border-radius:12px;background:#f1f6eb;color:#234b35;font:14px/1.7 system-ui,sans-serif">
-<strong>เดโมบนเว็บ</strong> · ฟังเสียง AI และดูผลแยกเสียงที่เตรียมไว้ได้ บันทึกและฟังเสียงของคุณซ้ำได้ในเบราว์เซอร์ การวิเคราะห์เสียงของคุณแบบสดต้องใช้ฉบับในเครื่อง
+<strong>ฝึกเสียงบนเว็บ</strong> · ฟังเสียง AI พร้อมผลที่เตรียมไว้ หรือบันทึกและวิเคราะห์เสียงของคุณในเบราว์เซอร์ เมื่อกดวิเคราะห์ครั้งแรกจะดาวน์โหลดโมเดลประมาณ 318 MB และชุดประมวลผลประมาณ 12 MB เสียงของคุณไม่ถูกส่งออกจากเบราว์เซอร์ เครื่องที่ช้าอาจใช้เวลารอ
  · <a href="../speech-training/demo-assets/ATTRIBUTION.txt">ที่มาของเสียงตัวอย่าง</a></aside>
   <a href="#main" class="skip-link">ข้ามไปบทเรียน</a>
   <div id="app" class="app-shell">
