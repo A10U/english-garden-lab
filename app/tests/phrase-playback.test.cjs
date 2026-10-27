@@ -108,20 +108,40 @@ test('a catalog key cannot substitute a recording whose actual text differs from
   assert.equal(app.separate.getAttribute('src'), null);
 });
 
-test('switching examples and leaving the phrase remove stale metadata and repeat callbacks', t => {
+test('a fresh unloaded phrase plays inside the click and late metadata cannot replay it after switching or cleanup', t => {
   const app = setup(t);
   Object.defineProperty(app.separate, 'readyState', { value: 0, configurable: true });
+  Object.defineProperty(app.separate, 'currentTime', { configurable: true, get: () => 0,
+    set() { throw new Error('An unloaded complete file must not wait for or seek metadata'); } });
   monitor(app.A);
-  app.exact.click(); assert.deepEqual(app.plays, []); assert.ok(app.loads.includes(app.separate));
-  app.fallback.click(); assert.deepEqual(app.plays, [app.A]);
+  app.exact.click();
+  assert.deepEqual(app.plays, [app.separate], 'play() must run synchronously during the click, before metadata');
+  assert.equal(app.loads.length, 0, 'play() loads a new complete file without a deferred metadata callback');
+  app.fallback.click(); assert.deepEqual(app.plays, [app.separate, app.A]);
   app.separate.dispatchEvent(new app.window.Event('loadedmetadata'));
-  assert.deepEqual(app.plays, [app.A], 'late metadata cannot restart the previous independent example');
+  assert.deepEqual(app.plays, [app.separate, app.A], 'late metadata cannot restart the previous independent example');
   app.document.querySelector('#repeat-example').click();
-  assert.equal(app.plays.length, 2);
+  assert.equal(app.plays.length, 3);
   app.document.querySelector('#next').click();
   app.A.dispatchEvent(new app.window.Event('ended'));
+  app.separate.dispatchEvent(new app.window.Event('loadedmetadata'));
   app.separate.dispatchEvent(new app.window.Event('ended'));
-  assert.equal(app.plays.length, 2, 'an old player cannot repeat after the phrase changes');
+  assert.equal(app.plays.length, 3, 'an old player cannot repeat after the phrase changes');
   assert.equal(app.A.getAttribute('src'), null); assert.equal(app.separate.getAttribute('src'), null);
   assert.equal(app.requests.length, 0);
+});
+
+test('a rejected unloaded play cleans repeat listeners and allows an explicit retry', async t => {
+  const app = setup(t);
+  app.window.HTMLMediaElement.prototype.play = function () { app.plays.push(this); return Promise.reject(new Error('Playback blocked')); };
+  app.document.querySelector('#repeat-example').click();
+  assert.deepEqual(app.plays, [app.A]);
+  await Promise.resolve();
+  assert.match(app.status(), /ยังเล่นตัวอย่างไม่ได้/);
+  app.A.dispatchEvent(new app.window.Event('ended'));
+  assert.equal(app.plays.length, 1, 'a failed play must not leave a repeat callback');
+  app.window.HTMLMediaElement.prototype.play = function () { app.plays.push(this); return Promise.resolve(); };
+  app.exact.click();
+  assert.deepEqual(app.plays, [app.A, app.separate]);
+  assert.match(app.status(), /เสียงวลีแยก/);
 });
