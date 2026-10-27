@@ -66,6 +66,9 @@
 
   function analyzeWord(analysis, referenceWordIndex, groups) {
     const suppliedGroups = Array.isArray(groups) ? groups : [];
+    if (record(analysis) && record(analysis.recognition_quality) && analysis.recognition_quality.status === 'uncertain') {
+      return empty(suppliedGroups, 'ระบบยังแยกหน่วยเสียงได้ไม่มั่นคง จึงยังให้เปอร์เซ็นต์หรือระบุส่วนที่ออกเสียงผิดไม่ได้');
+    }
     if (!record(analysis) || analysis.audio_analyzed !== true || analysis.analysis_type !== 'acoustic_phone_comparison'
       || !index(referenceWordIndex) || !record(analysis.reference)
       || !Array.isArray(analysis.reference.words)) return empty(suppliedGroups);
