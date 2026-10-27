@@ -6,6 +6,17 @@
 !/.openai/
 !/app/
 !/speech-training/
+!/package.json
+!/package-lock.json
+!/vite.config.ts
+!/next.config.ts
+!/tsconfig.json
+!/cloudflare-env.d.ts
+!/.npmrc
+!/scripts/
+!/lib/
+!/worker/
+!/server/
 node_modules/
 .venv/
 venv/
@@ -40,4 +51,9 @@ __pycache__/
 # Generated test reports
 *.tap
 coverage/
+.wrangler/
+.vinext/
+.next/
+.sites-runtime/
+*.tsbuildinfo
 .pytest_cache/

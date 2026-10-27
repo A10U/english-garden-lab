@@ -220,9 +220,9 @@ class StaticDemoBuildTests(unittest.TestCase):
 
         build(self.root, self.output)
         previous = versions()
-        for script in ('browser-phonetics-worker.js', 'microphone-processor.js', 'spelling-feedback.js'):
+        for script in ('browser-phonetics-worker.js', 'microphone-processor.js', 'spelling-feedback.js', 'styles.css'):
             path = self.root / 'app' / script
-            path.write_text(path.read_text() + '\n// changed runtime implementation\n')
+            path.write_text(path.read_text() + '\n/* changed runtime implementation */\n')
             build(self.root, self.output)
             current = versions()
             self.assertNotEqual(previous, current, script + ' must invalidate entry script URLs')
@@ -259,6 +259,20 @@ class StaticDemoBuildTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Missing browser phoneme runtime asset'):
             build(self.root, self.output)
         self.assertFalse(self.output.exists())
+
+    def test_speak_workspace_receives_browser_runtime_and_versioned_scripts(self):
+        (self.root / 'app/speak.html').write_text('''<!doctype html><html><head>
+<script src="browser-phonetics.js" defer></script><script src="phonetics.js" defer></script>
+<script src="speak.js" defer></script></head><body>Speak</body></html>''')
+        (self.root / 'app/speak.js').write_text('globalThis.speakReady=true;')
+        build(self.root, self.output)
+        text = (self.output / 'app/speak.html').read_text()
+        self.assertIn('id="egl-demo-runtime"', text)
+        self.assertIn('../speech-training/demo-assets/demo-data.js', text)
+        self.assertRegex(text, r'src="speak\.js\?v=[a-f0-9]{16}"')
+        self.assertIn('id="egl-demo-csp"', text)
+        self.assertIn('Cloud ส่งเสียงหรือข้อความเมื่อคุณกดใช้', text)
+        self.assertNotIn('เสียงของคุณไม่ถูกส่งออกจากเบราว์เซอร์', text)
 
     def test_missing_microphone_worklet_fails_before_writing(self):
         (self.root / 'app/microphone-processor.js').unlink()

@@ -193,7 +193,7 @@
     let stream = null, recorder = null, recording = false, requestingMic = false, preparing = false;
     let prepareController = null, decodeContext = null, captureContext = null;
     let recordingVersion = 0, recordTimer = null;
-    let clip = null, clipLabel = '', clipURL = null, clipKind = '', clipInfo = null, reference = null;
+    let clip = null, clipLabel = '', clipURL = null, clipKind = '', clipInfo = null, reference = null, clipId = 0;
     let mode = 'own', analysisData = null, wordItems = [], selectedIndex = null, slow = false;
     let practiceWord = null, practicePhone = null, sentenceResult = null, referenceFocus = null, inspector = null;
     let localUtterance = null, exampleVersion = 0, diagramSequence = 0;
@@ -287,11 +287,12 @@
       selectedPhrase.textContent = 'แตะคำเพื่อดูเสียงทีละส่วน';
       expected.replaceChildren();
       expected.hidden = true;
+      textButton.setAttribute('aria-expanded', 'false');
       clearObserved();
       setStatus('กด “ดูคำอ่าน” เพื่อดู IPA ตามข้อความและสำเนียงที่เลือก');
     }
-    function inputValues() {
-      const text = practiceWord ? String(practiceWord.text).trim() : textarea.value.trim();
+    function inputValues(textReference) {
+      const text = !textReference && practiceWord ? String(practiceWord.text).trim() : textarea.value.trim();
       if (!text) throw friendly('ใส่ข้อความภาษาอังกฤษก่อนครับ');
       if (text.length > 350 || text.split(/\s+/).length > 60) throw friendly('ใช้ข้อความไม่เกิน 350 ตัวอักษร และ 60 คำต่อครั้ง');
       return { text: text, accent: accent.value };
@@ -325,10 +326,10 @@
       }
       return cached;
     }
-    async function request(action, message) {
+    async function request(action, message, revealTextReference) {
       if (disposed) return;
       let values;
-      try { values = inputValues(); } catch (error) { showServiceError(error); return; }
+      try { values = inputValues(revealTextReference === true); } catch (error) { showServiceError(error); return; }
       cancelRequest();
       const current = version;
       const abort = new win.AbortController();
@@ -341,7 +342,11 @@
         const result = await action(values, abort.signal, () => !disposed && current === version);
         if (disposed || current !== version) return;
         if (result && result.audio_analyzed === true) renderAnalysis(result);
-        else if (result) { renderReference(result); setStatus('แสดงคำอ่านอ้างอิงจากข้อความแล้ว ยังไม่ได้วิเคราะห์เสียง'); }
+        else if (result) {
+          renderReference(result);
+          if (revealTextReference) revealReference();
+          setStatus('แสดงคำอ่านอ้างอิงจากข้อความแล้ว ยังไม่ได้วิเคราะห์เสียง' + (revealTextReference ? ' · เปิด IPA ฉบับเต็มด้านล่างแล้ว แตะคำเพื่อดูเสียงทีละส่วน' : ''));
+        }
       } catch (error) {
         if (!disposed && current === version && error.name !== 'AbortError') showServiceError(error);
       } finally {
@@ -367,6 +372,14 @@
     function revokeURL(url) {
       if (url && objectURLs.has(url)) { win.URL.revokeObjectURL(url); objectURLs.delete(url); }
     }
+    function notifyHost(name, value) {
+      if (disposed || typeof options[name] !== 'function') return;
+      try { options[name](value); } catch (_) { /* Host UI must not interrupt audio cleanup. */ }
+    }
+    function notifyClip() {
+      notifyHost('onClipChange', { blob: clip, label: clipLabel, kind: clipKind, info: clipInfo,
+        target: practiceWord ? practiceWord.text : textarea.value.trim(), clipId: ++clipId });
+    }
     function setClip(blob, label, kind, info) {
       checkBlob(blob);
       clearObserved();
@@ -382,6 +395,7 @@
       durationText.textContent = clipInfo ? 'ความยาวเสียง ' + clipInfo.duration.toFixed(2) + ' วินาที' : '';
       player.load();
       updateButtons();
+      notifyClip();
     }
     function clearClip() {
       clearObserved(); revokeURL(clipURL);
@@ -389,6 +403,7 @@
       player.removeAttribute('src'); player.hidden = true; chosen.textContent = '';
       durationText.textContent = '';
       fileInput.value = '';
+      notifyClip();
     }
     function closeContext(context) {
       if (!context || typeof context.close !== 'function') return;
@@ -1235,6 +1250,8 @@
       });
       referenceFocus = el('div', 'egl-ph-reference-focus'); referenceFocus.hidden = true;
       const raw = el('details', 'egl-ph-technical');
+      textButton.setAttribute('aria-expanded', 'false');
+      on(raw, 'toggle', () => textButton.setAttribute('aria-expanded', String(raw.open)), undefined, referenceListeners);
       raw.append(el('summary', '', 'ดู IPA ฉบับเต็ม'), el('p', 'egl-ph-ipa', data.ipa || 'ยังสร้างคำอ่านไม่ได้'));
       const unitList = el('div', 'egl-ph-words');
       data.words.slice(0, 200).forEach(word => {
@@ -1246,6 +1263,16 @@
       raw.append(unitList, el('p', 'egl-ph-note', 'ˈ เน้นเสียงหลัก · ˌ เน้นเสียงรอง · ː เสียงยาว · คำอ่านส่วนนี้สร้างจากข้อความ'));
       expected.append(words, referenceFocus, raw);
       expected.hidden = false;
+    }
+    function revealReference() {
+      const raw = expected.querySelector('details');
+      if (expected.hidden || !raw) return;
+      root.open = true;
+      raw.open = true;
+      textButton.setAttribute('aria-expanded', 'true');
+      const heading = raw.querySelector('summary');
+      if (heading) heading.focus({ preventScroll: true });
+      if (typeof raw.scrollIntoView === 'function') raw.scrollIntoView({ block: 'nearest' });
     }
     function stopPlayback() { player.pause(); }
     function wordOperations(word) {
@@ -1396,6 +1423,7 @@
       const silent = !phones.length || (metrics.voiced_seconds != null && Number(metrics.voiced_seconds) === 0) || (metrics.rms_dbfs != null && Number(metrics.rms_dbfs) < -60);
       setStatus(uncertain ? 'มีสัญญาณเสียง แต่ผลตรวจยังไม่มั่นคง จึงยังให้เปอร์เซ็นต์ไม่ได้ · ฟังเทียบหรือลองบันทึกใหม่ได้' : demoMode && data.precomputed === true ? 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · แตะคำเพื่อดูรายละเอียด' : silent ? 'เสียงเบาหรือมีช่วงเงียบมาก ลองบันทึกในที่เงียบและพูดใกล้ไมโครโฟนขึ้น' : 'วิเคราะห์จากไฟล์เสียงแล้ว แตะคำเพื่อฟังและเปรียบเทียบด้วยตัวเอง', uncertain || silent);
       if (wordItems.length) selectWord(0);
+      notifyHost('onAnalysis', { data, clipKind, target: data.reference && data.reference.text || '', clipId });
     }
 
     const root = el('details', 'egl-phonetics');
@@ -1436,12 +1464,15 @@
       return jsonResponse(await win.fetch(apiBase + '/api/phonetics/text', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values), signal: signal,
       }));
-    }, 'กำลังเตรียมคำอ่าน…'));
+    }, 'กำลังเตรียมคำอ่าน…', true));
     const listenExample = button('ฟังประโยคตัวอย่าง', () => playExample(null, true));
     listenButtons.push(listenExample);
     const exampleCaption = el('p', 'egl-ph-note egl-ph-example-caption');
     controls.append(textButton, listenExample);
     const expected = el('section', 'egl-ph-reference'); expected.hidden = true;
+    expected.id = id + '-reference';
+    textButton.setAttribute('aria-controls', expected.id);
+    textButton.setAttribute('aria-expanded', 'false');
     expected.setAttribute('aria-label', 'คำอ่านอ้างอิง');
     firstStep.append(phrase, translation, chunks, controls, exampleCaption, selectedPhrase, expected, advanced);
 

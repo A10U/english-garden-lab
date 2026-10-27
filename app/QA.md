@@ -2,9 +2,11 @@
 
 Checks for the portable App and Speech demo:
 
-- JavaScript unit and DOM integration suite: 271 passed.
+- JavaScript unit and DOM integration suite: 287 passed.
+- Speak UI: 10 regressions for explicit transmission, demo/connected separation, safe text, same-clip assessment and cancellation. Server: 18 tests for authentication, Origin, bounds/timeouts, real API wire format and malformed provider results. Provider calls were mocked; live cloud calls remain unverified until a provider key is connected.
+- “ดูคำอ่าน” explicitly reveals and focuses IPA even for cached references, preserving the active word and learner audio. Four regressions passed.
 - Recognition-quality regressions cover uncertain raw zero/100, preserved genuine zero, all score levels/coaching, later successful attempts, CTC blank exclusion and invalid logits. The supplied three learner files ran through the real q8 WASM worker twice with stable output; the short word is flagged uncertain while the two sentences remain recognized. This is regression evidence, not calibration of the experimental posterior threshold.
-- Direct PCM microphone capture, AudioWorklet batching/tail flush, short-word timing, truncation, interruption recovery and repeated recording: 17 regressions passed. Static builder suite: 25 passed, including required microphone-worklet packaging and cache version changes for worker/worklet/feedback edits.
+- Direct PCM microphone capture, AudioWorklet batching/tail flush, short-word timing, truncation, interruption recovery and repeated recording: 17 regressions passed. Static builder suite: 26 passed, including required microphone-worklet packaging, cache version changes and Speak runtime injection.
 - Full Python engine, API, reference-audio, exporter and static-builder suite: 80 passed.
 - Browser client, alignment and hosted learner dispatch have regression coverage for cancellation, PCM resampling and separation from cached AI results.
 - All 62 sentence WAVs and 210 complete standalone word WAVs verified against manifests, PCM headers, duration, and SHA256SUMS.

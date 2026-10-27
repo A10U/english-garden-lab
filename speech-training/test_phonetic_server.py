@@ -27,6 +27,8 @@ class PhoneticAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('javascript', response.headers['content-type'])
         self.assertIn("registerProcessor('egl-microphone'", response.text)
+        for name in ('speak.html', 'speak.js', 'speak.css'):
+            self.assertEqual(self.client.get('/app/' + name).status_code, 200, name)
 
     def test_text_reference_is_explicitly_not_audio_analysis(self):
         response = self.client.post('/api/phonetics/text', json={'text': 'This is a leaf.', 'accent': 'en-us'})

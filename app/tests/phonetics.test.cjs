@@ -130,6 +130,90 @@ test('text reference uses explicit POST and cannot be mistaken for audio analysi
   app.cleanup(); app.dom.window.close();
 });
 
+test('explicit ดูคำอ่าน opens cached IPA, focuses and reveals it, and works again after closing', async () => {
+  let microphones = 0;
+  const app = setup({ getUserMedia: () => { microphones++; }, mount: { expanded: true, precomputed: reference() } });
+  const scrolled = [];
+  app.window.HTMLElement.prototype.scrollIntoView = function (options) { scrolled.push({ node: this, options }); };
+  const button = app.button('ดูคำอ่าน');
+  assert.equal(app.container.querySelector('.egl-ph-reference details').open, false);
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  assert.equal(button.getAttribute('aria-controls'), app.container.querySelector('.egl-ph-reference').id);
+  button.click(); await flush();
+  let raw = app.container.querySelector('.egl-ph-reference details');
+  assert.equal(raw.open, true);
+  assert.equal(button.getAttribute('aria-expanded'), 'true');
+  assert.equal(app.window.document.activeElement, raw.querySelector('summary'));
+  assert.equal(scrolled.at(-1).node, raw);
+  assert.equal(scrolled.at(-1).options.block, 'nearest');
+  assert.match(app.container.querySelector('[role=status]').textContent, /เปิด IPA ฉบับเต็ม/);
+  assert.equal(app.calls.length, 0);
+  assert.equal(microphones, 0);
+  raw.open = false;
+  raw.dispatchEvent(new app.window.Event('toggle'));
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  button.click(); await flush();
+  raw = app.container.querySelector('.egl-ph-reference details');
+  assert.equal(raw.open, true);
+  assert.equal(app.window.document.activeElement, raw.querySelector('summary'));
+  assert.equal(scrolled.length, 2);
+  assert.equal(app.calls.length, 0);
+  assert.equal(microphones, 0);
+  app.cleanup(); app.dom.window.close();
+});
+
+test('a new reference request visibly loads and only reveals IPA after its successful response', async () => {
+  let finish;
+  const app = setup({ mount: { expanded: true }, fetch: () => new Promise(resolve => { finish = resolve; }) });
+  const button = app.button('ดูคำอ่าน');
+  button.click();
+  assert.equal(button.disabled, true);
+  assert.equal(app.container.querySelector('.egl-phonetics').getAttribute('aria-busy'), 'true');
+  assert.match(app.container.querySelector('[role=status]').textContent, /กำลังเตรียมคำอ่าน/);
+  assert.equal(app.container.querySelector('.egl-ph-reference').hidden, true);
+  finish(ok(reference())); await flush();
+  const raw = app.container.querySelector('.egl-ph-reference details');
+  assert.equal(raw.open, true);
+  assert.equal(app.window.document.activeElement, raw.querySelector('summary'));
+  assert.equal(button.disabled, false);
+  assert.equal(app.calls.length, 1);
+  app.cleanup(); app.dom.window.close();
+});
+
+test('ดูคำอ่าน reveals the sentence reference without clearing a selected word or its learner clip', async () => {
+  const app = setup({ mount: { expanded: true, precomputed: reference() } });
+  app.container.querySelector('.egl-ph-ref-word').click();
+  app.button('ฝึกคำนี้').click();
+  selectFile(app);
+  const clip = app.container.querySelector('.egl-ph-player').getAttribute('src');
+  const target = app.container.querySelector('.egl-ph-target').textContent;
+  app.button('ดูคำอ่าน').click(); await flush();
+  assert.equal(app.container.querySelector('.egl-ph-reference details').open, true);
+  assert.equal(app.container.querySelector('.egl-ph-reference .egl-ph-ipa').textContent, reference().ipa);
+  assert.equal(app.container.querySelector('.egl-ph-target').hidden, false);
+  assert.equal(app.container.querySelector('.egl-ph-target').textContent, target);
+  assert.equal(app.container.querySelector('.egl-ph-player').getAttribute('src'), clip);
+  assert.equal(app.calls.length, 0);
+  app.cleanup(); app.dom.window.close();
+});
+
+test('an unavailable changed accent clears the open-reference state and reports the error', async () => {
+  const app = setup({ url: 'https://garden.example/app/index.html', mount: { expanded: true, precomputed: reference() } });
+  const button = app.button('ดูคำอ่าน');
+  button.click(); await flush();
+  const accent = app.container.querySelector('select');
+  accent.value = 'en-gb'; accent.dispatchEvent(new app.window.Event('change'));
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  button.click(); await flush();
+  assert.equal(app.container.querySelector('.egl-ph-reference').hidden, true);
+  assert.equal(app.container.querySelector('.egl-ph-reference details'), null);
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  assert.equal(button.disabled, false);
+  assert.match(app.container.querySelector('[role=status]').textContent, /ยังไม่มีคำอ่าน/);
+  assert.equal(app.calls.length, 0);
+  app.cleanup(); app.dom.window.close();
+});
+
 test('text editing aborts pending request and ignores stale successful responses', async () => {
   let finish;
   const app = setup({ fetch: () => new Promise(resolve => { finish = resolve; }) });
@@ -276,6 +360,31 @@ function analysis(overrides = {}) {
     ...overrides,
   };
 }
+test('host callbacks identify the current learner clip without uploading it automatically', async () => {
+  const clips = [], results = [];
+  const app = setup({ fetch: async () => ok(analysis()), mount: { onClipChange: value => clips.push(value), onAnalysis: value => results.push(value) } });
+  selectFile(app);
+  assert.equal(app.calls.length, 0);
+  assert.equal(clips.length, 1);
+  assert.ok(clips[0].blob instanceof app.window.Blob);
+  assert.equal(clips[0].kind, 'uploaded');
+  app.button('ดูผลเสียงของฉัน').click(); await flush();
+  assert.equal(results.length, 1);
+  assert.equal(results[0].clipId, clips[0].clipId);
+  assert.equal(results[0].clipKind, 'uploaded');
+  const textarea = app.container.querySelector('textarea'); textarea.value = 'A leaf.';
+  textarea.dispatchEvent(new app.window.Event('input'));
+  assert.equal(clips.at(-1).blob, null);
+  assert.equal(clips.at(-1).target, 'A leaf.');
+  assert.ok(clips.at(-1).clipId > results[0].clipId);
+  app.cleanup(); app.dom.window.close();
+});
+test('an optional host callback cannot break learner audio preparation or cleanup', () => {
+  const app = setup({ mount: { onClipChange() { throw new Error('host unavailable'); } } });
+  selectFile(app);
+  assert.equal(app.container.querySelector('.egl-ph-player').hidden, false);
+  assert.doesNotThrow(app.cleanup); app.dom.window.close();
+});
 async function analyzeFixture(data, options = {}) {
   const app = setup({ fetch: async () => ok(data), ...options });
   selectFile(app);

@@ -227,7 +227,7 @@ def build(baseline_path: Path, candidate_path: Path, result_path: Path, output: 
 </head>
 <body>
 <main class="page">
-<header class="page-header"><div><p class="eyebrow">ENGLISH GARDEN LAB / SPEAKING PRACTICE</p><h1>ฟังให้ชัด ฝึกทีละประโยค</h1><p class="intro">ฟังตัวอย่าง ดูคำและเสียงที่ตรงกัน แล้วลองพูดตาม เลือกฝึกทีละประโยคได้ตามจังหวะของคุณ</p></div><span class="pill">พื้นที่ทดลองฝึกออกเสียง</span></header>
+<header class="page-header"><div><p class="eyebrow">ENGLISH GARDEN LAB / SPEAKING PRACTICE</p><h1>ฟังให้ชัด ฝึกทีละประโยค</h1><p class="intro">ฟังตัวอย่าง ดูคำและเสียงที่ตรงกัน แล้วลองพูดตาม เลือกฝึกทีละประโยคได้ตามจังหวะของคุณ</p></div><a class="pill" href="../app/speak.html">ใหม่ · Speak คุยกับมะลิ ↗</a></header>
 <ol class="steps" aria-label="วิธีฝึกสามขั้น"><li><strong>1</strong><span>เลือกประโยคที่อยากลอง</span></li><li><strong>2</strong><span>ฟังเสียง A และ B แล้วกดวิเคราะห์</span></li><li><strong>3</strong><span>ดูจุดที่ควรฝึก แล้วลองพูดเอง</span></li></ol>
 <div class="toolbar"><p id="progress" role="status" aria-live="polite">ยังไม่ได้ให้คะแนนเสียงที่ฟัง</p><div class="actions"><button id="reveal" class="action secondary" type="button">เฉลยเสียง A / B</button><button id="export" class="action" type="button">บันทึกผล JSON</button></div></div>
 <p class="notice" id="settings-warning" hidden></p>

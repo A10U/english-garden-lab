@@ -6,6 +6,22 @@
 
 - **[Learning App](app/index.html)** — 3 บทเรียน สวนคำศัพท์ และความก้าวหน้าที่บันทึกในเบราว์เซอร์
 - **[Speech Training](speech-training/listen.html)** — 24 ประโยค ตัวอย่างเสียง AI, IPA, ฟังรายคำ และวิเคราะห์เสียงที่บันทึกในเบราว์เซอร์
+- **[Speak Studio](app/speak.html)** — พื้นที่อัด/ฟังในเครื่อง บทสนทนาตัวอย่าง และสนทนา/ถอดเสียงผ่าน Cloud เมื่อเชื่อมบริการบน Sites
+
+## Speak แบบผสมและเซิร์ฟเวอร์
+
+เว็บ Sites ใช้ Vinext/Cloudflare Worker เพื่อให้หน้าเดิมกับ `/api/speak` อยู่ในโดเมนเดียวกัน บทเรียนและหน้า Speech เดิมยังเป็น HTML/JS ปกติ ส่วน GitHub Pages ใช้เฉพาะไฟล์ static และไม่มี Cloud API จึงแสดงตัวอย่างและการฝึกในเครื่องได้
+
+```sh
+npm ci
+npm run dev
+```
+
+เปิด `http://127.0.0.1:5173/app/speak.html` การ build สำหรับ Sites ใช้ `npm run build` ซึ่งสร้างไฟล์เว็บเดิมใน `public/` แล้วรวม server กับ assets ใน `dist/` ส่วนการเผยแพร่ GitHub Pages ให้รัน `python3 speech-training/build_demo.py --output .build/github-pages-speak` แล้วใช้เฉพาะไฟล์ static ในโฟลเดอร์นั้น
+
+Cloud ต้องตั้ง secret `OPENAI_API_KEY` ผ่าน Sites โดยใช้การเชื่อมต่อ OpenAI Developers สำหรับการสร้าง key ค่าเลือกโมเดลคือ `OPENAI_SPEAK_MODEL` (เริ่มต้น `gpt-5.6-terra`) และ `OPENAI_TRANSCRIBE_MODEL` (เริ่มต้น `gpt-transcribe`) ดูชื่อค่าที่ต้องตั้งใน `.env.example` ไม่มี key ในหน้าเว็บหรือ repository หากยังไม่ตั้งค่า หน้า Speak ให้ลองบทสนทนาที่เตรียมไว้และแสดงสถานะว่า Cloud ยังไม่พร้อม โดยไม่สร้างคำตอบปลอมจาก API ที่ล้มเหลว
+
+เสียงถูกส่งเฉพาะเมื่อกดถอดเสียง ส่วนข้อความและผลหน่วยเสียงที่เลือกถูกส่งเฉพาะเมื่อกดส่งให้มะลิ ผลเสียงต้องตรงกับคลิปและข้อความเดียวกัน และไม่มีการให้ LLM สร้างคะแนนออกเสียงเอง Cloud API ตรวจผู้ใช้ที่ลงชื่อเข้าใช้และ Origin ก่อนเรียกบริการ เก็บคำขอไว้ในหน่วยความจำระหว่างประมวลผล ไม่บันทึกเสียงบนเซิร์ฟเวอร์ของแอป เสียงอ่านคำตอบใช้เสียงอังกฤษที่ติดตั้งในอุปกรณ์
 
 เปิด `index.html` เพื่อเลือก App หรือ Speech Training
 

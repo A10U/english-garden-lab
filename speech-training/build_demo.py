@@ -228,7 +228,7 @@ def disable_local_api_literals(text: str) -> str:
     return text
 
 
-def demo_html(source: str, *, data_url: str, trial: dict | None = None, runtime_version: str | None = None) -> str:
+def demo_html(source: str, *, data_url: str, trial: dict | None = None, runtime_version: str | None = None, cloud_workspace: bool = False) -> str:
     if trial is not None:
         source, count = TRIAL_SCRIPT.subn(lambda match: match[1] + script_json(trial) + match[2], source)
         if count != 1:
@@ -252,16 +252,18 @@ def demo_html(source: str, *, data_url: str, trial: dict | None = None, runtime_
         def version_script(match):
             prefix, quote, url = match.groups()
             parsed = urlsplit(url)
-            if parsed.scheme or parsed.netloc or Path(parsed.path).name not in {"phonetics.js", "browser-phonetics.js", "spelling-feedback.js"}:
+            if parsed.scheme or parsed.netloc or (Path(parsed.path).name not in {"phonetics.js", "browser-phonetics.js", "spelling-feedback.js", "speak.js"} and Path(parsed.path).suffix != '.css'):
                 return match[0]
             query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key != "v"]
             versioned = parsed._replace(query=urlencode(query + [("v", runtime_version)])).geturl()
             return prefix + quote + versioned + quote
         source = re.sub(r"(<script\b[^>]*\bsrc\s*=\s*)(['\"])([^'\"]+)\2", version_script, source, flags=re.I)
+        source = re.sub(r"(<link\b[^>]*\bhref\s*=\s*)(['\"])([^'\"]+)\2", version_script, source, flags=re.I)
     if 'id="egl-demo-csp"' not in source:
         source = re.sub(r"</head\s*>", CSP + "\n</head>", source, count=1, flags=re.I)
     if 'id="egl-hosted-demo-notice"' not in source:
-        source, count = re.subn(r"(<body\b[^>]*>)", lambda match: match[1] + "\n" + NOTICE, source, count=1, flags=re.I)
+        notice = NOTICE.replace('เสียงของคุณไม่ถูกส่งออกจากเบราว์เซอร์', 'การฝึกในเครื่องไม่ส่งเสียงออก ส่วน Cloud ส่งเสียงหรือข้อความเมื่อคุณกดใช้') if cloud_workspace else NOTICE
+        source, count = re.subn(r"(<body\b[^>]*>)", lambda match: match[1] + "\n" + notice, source, count=1, flags=re.I)
         if count != 1:
             raise ValueError("HTML page has no body for demo notice")
     return source
@@ -388,10 +390,13 @@ def build(project_root: Path, output: Path) -> dict:
     # when their implementation changes without a change to the entry scripts.
     runtime_version = hashlib.sha256(b"".join(
         name.encode("utf-8") + b"\0" + hashlib.sha256(content).digest()
-        for name, content in sorted(files.items()) if name.startswith("app/") and name.endswith(".js")
+        for name, content in sorted(files.items()) if name.startswith("app/") and name.endswith((".js", ".css"))
     )).hexdigest()[:16]
     files["app/index.html"] = demo_html(files["app/index.html"].decode("utf-8"),
         data_url="../speech-training/demo-assets/demo-data.js", runtime_version=runtime_version).encode("utf-8")
+    if "app/speak.html" in files:
+        files["app/speak.html"] = demo_html(files["app/speak.html"].decode("utf-8"),
+            data_url="../speech-training/demo-assets/demo-data.js", runtime_version=runtime_version, cloud_workspace=True).encode("utf-8")
     files["speech-training/listen.html"] = demo_html(
         (root / "speech-training/listen.html").read_text(encoding="utf-8"),
         data_url="demo-assets/demo-data.js", trial=public_trial_payload(demo), runtime_version=runtime_version).encode("utf-8")
