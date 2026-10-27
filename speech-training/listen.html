@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ฝึกออกเสียงทีละประโยค — English Garden Lab</title>
-<link rel="stylesheet" href="../app/phonetics.css">
+<link rel="stylesheet" href="../app/phonetics.css?v=c30f66a72e671791">
 <style>
 :root{color-scheme:light;--ink:#17392c;--muted:#607167;--line:#d9e3d7;--paper:#f5f7f1;--white:#fff;--accent:#24593d}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #b88639;outline-offset:3px}a{color:var(--accent)}
@@ -28,7 +28,7 @@
 <strong>ฝึกเสียงบนเว็บ</strong> · ฟังเสียง AI พร้อมผลที่เตรียมไว้ หรือบันทึกและวิเคราะห์เสียงของคุณในเบราว์เซอร์ เมื่อกดวิเคราะห์ครั้งแรกจะดาวน์โหลดโมเดลประมาณ 318 MB และชุดประมวลผลประมาณ 12 MB เสียงของคุณไม่ถูกส่งออกจากเบราว์เซอร์ เครื่องที่ช้าอาจใช้เวลารอ
  · <a href="../speech-training/demo-assets/ATTRIBUTION.txt">ที่มาของเสียงตัวอย่าง</a></aside>
 <main class="page">
-<header class="page-header"><div><p class="eyebrow">ENGLISH GARDEN LAB / SPEAKING PRACTICE</p><h1>ฟังให้ชัด ฝึกทีละประโยค</h1><p class="intro">ฟังตัวอย่าง ดูคำและเสียงที่ตรงกัน แล้วลองพูดตาม เลือกฝึกทีละประโยคได้ตามจังหวะของคุณ</p></div><span class="pill">พื้นที่ทดลองฝึกออกเสียง</span></header>
+<header class="page-header"><div><p class="eyebrow">ENGLISH GARDEN LAB / SPEAKING PRACTICE</p><h1>ฟังให้ชัด ฝึกทีละประโยค</h1><p class="intro">ฟังตัวอย่าง ดูคำและเสียงที่ตรงกัน แล้วลองพูดตาม เลือกฝึกทีละประโยคได้ตามจังหวะของคุณ</p></div><a class="pill" href="../app/speak.html">ใหม่ · Speak คุยกับมะลิ ↗</a></header>
 <ol class="steps" aria-label="วิธีฝึกสามขั้น"><li><strong>1</strong><span>เลือกประโยคที่อยากลอง</span></li><li><strong>2</strong><span>ฟังเสียง A และ B แล้วกดวิเคราะห์</span></li><li><strong>3</strong><span>ดูจุดที่ควรฝึก แล้วลองพูดเอง</span></li></ol>
 <div class="toolbar"><p id="progress" role="status" aria-live="polite">ยังไม่ได้ให้คะแนนเสียงที่ฟัง</p><div class="actions"><button id="reveal" class="action secondary" type="button">เฉลยเสียง A / B</button><button id="export" class="action" type="button">บันทึกผล JSON</button></div></div>
 <p class="notice" id="settings-warning" hidden></p>
@@ -47,13 +47,13 @@
 <script src="../app/pronunciation-videos.js"></script>
 <script src="../app/articulation-images.js"></script>
 <script src="../app/study-help.js"></script>
-<script src="../app/browser-phonetics.js?v=64e8580545faa43e"></script>
+<script src="../app/browser-phonetics.js?v=c30f66a72e671791"></script>
 <script src="../app/spelling-guide.js"></script>
-<script src="../app/spelling-feedback.js?v=64e8580545faa43e"></script>
+<script src="../app/spelling-feedback.js?v=c30f66a72e671791"></script>
 <script src="../app/word-audio.js"></script>
 <script id="egl-demo-runtime">globalThis.EGL_DEMO_RUNTIME={mode:"demo",apiBase:null};</script>
 <script src="demo-assets/demo-data.js"></script>
-<script src="../app/phonetics.js?v=64e8580545faa43e"></script>
+<script src="../app/phonetics.js?v=c30f66a72e671791"></script>
 <script>
 'use strict';
 const data=JSON.parse(document.getElementById('trial-data').textContent);

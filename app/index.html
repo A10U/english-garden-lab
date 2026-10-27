@@ -7,8 +7,8 @@
   <meta name="theme-color" content="#184d3c">
   <meta name="description" content="ฝึกภาษาอังกฤษทีละนิด ผ่านพืช AI และเพื่อนในสวน">
   <title>สวนภาษา AI — พื้นที่เรียนของฉัน</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="phonetics.css">
+  <link rel="stylesheet" href="styles.css?v=c30f66a72e671791">
+  <link rel="stylesheet" href="phonetics.css?v=c30f66a72e671791">
   <script src="content.js" defer></script>
   <script src="core.js" defer></script>
   <script src="storage.js" defer></script>
@@ -22,13 +22,13 @@
   <script src="articulation-images.js" defer></script>
   <script src="study-help.js" defer></script>
   <script src="reference-audio.js" defer></script>
-  <script src="browser-phonetics.js?v=64e8580545faa43e" defer></script>
+  <script src="browser-phonetics.js?v=c30f66a72e671791" defer></script>
   <script src="spelling-guide.js" defer></script>
-  <script src="spelling-feedback.js?v=64e8580545faa43e" defer></script>
+  <script src="spelling-feedback.js?v=c30f66a72e671791" defer></script>
   <script src="word-audio.js" defer></script>
   <script id="egl-demo-runtime">globalThis.EGL_DEMO_RUNTIME={mode:"demo",apiBase:null};</script>
 <script src="../speech-training/demo-assets/demo-data.js" defer></script>
-<script src="phonetics.js?v=64e8580545faa43e" defer></script>
+<script src="phonetics.js?v=c30f66a72e671791" defer></script>
   <script src="app.js" defer></script>
 <meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="connect-src 'self' https://huggingface.co https://*.hf.co; worker-src 'self' blob:; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'">
 </head>
@@ -47,6 +47,7 @@
         <span class="sidebar-edition">พื้นที่เรียนของฉัน</span>
       </div>
       <nav class="app-nav" aria-label="เมนูหลัก">
+        <a class="speak-nav-link" href="speak.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4ZM8 8h8M8 12h5"/></svg><span>Speak · คุยกับมะลิ</span></a>
         <button type="button" data-view="home" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/></svg><span>เริ่มเรียน</span></button>
         <button type="button" data-view="garden"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V10M12 16C5 17 3 12 3 7c6 0 9 3 9 9ZM12 11C12 5 16 3 21 3c0 6-3 9-9 8ZM7 21h10"/></svg><span>สวนคำศัพท์</span></button>
         <button type="button" data-view="review"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a9 9 0 1 1-1 7M4 3v5h5M12 7v6l4 2"/></svg><span>ทบทวน</span></button>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#184d3c">
+  <meta name="description" content="ฝึกพูดอังกฤษในเครื่อง แล้วคุยกับมะลิผ่าน cloud เมื่อพร้อม">
+  <title>Speak — คุยให้กล้าขึ้น · สวนภาษา AI</title>
+  <link rel="stylesheet" href="phonetics.css?v=c30f66a72e671791">
+  <link rel="stylesheet" href="speak.css?v=c30f66a72e671791">
+  <script src="phonetic-data.js" defer></script>
+  <script src="phone-guide.js" defer></script>
+  <script src="sound-foundations.js" defer></script>
+  <script src="vowel-pairs.js" defer></script>
+  <script src="vowel-audio.js" defer></script>
+  <script src="pronunciation-videos.js" defer></script>
+  <script src="articulation-images.js" defer></script>
+  <script src="study-help.js" defer></script>
+  <script src="reference-audio.js" defer></script>
+  <script src="browser-phonetics.js?v=c30f66a72e671791" defer></script>
+  <script src="spelling-guide.js" defer></script>
+  <script src="spelling-feedback.js?v=c30f66a72e671791" defer></script>
+  <script src="word-audio.js" defer></script>
+  <script id="egl-demo-runtime">globalThis.EGL_DEMO_RUNTIME={mode:"demo",apiBase:null};</script>
+<script src="../speech-training/demo-assets/demo-data.js" defer></script>
+<script src="phonetics.js?v=c30f66a72e671791" defer></script>
+  <script src="speak.js?v=c30f66a72e671791" defer></script>
+<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="connect-src 'self' https://huggingface.co https://*.hf.co; worker-src 'self' blob:; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'">
+</head>
+<body>
+<aside id="egl-hosted-demo-notice" role="note" style="margin:16px auto;padding:12px 16px;max-width:1120px;border:1px solid #c7d8bd;border-radius:12px;background:#f1f6eb;color:#234b35;font:14px/1.7 system-ui,sans-serif">
+<strong>ฝึกเสียงบนเว็บ</strong> · ฟังเสียง AI พร้อมผลที่เตรียมไว้ หรือบันทึกและวิเคราะห์เสียงของคุณในเบราว์เซอร์ เมื่อกดวิเคราะห์ครั้งแรกจะดาวน์โหลดโมเดลประมาณ 318 MB และชุดประมวลผลประมาณ 12 MB การฝึกในเครื่องไม่ส่งเสียงออก ส่วน Cloud ส่งเสียงหรือข้อความเมื่อคุณกดใช้ เครื่องที่ช้าอาจใช้เวลารอ
+ · <a href="../speech-training/demo-assets/ATTRIBUTION.txt">ที่มาของเสียงตัวอย่าง</a></aside>
+  <a class="skip-link" href="#speak-main">ข้ามไปพื้นที่ฝึกพูด</a>
+  <header class="speak-topbar">
+    <a class="speak-brand" href="index.html"><span class="brand-mark" aria-hidden="true">❧</span><span><strong>สวนภาษา AI</strong><small>ENGLISH GARDEN</small></span></a>
+    <nav aria-label="พื้นที่เรียน"><a href="index.html">บทเรียน</a><a href="../speech-training/listen.html">ฝึกออกเสียง</a><a href="speak.html" aria-current="page">Speak <span class="new-badge">ใหม่</span></a></nav>
+    <span class="page-edition">พื้นที่ลองพูดของคุณ</span>
+  </header>
+  <main id="speak-main" class="speak-main">
+    <section class="speak-hero">
+      <div><p class="eyebrow">SPEAK STUDIO <span>LOCAL + CLOUD</span></p><h1>คุยให้กล้าขึ้น<br><em>ทีละประโยคก็พอ</em></h1><p class="hero-description">ลองพูด ฟังเสียงตัวเอง แล้วค่อยต่อบทสนทนา<br>กับมะลิ มีคำช่วยอยู่ใกล้มือเสมอ</p><a class="hero-cta" href="#conversation-heading">ลองคุยกับมะลิ <span aria-hidden="true">→</span></a></div>
+      <div class="hero-path" aria-label="ขั้นตอนการฝึก"><div><span>01</span><p><strong>ลองพูด</strong><small>อัดและฟังในเครื่อง</small></p></div><i aria-hidden="true">→</i><div><span>02</span><p><strong>คุยต่อ</strong><small>ส่งเมื่อคุณพร้อม</small></p></div><i aria-hidden="true">→</i><div><span>03</span><p><strong>เข้าใจมากขึ้น</strong><small>อ่านคำอธิบายและลองใหม่</small></p></div></div>
+    </section>
+    <section class="scenario-bar" aria-labelledby="scenario-heading"><div><h2 id="scenario-heading">วันนี้อยากคุยเรื่องอะไร</h2><p>เลือกเรื่องใกล้ตัว แล้วเริ่มจากประโยคสั้น ๆ</p></div><div class="scenario-options" role="group" aria-label="เรื่องที่อยากคุย"><button type="button" data-scenario="garden" aria-pressed="true"><span aria-hidden="true">❧</span> ในสวน</button><button type="button" data-scenario="cafe" aria-pressed="false"><span aria-hidden="true">☕</span> ที่คาเฟ่</button><button type="button" data-scenario="introductions" aria-pressed="false"><span aria-hidden="true">☀</span> ทำความรู้จัก</button></div></section>
+    <div class="speak-workspace">
+      <section class="local-panel" aria-labelledby="local-heading">
+        <div class="panel-heading"><div><p class="eyebrow">01 · พื้นที่ซ้อมของคุณ</p><h2 id="local-heading">พูด ฟัง แล้วลองใหม่</h2></div><span class="status-pill local-pill"><i></i> Local</span></div>
+        <p class="panel-intro">อัดเสียง ฟังซ้ำ และฝึกประโยคที่เลือกในเบราว์เซอร์</p>
+        <div class="practice-summary"><span>ประโยคสำหรับฝึก</span><p id="practice-target" lang="en"></p><small id="practice-translation"></small></div>
+        <div id="local-practice" class="speak-practice-host"></div>
+        <div class="local-footnote"><span aria-hidden="true">◉</span><p>กดบันทึกจึงเปิดไมค์ เสียงจะอยู่ในหน้านี้<br>จนกว่าคุณจะเลือกส่งไปถอดเสียงผ่าน cloud</p></div>
+      </section>
+      <section class="conversation-panel" aria-labelledby="conversation-heading">
+        <div class="panel-heading conversation-heading"><div class="mali-identity"><span class="mali-avatar" aria-hidden="true">ม</span><div><h2 id="conversation-heading" tabindex="-1">คุยกับมะลิ</h2><p>เพื่อนฝึกอังกฤษในสวนของเรา</p></div></div><span id="cloud-badge" class="status-pill">กำลังตรวจ Cloud…</span></div>
+        <div class="conversation-toolbar"><div class="mode-switch" role="group" aria-label="รูปแบบบทสนทนา"><button id="sample-mode" type="button" aria-pressed="true">ลองตัวอย่าง</button><button id="cloud-mode" type="button" aria-pressed="false" disabled>สนทนา Cloud</button></div><button id="new-conversation" class="text-button" type="button">เริ่มใหม่ ↺</button></div>
+        <p id="connection-status" class="connection-status" role="status">กำลังตรวจว่าบริการสนทนาพร้อมใช้งานหรือไม่</p>
+        <div id="conversation-thread" class="conversation-thread" role="log" aria-label="บทสนทนา" aria-live="polite"></div>
+        <div id="sample-controls" class="sample-controls"><div><span class="sample-label">บทสนทนาตัวอย่างที่เตรียมไว้</span><p>ลองดูว่าการคุยและคำช่วยทำงานอย่างไร</p></div><button id="try-sample" class="sample-start" type="button">ลองบทสนทนาตัวอย่าง <span aria-hidden="true">↗</span></button><div id="sample-replies" class="sample-replies" hidden></div></div>
+        <form id="conversation-form" class="conversation-composer">
+          <label for="speak-transcript">ประโยคของคุณ</label><textarea id="speak-transcript" rows="3" maxlength="1200" placeholder="พิมพ์เป็นภาษาอังกฤษ หรืออัดเสียงในพื้นที่ซ้อมแล้วกดถอดเสียงผ่าน cloud" lang="en"></textarea>
+          <div class="transcript-tools"><button id="transcribe-audio" class="text-button" type="button" disabled>ถอดเสียงผ่าน cloud</button><span id="clip-status">ยังไม่ได้เลือกเสียงของคุณ</span></div>
+          <label class="assessment-choice"><input id="attach-assessment" type="checkbox" checked disabled><span>ให้มะลิอธิบายผลเสียงนี้ด้วย <small id="assessment-status">บันทึกและวิเคราะห์ประโยคฝึกก่อน</small></span></label>
+          <div class="composer-bottom"><p id="send-note">โหมดตัวอย่าง: เลือกคำตอบที่เตรียมไว้ด้านบน</p><div><button id="cancel-request" class="secondary-button" type="button" hidden>ยกเลิก</button><button id="send-message" class="primary-button" type="submit" disabled>ส่งให้มะลิ <span aria-hidden="true">↑</span></button></div></div>
+          <p id="speak-action-status" class="action-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+    </div>
+    <section class="speak-method" aria-label="การทำงานของโหมด Speak"><div><span>LOCAL</span><p>เสียงของคุณ อัดและฟังซ้ำในเครื่อง</p></div><div><span>CLOUD</span><p>บทสนทนา คำแปล และคำช่วยจาก AI เมื่อเชื่อมต่อ</p></div><div><span>PRONUNCIATION</span><p>ผลเสียงจากตัวตรวจแยก การคุยไม่สร้างเปอร์เซ็นต์ขึ้นเอง</p></div></section>
+    <footer class="speak-footer"><p>พื้นที่เล็ก ๆ สำหรับภาษาอังกฤษที่เติบโตได้ทุกวัน</p><a href="index.html">กลับไปบทเรียน <span aria-hidden="true">↗</span></a></footer>
+  </main>
+</body>
+</html>
