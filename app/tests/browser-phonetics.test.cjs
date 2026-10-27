@@ -79,6 +79,52 @@ function decodedAudio() {
   return { length: 6400, sampleRate: 16000, duration: .4, numberOfChannels: 1,
     getChannelData: () => new Float32Array(6400).fill(.25) };
 }
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+function trackedAbort() {
+  const listeners = new Map();
+  const signal = {
+    aborted: false,
+    addEventListener(type, listener, options) { if (type === 'abort') listeners.set(listener, options); },
+    removeEventListener(type, listener) { if (type === 'abort') listeners.delete(listener); },
+  };
+  return { signal, listeners, abort() {
+    if (signal.aborted) return;
+    signal.aborted = true;
+    for (const [listener, options] of [...listeners]) {
+      if (options && options.once) listeners.delete(listener);
+      listener();
+    }
+  } };
+}
+function resamplerFixture(rendering, options = {}) {
+  const instances = [];
+  class OfflineAudioContext {
+    constructor(_channels, frames, rate) { this.frames = frames; this.rate = rate; this.destination = {}; instances.push(this); }
+    createBuffer(_channels, frames) { return { getChannelData: () => new Float32Array(frames) }; }
+    createBufferSource() {
+      const source = { stops: 0, disconnects: 0, connect() {}, start() {},
+        stop() { this.stops++; if (options.cleanupThrows) throw new Error('stop failed'); },
+        disconnect() { this.disconnects++; if (options.cleanupThrows) throw new Error('disconnect failed'); } };
+      let buffer;
+      Object.defineProperty(source, 'buffer', { get: () => buffer, set: value => {
+        if (value === null && options.cleanupThrows) throw new Error('buffer release failed');
+        buffer = value;
+      } });
+      this.source = source;
+      return source;
+    }
+    startRendering() { return rendering.promise; }
+  }
+  return { OfflineAudioContext, instances };
+}
+async function waitForDecodeStage(check) {
+  for (let i = 0; i < 20 && !check(); i++) await flush();
+  assert.ok(check(), 'the selected native preparation stage must start');
+}
 
 test('loading and checking support do not create a worker, decoder, timer, or request', () => {
   const app = setup();
@@ -234,6 +280,165 @@ test('cancel during container decoding closes the decoder, blocks simultaneous w
   assert.equal(app.workers.length, 0);
   const retry = begin(app), worker = await waitForWorker(app);
   result(worker); await retry;
+});
+
+test('aborting a permanently pending decoder immediately releases the reservation and closes only its own context', { timeout: 1000 }, async () => {
+  const app = setup({ decode: () => new Promise(() => {}) }), controller = trackedAbort();
+  const job = begin(app, { blob: new Blob(['container']), signal: controller.signal });
+  const canceled = assert.rejects(job, error => error.name === 'AbortError');
+  await waitForDecodeStage(() => app.contexts.length === 1);
+  controller.abort();
+  const retry = begin(app); // Same call stack: do not wait for old async finally.
+  assert.equal(app.contexts[0].closed, 1);
+  await canceled;
+  const worker = await waitForWorker(app);
+  assert.equal(controller.listeners.size, 0);
+  assert.equal(app.contexts.length, 1, 'the valid PCM retry needs no new decoder');
+  assert.deepEqual([...app.timers.values()].map(timer => timer.delay), [600000]);
+  result(worker); await retry;
+  assert.equal(app.timers.size, 0);
+});
+
+test('late decoder resolution or rejection cannot dispatch stale audio or clear a replacement job', { timeout: 1000 }, async () => {
+  for (const settle of ['resolve', 'reject']) {
+    const oldDecode = deferred(), app = setup({ decode: () => oldDecode.promise }), controller = trackedAbort();
+    const old = begin(app, { blob: new Blob(['container']), signal: controller.signal });
+    const canceled = assert.rejects(old, error => error.name === 'AbortError');
+    await waitForDecodeStage(() => app.contexts.length === 1);
+    controller.abort();
+    const replacement = begin(app), worker = await waitForWorker(app);
+    await canceled;
+    oldDecode[settle](settle === 'resolve' ? decodedAudio() : new Error('old native decoder failed late'));
+    await flush(); await flush();
+    assert.equal(worker.messages.length, 1);
+    assert.equal(worker.terminated, false);
+    assert.equal(app.contexts[0].closed, 1);
+    assert.equal(controller.listeners.size, 0);
+    await assert.rejects(begin(app), error => /กำลังวิเคราะห์เสียงอีกไฟล์/.test(error.userMessage));
+    const expected = result(worker, { marker: 'replacement survives old ' + settle });
+    assert.equal(await replacement, expected);
+    assert.equal(app.timers.size, 0);
+  }
+});
+
+test('a pending Blob read is cancellable and its late data cannot start a decoder or worker', { timeout: 1000 }, async () => {
+  const reading = deferred(), app = setup(), controller = trackedAbort();
+  const old = begin(app, { blob: { size: 10, arrayBuffer: () => reading.promise }, signal: controller.signal });
+  const canceled = assert.rejects(old, error => error.name === 'AbortError');
+  controller.abort();
+  const replacement = begin(app), worker = await waitForWorker(app);
+  await canceled;
+  reading.resolve(await wave().blob.arrayBuffer());
+  await flush();
+  assert.equal(app.contexts.length, 0);
+  assert.equal(worker.messages.length, 1);
+  assert.equal(controller.listeners.size, 0);
+  result(worker); await replacement;
+  assert.equal(app.timers.size, 0);
+});
+
+test('an already aborted request does not read a Blob, reserve work, or create timers', async () => {
+  const app = setup(), controller = trackedAbort(); controller.abort();
+  let reads = 0;
+  await assert.rejects(begin(app, { blob: { size: 10, arrayBuffer() { reads++; throw new Error('must not read'); } }, signal: controller.signal }), error => error.name === 'AbortError');
+  assert.equal(reads, 0);
+  assert.equal(app.contexts.length, 0);
+  assert.equal(app.workers.length, 0);
+  assert.equal(app.timers.size, 0);
+  assert.equal(controller.listeners.size, 0);
+  const retry = begin(app), worker = await waitForWorker(app); result(worker); await retry;
+});
+
+test('aborting offline rendering releases its graph and ignores late render success or failure', { timeout: 1000 }, async () => {
+  for (const settle of ['resolve', 'reject']) {
+    const rendering = deferred(), fixture = resamplerFixture(rendering);
+    const app = setup(fixture), controller = trackedAbort();
+    const old = begin(app, { blob: wave({ rate: 48000 }).blob, signal: controller.signal });
+    const canceled = assert.rejects(old, error => error.name === 'AbortError');
+    await waitForDecodeStage(() => fixture.instances.length === 1);
+    const source = fixture.instances[0].source;
+    controller.abort();
+    const replacement = begin(app), worker = await waitForWorker(app);
+    await canceled;
+    assert.equal(source.stops, 1); assert.equal(source.disconnects, 1); assert.equal(source.buffer, null);
+    rendering[settle](settle === 'resolve' ? { sampleRate: 16000, getChannelData: () => new Float32Array(6400) } : new Error('old render failed late'));
+    await flush(); await flush();
+    assert.equal(worker.messages.length, 1);
+    assert.equal(worker.terminated, false);
+    assert.equal(controller.listeners.size, 0);
+    await assert.rejects(begin(app), error => /กำลังวิเคราะห์เสียงอีกไฟล์/.test(error.userMessage));
+    result(worker); await replacement;
+    assert.equal(app.timers.size, 0);
+  }
+});
+
+test('preparation timeouts bound hung Blob reads, decoders and resamplers while permitting immediate retry', { timeout: 1000 }, async () => {
+  for (const stage of ['read', 'decode', 'render']) {
+    const operation = deferred(), fixture = resamplerFixture(operation);
+    const app = setup({ decode: () => operation.promise, ...fixture }), controller = trackedAbort();
+    const blob = stage === 'read' ? { size: 10, arrayBuffer: () => operation.promise }
+      : stage === 'decode' ? new Blob(['container']) : wave({ rate: 48000 }).blob;
+    const old = begin(app, { blob, signal: controller.signal });
+    const timedOut = assert.rejects(old, error => /เตรียมไฟล์เสียงนานเกิน 30 วินาที.*บันทึกใหม่.*WAV/.test(error.userMessage));
+    if (stage === 'decode') await waitForDecodeStage(() => app.contexts.length === 1);
+    if (stage === 'render') await waitForDecodeStage(() => fixture.instances.length === 1);
+    const timeout = [...app.timers.values()].find(timer => timer.delay === 30000);
+    assert.ok(timeout);
+    timeout.callback();
+    const replacement = begin(app), worker = await waitForWorker(app);
+    await timedOut;
+    assert.equal(controller.listeners.size, 0);
+    if (stage === 'decode') assert.equal(app.contexts[0].closed, 1);
+    if (stage === 'render') {
+      assert.equal(fixture.instances[0].source.stops, 1);
+      assert.equal(fixture.instances[0].source.disconnects, 1);
+      assert.equal(fixture.instances[0].source.buffer, null);
+    }
+    operation.reject(new Error('native operation rejected after its timeout'));
+    timeout.callback(); // A queued stale timeout must not cancel the new job.
+    await flush();
+    assert.equal(worker.messages.length, 1); assert.equal(worker.terminated, false);
+    await assert.rejects(begin(app), error => /กำลังวิเคราะห์เสียงอีกไฟล์/.test(error.userMessage));
+    result(worker); await replacement;
+    assert.equal(app.timers.size, 0);
+  }
+});
+
+test('one preparation deadline covers Blob reading, decoding and resampling without resetting between stages', { timeout: 1000 }, async () => {
+  const reading = deferred(), decoding = deferred(), fixture = resamplerFixture(deferred());
+  const app = setup({ decode: () => decoding.promise, ...fixture });
+  const job = begin(app, { blob: { size: 10, arrayBuffer: () => reading.promise } });
+  const timedOut = assert.rejects(job, error => /เตรียมไฟล์เสียงนานเกิน 30 วินาที/.test(error.userMessage));
+  const [[deadlineId, deadline]] = app.timers;
+  assert.equal(deadline.delay, 30000);
+  reading.resolve(await new Blob(['encoded audio']).arrayBuffer());
+  await waitForDecodeStage(() => app.contexts.length === 1);
+  assert.equal(app.timers.size, 1); assert.equal(app.timers.get(deadlineId), deadline);
+  decoding.resolve({ ...decodedAudio(), length: 19200, sampleRate: 48000,
+    getChannelData: () => new Float32Array(19200).fill(.25) });
+  await waitForDecodeStage(() => fixture.instances.length === 1);
+  assert.equal(app.timers.size, 1); assert.equal(app.timers.get(deadlineId), deadline);
+  deadline.callback(); await timedOut;
+  assert.equal(app.contexts[0].closed, 1);
+  assert.equal(fixture.instances[0].source.disconnects, 1);
+  assert.equal(app.workers.length, 0);
+  assert.equal(app.timers.size, 0);
+});
+
+test('offline cleanup failures cannot replace AbortError or leave the canceled reservation occupied', { timeout: 1000 }, async () => {
+  const fixture = resamplerFixture(deferred(), { cleanupThrows: true });
+  const app = setup(fixture), controller = trackedAbort();
+  const old = begin(app, { blob: wave({ rate: 48000 }).blob, signal: controller.signal });
+  const canceled = assert.rejects(old, error => error.name === 'AbortError');
+  await waitForDecodeStage(() => fixture.instances.length === 1);
+  assert.doesNotThrow(() => controller.abort());
+  const replacement = begin(app), worker = await waitForWorker(app);
+  await canceled;
+  assert.equal(fixture.instances[0].source.stops, 1);
+  assert.equal(fixture.instances[0].source.disconnects, 1);
+  result(worker); await replacement;
+  assert.equal(controller.listeners.size, 0);
+  assert.equal(app.timers.size, 0);
 });
 
 test('an idle worker error during the next decode cannot call a missing reservation reject handler', async () => {
