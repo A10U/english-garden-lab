@@ -21,7 +21,7 @@ function setup(t, options = {}) {
     url: 'https://garden.example/demo/app/index.html', runScripts: 'outside-only'
   });
   const window = dom.window;
-  const events = [], contexts = [], nodes = [], streams = [], network = [], blobs = new Map(), revoked = [];
+  const events = [], contexts = [], nodes = [], streams = [], network = [], blobs = new Map(), revoked = [], encoded = [];
   let time = 0, mediaRecorders = 0, decodeCalls = 0, sequence = 0;
   Object.defineProperty(window.performance, 'now', { value: () => time, configurable: true });
   window.Date.now = () => 1000000 + time;
@@ -89,7 +89,10 @@ function setup(t, options = {}) {
   }
   class MediaRecorder {
     static isTypeSupported() { return true; }
-    constructor() { mediaRecorders++; this.state = 'inactive'; this.mimeType = 'audio/webm'; }
+    constructor() {
+      mediaRecorders++; this.state = 'inactive'; this.mimeType = 'audio/webm'; encoded.push(this);
+      if (options.nativeStartEvents) this.onstart = null;
+    }
     start() { this.state = 'recording'; events.push(['encoded-start']); }
     stop() { this.state = 'inactive'; }
   }
@@ -103,16 +106,23 @@ function setup(t, options = {}) {
   const cleanup = window.EGLPhonetics.mount(container, { text: 'leaf', expanded: true, precomputed: reference });
   const button = text => [...container.querySelectorAll('button')].find(item => item.textContent === text);
   t.after(() => { cleanup(); window.close(); });
-  return { window, container, cleanup, events, contexts, nodes, streams, network, blobs, revoked, button, newStream,
+  return { window, container, cleanup, events, contexts, nodes, streams, network, blobs, revoked, encoded, button, newStream,
     setTime: value => { time = value; }, mediaRecorders: () => mediaRecorders, decodeCalls: () => decodeCalls,
     status: () => container.querySelector('[role=status]').textContent,
     player: () => container.querySelector('.egl-ph-player') };
 }
 
-async function start(app) {
+async function opening(app) {
+  const previous = app.nodes.length;
   app.button('บันทึกเสียงของฉัน').click();
-  await until(() => Boolean(app.button('หยุดบันทึก')));
+  await until(() => app.nodes.length > previous && app.nodes.at(-1).port.commands.some(command => command.type === 'start'));
   const node = app.nodes.at(-1);
+  return node;
+}
+async function start(app) {
+  const node = await opening(app);
+  node.port.emit({ type: 'started' });
+  await until(() => Boolean(app.button('หยุดบันทึก')));
   assert.ok(node, 'a PCM worklet should capture the microphone');
   assert.equal(node.name, 'egl-microphone');
   assert.ok(node.port.commands.some(command => command.type === 'start'));
@@ -162,6 +172,9 @@ test('word recording resumes audio inside the click, captures PCM without MediaR
   app.button('บันทึกเสียงของฉัน').click();
   assert.ok(app.events.findIndex(event => event[0] === 'resume') < app.events.findIndex(event => event[0] === 'microphone'),
     'iPhone audio activation must happen before awaiting microphone permission');
+  await until(() => app.nodes.length && app.nodes[0].port.commands.some(command => command.type === 'start'));
+  assert.equal(Boolean(app.button('หยุดบันทึก')), false, 'do not announce recording before the first microphone input');
+  app.nodes[0].port.emit({ type: 'started' });
   await until(() => Boolean(app.button('หยุดบันทึก')));
   const node = app.nodes[0], context = app.contexts[0];
   assert.match(app.events.find(event => event[0] === 'module')[1], /\/app\/microphone-processor\.js(?:\?|$)/);
@@ -323,4 +336,100 @@ test('a worklet processor error releases all capture resources and allows a fres
   const next = await start(app);
   assert.notEqual(next, node); assert.equal(app.contexts.length, 2); assert.equal(app.streams.length, 2);
   assert.equal(app.streams[1].track.stopped, 0); assert.equal(app.network.length, 0);
+});
+
+test('opening guidance stays visible until first input and preserves samples arriving before the ready cue renders', async t => {
+  const app = setup(t), timers = fakeTimers(app), node = await opening(app);
+  assert.match(app.status(), /^กำลังเปิดไมโครโฟน/);
+  assert.equal(Boolean(app.button('หยุดบันทึก')), false);
+  assert.equal(app.button('กำลังขอใช้ไมโครโฟน…').disabled, true);
+  timers.advance(1000);
+  assert.doesNotMatch(app.status(), /^เริ่มพูดได้/);
+  node.port.emit({ type: 'started' });
+  samples(app, node, 128, -.5); // Already captured before the awaiting UI resumes.
+  await until(() => Boolean(app.button('หยุดบันทึก')));
+  assert.match(app.status(), /^เริ่มพูดได้/);
+  samples(app, node, 28672, .25);
+  timers.advance(600); app.button('หยุดบันทึก').click(); node.port.emit({ type: 'stopped' });
+  await until(() => Boolean(app.button('บันทึกเสียงของฉัน')));
+  assert.match(app.status(), /บันทึกแล้ว 0\.60 วินาที/);
+  const wav = new DataView(await bytes(app.window, app.blobs.get(app.player().src)));
+  assert.equal(wav.getUint32(40, true), 28800 * 2);
+  assert.equal(wav.getInt16(44, true), -16384, 'the first captured block must not be trimmed');
+  assert.equal(timers.count(), 0);
+});
+
+test('no microphone input times out before ready, releases resources, and ignores a stale start acknowledgement', async t => {
+  const app = setup(t), timers = fakeTimers(app), node = await opening(app);
+  timers.advance(1999);
+  assert.doesNotMatch(app.status(), /^เริ่มพูดได้/);
+  assert.equal(app.streams[0].track.stopped, 0);
+  timers.advance(1);
+  await until(() => Boolean(app.button('บันทึกเสียงของฉัน')));
+  assert.match(app.status(), /ไมโครโฟนยังไม่ส่งเสียง/);
+  assert.equal(app.streams[0].track.stopped, 1);
+  assert.ok(app.contexts[0].closed >= 1); assert.ok(node.disconnected >= 1);
+  assert.equal(node.port.closed, true); assert.equal(timers.count(), 0);
+  node.port.emit({ type: 'started' }); samples(app, node, 24000); node.port.emit({ type: 'stopped' });
+  await flush();
+  assert.equal(app.player().getAttribute('src'), null);
+  assert.equal(app.blobs.size, 0);
+  const next = await start(app);
+  assert.notEqual(next, node); assert.match(app.status(), /^เริ่มพูดได้/);
+  assert.equal(app.streams[1].track.stopped, 0);
+});
+
+test('changing target before the first input stops capture and a late start cannot revive the canceled attempt', async t => {
+  const app = setup(t), timers = fakeTimers(app), node = await opening(app);
+  const input = app.container.querySelector('textarea');
+  input.value = 'root'; input.dispatchEvent(new app.window.Event('input'));
+  await flush();
+  assert.ok(node.port.commands.some(command => command.type === 'stop'));
+  assert.equal(node.port.closed, true); assert.equal(app.streams[0].track.stopped, 1);
+  assert.ok(app.contexts[0].closed >= 1); assert.equal(timers.count(), 0);
+  node.port.emit({ type: 'started' }); node.port.emit({ type: 'stopped' });
+  await flush();
+  assert.doesNotMatch(app.status(), /^เริ่มพูดได้/);
+  assert.ok(app.button('บันทึกเสียงของฉัน')); assert.equal(app.blobs.size, 0);
+});
+
+test('cleanup while waiting for the first input rejects readiness and discards a late acknowledgement', async t => {
+  const app = setup(t), timers = fakeTimers(app), node = await opening(app);
+  app.cleanup(); node.port.emit({ type: 'started' });
+  await flush(); await flush();
+  assert.equal(app.container.children.length, 0);
+  assert.equal(node.port.closed, true); assert.equal(app.streams[0].track.stopped, 1);
+  assert.equal(timers.count(), 0); assert.equal(app.blobs.size, 0);
+});
+
+test('native MediaRecorder fallback waits for its start event before announcing readiness', async t => {
+  const module = deferred(), app = setup(t, { module, nativeStartEvents: true }), timers = fakeTimers(app);
+  app.button('บันทึกเสียงของฉัน').click();
+  await until(() => app.events.some(event => event[0] === 'module'));
+  module.reject(new Error('Worklet unavailable'));
+  await until(() => app.encoded.length === 1 && app.encoded[0].state === 'recording');
+  assert.equal(Boolean(app.button('หยุดบันทึก')), false);
+  assert.match(app.status(), /^กำลังเปิดไมโครโฟน/);
+  const native = app.encoded[0], started = native.onstart;
+  started(); await until(() => Boolean(app.button('หยุดบันทึก')));
+  assert.match(app.status(), /^เริ่มพูดได้/);
+  app.cleanup(); started(); await flush();
+  assert.equal(app.container.children.length, 0); assert.equal(timers.count(), 0);
+  assert.equal(app.streams[0].track.stopped, 1);
+});
+
+test('native start timeout cleans up and never announces ready from a stale event', async t => {
+  const module = deferred(), app = setup(t, { module, nativeStartEvents: true }), timers = fakeTimers(app);
+  app.button('บันทึกเสียงของฉัน').click();
+  await until(() => app.events.some(event => event[0] === 'module'));
+  module.reject(new Error('Worklet unavailable'));
+  await until(() => app.encoded.length === 1 && app.encoded[0].state === 'recording');
+  const native = app.encoded[0], started = native.onstart;
+  timers.advance(2000);
+  await until(() => Boolean(app.button('บันทึกเสียงของฉัน')));
+  assert.match(app.status(), /ไมโครโฟนยังไม่พร้อม/);
+  assert.equal(native.state, 'inactive'); assert.equal(app.streams[0].track.stopped, 1);
+  assert.equal(timers.count(), 0);
+  started(); await flush();
+  assert.doesNotMatch(app.status(), /^เริ่มพูดได้/); assert.equal(app.blobs.size, 0);
 });

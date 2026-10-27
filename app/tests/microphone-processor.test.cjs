@@ -48,9 +48,12 @@ test('microphone processor ignores input until start and always silences every o
   assert.equal(app.processor.process([], outputs), true);
   assert.ok(outputs[0][0].every(sample => sample === 0));
   assert.equal(app.processor.process([[]], []), true);
+  assert.equal(app.processor.process([[new Float32Array(0)]], []), true);
   assert.deepEqual(app.messages, []);
   app.command('stop');
   assert.deepEqual(app.messages, [{ type: 'stopped' }]);
+  app.processor.process([[new Float32Array(128).fill(.25)]], []);
+  assert.deepEqual(app.messages, [{ type: 'stopped' }], 'late input after stop must not acknowledge a canceled start');
 });
 
 test('stereo channels are averaged into mono and the final partial batch precedes stopped', () => {
@@ -59,12 +62,12 @@ test('stereo channels are averaged into mono and the final partial batch precede
   assert.equal(app.processor.process([
     [new Float32Array([1, .5, -1, -.5]), new Float32Array([-1, .5, .5, -.5])]
   ], [[new Float32Array(4).fill(1)]]), true);
-  assert.deepEqual(app.messages, []);
+  assert.deepEqual(app.messages.map(message => message.type), ['started']);
   app.command('stop');
   assert.deepEqual(app.samples(), [0, .5, -.25, -.5]);
-  assert.deepEqual(app.messages.map(message => message.type), ['samples', 'stopped']);
-  assert.equal(app.messages[0].samples.length, 4);
-  assert.deepEqual(app.transfers, [1, 0]);
+  assert.deepEqual(app.messages.map(message => message.type), ['started', 'samples', 'stopped']);
+  assert.equal(app.messages[1].samples.length, 4);
+  assert.deepEqual(app.transfers, [0, 1, 0]);
 });
 
 test('PCM batches retain frame order and copy samples before input buffers are reused', () => {
@@ -76,11 +79,11 @@ test('PCM batches retain frame order and copy samples before input buffers are r
     app.processor.process([[input]], []);
     input.fill(-999);
   }
-  assert.deepEqual(app.messages.map(message => message.samples.length), [2048, 2048]);
+  assert.deepEqual(app.messages.filter(message => message.type === 'samples').map(message => message.samples.length), [2048, 2048]);
   app.command('stop');
   assert.deepEqual(app.messages.filter(message => message.type === 'samples').map(message => message.samples.length), [2048, 2048, 384]);
   assert.deepEqual(app.samples(), Array.from({ length: 4480 }, (_, frame) => frame));
-  assert.deepEqual(app.transfers, [1, 1, 1, 0]);
+  assert.deepEqual(app.transfers, [0, 1, 1, 1, 0]);
 });
 
 test('stop excludes subsequent audio, is idempotent, and a fresh start has no stale tail', () => {
@@ -100,6 +103,7 @@ test('stop excludes subsequent audio, is idempotent, and a fresh start has no st
   app.command('stop');
   assert.deepEqual(app.samples(), [1, 2, 3, 4, 5]);
   assert.equal(app.messages.filter(message => message.type === 'stopped').length, 2);
+  assert.equal(app.messages.filter(message => message.type === 'started').length, 2, 'acknowledge input exactly once per capture');
 });
 
 test('capture stops at exactly 14.5 seconds, flushing only the allowed tail frames', () => {

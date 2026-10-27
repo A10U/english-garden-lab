@@ -188,20 +188,26 @@ test('search and category filters select only visible phrases, clear stale analy
   assert.deepEqual(app.errors, []);
 });
 
-test('Thai phrase chunks replay the actual A word boundaries, with slow playback and a finite two-repeat control', t => {
+test('phrase chips clearly replay full-sentence context without CTC cuts, with slow playback and a finite two-repeat control', t => {
   const app = setup(); t.after(() => app.close());
   const audio = app.document.querySelector('[data-voice="A"]');
   Object.defineProperty(audio, 'readyState', { value: 1, configurable: true });
   const example = app.mounts[0].referenceExample;
   click(app, '.study-chunk');
-  assert.equal(audio.currentTime, example.words[0].start);
+  assert.equal(audio.currentTime, 0);
+  assert.match(app.document.querySelector('.study-chunk .chunk-playback-mode').textContent, /ประโยคเต็ม/);
+  assert.match(app.document.querySelector('.example-status').textContent, /ประโยคเต็มจากเสียง A/);
   assert.equal(app.plays.length, 1);
   const slow = app.document.querySelector('#example-slow'); slow.checked = true;
   slow.dispatchEvent(new app.window.Event('change'));
   assert.equal(audio.playbackRate, 0.75);
   assert.equal(app.document.querySelector('[data-voice="B"]').playbackRate, 0.75);
+  const pauses = app.pauses.length;
   audio.currentTime = example.words[1].end + 0.01;
   audio.dispatchEvent(new app.window.Event('timeupdate'));
+  assert.equal(app.pauses.length, pauses, 'approximate CTC boundaries must not pause the complete sentence');
+  assert.doesNotMatch(app.document.querySelector('.example-status').textContent, /ฟังจบแล้ว/);
+  audio.dispatchEvent(new app.window.Event('ended'));
   assert.match(app.document.querySelector('.example-status').textContent, /ฟังจบแล้ว/);
   click(app, '#repeat-example');
   assert.equal(app.plays.length, 2);

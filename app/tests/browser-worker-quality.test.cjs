@@ -60,8 +60,8 @@ function setup(outputFactory) {
   vm.runInContext(source, context, { filename: 'browser-phonetics-worker.js' });
   return {
     messages, inputs, outputDisposals, creates: () => creates, runs: () => runs,
-    async analyze(id = 1, expected = reference()) {
-      await self.onmessage({ data: { id, samples: waveform(), reference: expected } });
+    async analyze(id = 1, expected = reference(), samples = waveform()) {
+      await self.onmessage({ data: { id, samples, reference: expected } });
       return messages.filter(message => message.id === id && message.type !== 'progress').at(-1);
     },
   };
@@ -91,6 +91,61 @@ test('strong recognized speech can still have a genuine zero raw phone agreement
   assert.equal(result.recognition_quality.mean_token_posterior, .9);
   assert.equal(result.recognition_quality.reason, null);
   assert.equal(result.recognition_quality.calibrated, false);
+});
+
+test('high-posterior multilingual tokens remain raw evidence but cannot become assessed English scores', async () => {
+  for (const token of [82, 148, 47, 28]) { // i5, y5, y, French-style uvular r.
+    const app = setup(() => ({ logits: logits(phoneFrames(.95, [5, token])) }));
+    const { result } = await app.analyze();
+    assert.equal(result.recognition_quality.mean_token_posterior, .95);
+    assert.equal(result.recognition_quality.status, 'uncertain');
+    assert.equal(result.recognition_quality.reason, 'unsupported_english_tokens');
+    assert.deepEqual(Array.from(result.recognition_quality.unsupported_tokens), [Object.keys(model.vocab).find(phone => model.vocab[phone] === token)]);
+    assert.equal(result.recognition_quality.calibrated, false);
+    assert.equal(result.observed.phones[1].phone, result.recognition_quality.unsupported_tokens[0], 'do not substitute an English or target phone');
+    assert.match(result.recognition_quality.limitation, /ไม่ได้ยืนยันว่าผู้พูดออกเสียงผิด/);
+    assert.ok(result.limitations.includes(result.recognition_quality.limitation));
+    assert.deepEqual(result.alignment, alignment.alignPhoneSequences(result.reference.words, result.observed.phones), 'raw phone edit agreement stays intact for diagnostics');
+  }
+});
+
+test('guide-supported English tokens and common variants are assessed independently of the expected word', async () => {
+  const guide = require('../phone-guide.js');
+  const supported = Object.entries(model.vocab).filter(([phone]) => {
+    const described = guide.describe(phone);
+    return described.symbol === alignment.canonical_phone(phone) && !described.label.includes('ยังไม่มี');
+  });
+  for (const [phone, token] of [...supported, ...['ʔ', 'ᵻ', 'ɜ', 'pʰ', 'tʰ', 'kʰ', 'ɻ', 'æː', 'ɪː', 'ʊː'].map(phone => [phone, model.vocab[phone]])]) {
+    const app = setup(() => ({ logits: logits(phoneFrames(.9, [token])) }));
+    const { result } = await app.analyze();
+    assert.equal(result.recognition_quality.status, 'recognized', phone + ' must not be rejected merely for differing from the target');
+    assert.deepEqual(Array.from(result.recognition_quality.unsupported_tokens), []);
+  }
+});
+
+test('English sentence recognition keeps actual counts, supported composites and quality unchanged', async () => {
+  const words = [{ index: 0, text: 'a', ipa: 'ɐ', phones: ['ɐ'] },
+    { index: 1, text: 'garden', ipa: 'ɡɑːɹdən', phones: ['ɡ', 'ɑːɹ', 'd', 'ə', 'n'] }];
+  const expected = { ...reference(), text: 'a garden', ipa: 'ɐ ɡɑːɹdən', words };
+  const tokens = words.flatMap(word => word.phones.map(phone => model.vocab[phone]));
+  const app = setup(() => ({ logits: logits(phoneFrames(.88, tokens)) }));
+  const { result } = await app.analyze(1, expected);
+  assert.equal(result.alignment.summary.match_percent, 100);
+  assert.equal(result.alignment.summary.matched_phones, tokens.length);
+  assert.equal(result.recognition_quality.status, 'recognized');
+  assert.equal(result.recognition_quality.mean_token_posterior, .88);
+  assert.deepEqual(Array.from(result.recognition_quality.unsupported_tokens), []);
+  assert.deepEqual(Array.from(result.observed.phones, item => item.phone), words.flatMap(word => word.phones));
+});
+
+test('silence is rejected before model inference and cannot receive recognition or a score', async () => {
+  const app = setup(() => { throw new Error('silence must not reach inference'); });
+  const message = await app.analyze(1, reference(), new Float32Array(9600));
+  assert.equal(message.type, 'error');
+  assert.match(message.message, /เสียงเงียบหรือเบาเกินไป/);
+  assert.equal(app.creates(), 0);
+  assert.equal(app.runs(), 0);
+  assert.equal(app.messages.some(message => message.type === 'result'), false);
 });
 
 test('high posterior blank frames cannot make weak phone recognition appear reliable', async () => {

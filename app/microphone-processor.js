@@ -3,6 +3,7 @@ class EGLMicrophoneProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.collecting = false;
+    this.ready = false;
     this.frames = 0;
     this.limit = Math.floor(sampleRate * 14.5);
     this.batch = new Float32Array(2048);
@@ -11,6 +12,7 @@ class EGLMicrophoneProcessor extends AudioWorkletProcessor {
       if (event.data && event.data.type === 'start' && !this.collecting) {
         this.frames = 0;
         this.used = 0;
+        this.ready = false;
         this.collecting = true;
       } else if (event.data && event.data.type === 'stop') this.stop();
     };
@@ -37,6 +39,10 @@ class EGLMicrophoneProcessor extends AudioWorkletProcessor {
     const channels = inputs[0];
     if (!this.collecting || !channels || !channels.length) return true;
     const frames = channels[0].length;
+    if (frames && !this.ready) {
+      this.ready = true;
+      this.port.postMessage({ type: 'started' });
+    }
     for (let frame = 0; frame < frames && this.collecting; frame++) {
       if (this.frames >= this.limit) { this.stop(); break; }
       let sample = 0;
