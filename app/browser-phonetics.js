@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
   const scriptURL = root.document && root.document.currentScript && root.document.currentScript.src;
-  const workerURL = scriptURL ? new URL('browser-phonetics-worker.js', scriptURL).href : null;
+  const workerURL = scriptURL ? new URL('browser-phonetics-worker.js' + new URL(scriptURL).search, scriptURL).href : null;
   let worker = null, pending = null, sequence = 0;
   function friendly(message) { const error = new Error(message); error.userMessage = message; return error; }
   function aborted() { return new root.DOMException('Analysis canceled', 'AbortError'); }

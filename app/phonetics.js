@@ -1591,7 +1591,7 @@
           try {
             if (!await resumed || context.state !== 'running') throw new Error('Microphone AudioContext could not resume');
             if (!current()) return;
-            const moduleURL = new win.URL('microphone-processor.js', runtimeScriptURL || doc.baseURI).href;
+            const moduleURL = new win.URL('microphone-processor.js' + (runtimeScriptURL ? new win.URL(runtimeScriptURL).search : ''), runtimeScriptURL || doc.baseURI).href;
             active = await pcmRecorder(win, context, acquired, moduleURL, current);
           } catch (error) {
             closeContext(context);
