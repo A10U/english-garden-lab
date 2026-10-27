@@ -47,6 +47,7 @@ class StaticDemoBuildTests(unittest.TestCase):
         (app / "reference-audio.js").write_text("globalThis.EGL_REFERENCE_AUDIO={'private':'../speech-training/runs/secret.wav'};")
         (app / "phonetic-data.js").write_text('globalThis.EGL_PHONETIC_DATA={};')
         (app / 'browser-phonetics.js').write_text('globalThis.EGLBrowserPhonetics={};')
+        (app / 'microphone-processor.js').write_text("registerProcessor('egl-microphone', class {});")
         (app / 'browser-phonetics-worker.js').write_text("importScripts('vendor/onnxruntime/ort.wasm.min.js','phonetic-alignment.js','browser-phoneme-model.js');")
         (app / 'browser-phoneme-model.js').write_text('globalThis.EGLBrowserPhonemeModel=' + json.dumps({'url': MODEL_URL}) + ';')
         (app / 'phonetic-alignment.js').write_text('globalThis.EGLPhoneticAlignment={};')
@@ -216,6 +217,12 @@ class StaticDemoBuildTests(unittest.TestCase):
     def test_missing_worker_binary_fails_before_writing(self):
         (self.root / 'app/vendor/onnxruntime/ort-wasm-simd-threaded.wasm').unlink()
         with self.assertRaisesRegex(ValueError, 'Missing browser phoneme runtime asset'):
+            build(self.root, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_missing_microphone_worklet_fails_before_writing(self):
+        (self.root / 'app/microphone-processor.js').unlink()
+        with self.assertRaisesRegex(ValueError, 'Missing browser phoneme runtime asset: app/microphone-processor.js'):
             build(self.root, self.output)
         self.assertFalse(self.output.exists())
 

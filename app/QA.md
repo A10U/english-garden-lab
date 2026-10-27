@@ -2,7 +2,8 @@
 
 Checks for the portable App and Speech demo:
 
-- JavaScript unit and DOM integration suite: 239 passed.
+- JavaScript unit and DOM integration suite: 256 passed.
+- Direct PCM microphone capture, AudioWorklet batching/tail flush, short-word timing, truncation, interruption recovery and repeated recording: 17 regressions passed. Static builder suite: 24 passed, including required microphone-worklet packaging.
 - Full Python engine, API, reference-audio, exporter and static-builder suite: 80 passed.
 - Browser client, alignment and hosted learner dispatch have regression coverage for cancellation, PCM resampling and separation from cached AI results.
 - All 62 sentence WAVs and 210 complete standalone word WAVs verified against manifests, PCM headers, duration, and SHA256SUMS.

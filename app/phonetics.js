@@ -103,6 +103,67 @@
     return monoWave([samples], rate);
   }
 
+  // Capture PCM before a browser encoder/container can truncate a short take.
+  // The worklet outputs silence, so connecting it keeps capture running without
+  // playing the microphone through the speakers.
+  async function pcmRecorder(win, context, stream, moduleURL, current) {
+    await context.audioWorklet.addModule(moduleURL);
+    if (!current()) throw new win.DOMException('Recording canceled', 'AbortError');
+    const source = context.createMediaStreamSource(stream);
+    let node;
+    try { node = new win.AudioWorkletNode(context, 'egl-microphone'); }
+    catch (error) { source.disconnect(); throw error; }
+    let blocks = [], frames = 0, collecting = false, finished = false, released = false, stopTimer = null;
+    const clearStopTimer = () => { if (stopTimer !== null) win.clearTimeout(stopTimer); stopTimer = null; };
+    const active = {
+      state: 'inactive', prepared: null,
+      start() { collecting = true; this.state = 'recording'; node.port.postMessage({ type: 'start' }); },
+      stop() {
+        if (this.state !== 'recording') return;
+        this.state = 'inactive';
+        stopTimer = win.setTimeout(() => fail(new Error('Microphone stop timed out')), 2000);
+        node.port.postMessage({ type: 'stop' });
+      },
+      release() {
+        if (released) return;
+        released = true; clearStopTimer();
+        finished = true; collecting = false; blocks = [];
+        node.port.onmessage = null; node.onprocessorerror = null;
+        source.disconnect(); node.disconnect(); node.port.close();
+      }
+    };
+    const fail = error => {
+      if (finished) return;
+      finished = true; clearStopTimer();
+      active.state = 'inactive';
+      if (active.onerror) active.onerror(error);
+    };
+    node.onprocessorerror = fail;
+    node.port.onmessage = event => {
+      if (!collecting || finished) return;
+      const data = event.data || {};
+      try {
+        if (data.type === 'samples') {
+          const samples = new Float32Array(data.samples);
+          if (frames + samples.length > Math.floor(context.sampleRate * 14.5)) throw new Error('Too many microphone frames');
+          blocks.push(samples); frames += samples.length;
+        } else if (data.type === 'stopped') {
+          clearStopTimer();
+          finished = true; collecting = false; active.state = 'inactive';
+          const samples = new Float32Array(frames);
+          let offset = 0;
+          blocks.forEach(block => { samples.set(block, offset); offset += block.length; });
+          blocks = [];
+          active.prepared = monoWave([samples], context.sampleRate);
+          if (active.onstop) active.onstop();
+        }
+      } catch (error) { finished = false; fail(error); }
+    };
+    try { source.connect(node); node.connect(context.destination); }
+    catch (error) { active.release(); throw error; }
+    return active;
+  }
+
   function mount(container, options) {
     if (!container || !container.ownerDocument) throw new TypeError('A container element is required');
     options = options || {};
@@ -127,7 +188,7 @@
     const id = 'egl-phonetics-' + (++nextId);
     let disposed = false, version = 0, controller = null, busy = false, browserRequest = false;
     let stream = null, recorder = null, recording = false, requestingMic = false, preparing = false;
-    let prepareController = null, decodeContext = null;
+    let prepareController = null, decodeContext = null, captureContext = null;
     let recordingVersion = 0, recordTimer = null;
     let clip = null, clipLabel = '', clipURL = null, clipKind = '', clipInfo = null, reference = null;
     let mode = 'own', analysisData = null, wordItems = [], selectedIndex = null, slow = false;
@@ -1472,60 +1533,105 @@
         recorder.onstop = null; recorder.ondataavailable = null; recorder.onerror = null;
         if (recorder.state !== 'inactive') { try { recorder.stop(); } catch (_) {} }
       }
-      recorder = null; recording = false; requestingMic = false;
       stopTracks();
+      recorder = null; recording = false; requestingMic = false;
       if (!disposed) updateButtons();
     }
     function stopTracks() {
       if (stream) stream.getTracks().forEach(track => track.stop());
       stream = null;
+      if (recorder && recorder.release) recorder.release();
+      closeContext(captureContext); captureContext = null;
       if (recordTimer !== null) win.clearTimeout(recordTimer);
       recordTimer = null;
     }
     async function record() {
       if (recording && recorder) { if (recorder.state !== 'inactive') recorder.stop(); return; }
       if (requestingMic || preparing || disposed) return;
-      if (!win.navigator.mediaDevices || !win.navigator.mediaDevices.getUserMedia || !win.MediaRecorder) {
+      const Context = win.AudioContext || win.webkitAudioContext;
+      if (!win.navigator.mediaDevices || !win.navigator.mediaDevices.getUserMedia || (!win.MediaRecorder && !(Context && win.AudioWorkletNode))) {
         setStatus('เบราว์เซอร์นี้ยังบันทึกเสียงไม่ได้ เลือกไฟล์เสียงแทนได้ครับ', true); return;
       }
       cancelRequest();
       stopExample(); stopPlayback();
+      doc.querySelectorAll('audio, video').forEach(media => media.pause());
       requestingMic = true; updateButtons();
       const attempt = ++recordingVersion;
+      const current = () => !disposed && attempt === recordingVersion;
+      let context = null, resumed = null;
       try {
+        // iOS needs resume() in the tap handler, before microphone permission
+        // or module loading yields away the user activation.
+        if (Context && win.AudioWorkletNode) {
+          try {
+            context = new Context(); captureContext = context;
+            if (!context.audioWorklet || !context.audioWorklet.addModule) throw new Error('AudioWorklet unavailable');
+            resumed = Promise.resolve(context.resume()).then(() => true, () => false);
+          } catch (_) {
+            closeContext(context); captureContext = null; context = null;
+          }
+        }
         const acquired = await win.navigator.mediaDevices.getUserMedia({ audio: true });
-        if (disposed || attempt !== recordingVersion) { acquired.getTracks().forEach(track => track.stop()); return; }
+        if (!current()) { acquired.getTracks().forEach(track => track.stop()); return; }
         stream = acquired;
-        const types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'];
-        const mimeType = types.find(type => win.MediaRecorder.isTypeSupported && win.MediaRecorder.isTypeSupported(type));
-        const active = new win.MediaRecorder(stream, mimeType ? { mimeType: mimeType } : undefined);
+        let active = null;
+        if (context) {
+          try {
+            if (!await resumed || context.state !== 'running') throw new Error('Microphone AudioContext could not resume');
+            if (!current()) return;
+            const moduleURL = new win.URL('microphone-processor.js', runtimeScriptURL || doc.baseURI).href;
+            active = await pcmRecorder(win, context, acquired, moduleURL, current);
+          } catch (error) {
+            closeContext(context);
+            if (captureContext === context) captureContext = null;
+            if (!current()) return;
+          }
+        }
+        if (!active) {
+          if (!win.MediaRecorder) throw new Error('No microphone recorder available');
+          const types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'];
+          const mimeType = types.find(type => win.MediaRecorder.isTypeSupported && win.MediaRecorder.isTypeSupported(type));
+          active = new win.MediaRecorder(stream, mimeType ? { mimeType: mimeType } : undefined);
+        }
         recorder = active;
+        let startedAt = null, stoppedAt = null;
+        const stop = active.stop.bind(active);
+        active.stop = () => {
+          if (active.state === 'recording' && stoppedAt === null) stoppedAt = win.performance.now();
+          if (current()) { preparing = true; updateButtons(); setStatus('กำลังเตรียมเสียงให้ฟัง…'); }
+          return stop();
+        };
         const chunks = [];
         active.ondataavailable = event => { if (event.data && event.data.size) chunks.push(event.data); };
         active.onerror = () => {
           if (disposed || attempt !== recordingVersion) return;
           active.onstop = null; active.ondataavailable = null; active.onerror = null;
           if (active.state !== 'inactive') { try { active.stop(); } catch (_) {} }
-          stopTracks(); recording = false; recorder = null; requestingMic = false; updateButtons();
+          stopTracks(); recording = false; recorder = null; requestingMic = false; preparing = false; updateButtons();
           setStatus('บันทึกเสียงไม่สำเร็จ ลองอีกครั้งหรือเลือกไฟล์เสียง', true);
         };
         active.onstop = async () => {
           if (disposed || attempt !== recordingVersion) return;
+          if (stoppedAt === null) stoppedAt = win.performance.now();
           stopTracks(); recording = false; recorder = null;
           preparing = true;
           const preparation = new win.AbortController(); prepareController = preparation;
           service.hidden = true; updateButtons(); setStatus('กำลังเตรียมเสียงให้ฟัง…');
           try {
-            const blob = new win.Blob(chunks, { type: active.mimeType || 'audio/webm' });
-            const prepared = await prepareRecording(blob, attempt, preparation.signal);
+            const blob = active.prepared ? null : new win.Blob(chunks, { type: active.mimeType || 'audio/webm' });
+            const prepared = active.prepared || await prepareRecording(blob, attempt, preparation.signal);
             assertPreparing(attempt, preparation.signal);
+            const elapsed = ((stoppedAt === null ? win.performance.now() : stoppedAt) - startedAt) / 1000;
+            if (elapsed - prepared.duration > Math.max(0.75, elapsed * 0.35)) {
+              throw friendly('เสียงที่บันทึกขาดหายหรือไมโครโฟนหยุดทำงาน ลองบันทึกใหม่โดยเปิดหน้านี้ค้างไว้ หรือเลือกไฟล์เสียงแทน');
+            }
             setClip(prepared.blob, 'เสียงที่คุณบันทึก', 'recorded', prepared);
             const quiet = prepared.rmsDbfs < -55;
             setStatus('บันทึกแล้ว ' + prepared.duration.toFixed(2) + ' วินาที · ' + (quiet ? 'เสียงเบามาก ลองกดฟังหรือบันทึกใกล้ไมโครโฟนขึ้น' : 'กด “ฟังเสียงของฉัน” เพื่อลองฟัง'), quiet);
           } catch (error) {
             if (!disposed && attempt === recordingVersion && error.name !== 'AbortError') {
               clearClip();
-              setStatus(demoMode ? error.userMessage || 'เดโมนี้ยังเตรียมไฟล์เสียงให้เล่นไม่ได้ ลองเลือกไฟล์ WAV หรือเปิดรุ่นในเครื่อง' : 'ยังเตรียมเสียงให้เล่นไม่ได้ ลองบันทึกใหม่ หรือเปิดบริการเสียงในเครื่องแล้วลองอีกครั้ง', true);
+              setStatus(error.userMessage || (demoMode ? 'เดโมนี้ยังเตรียมไฟล์เสียงให้เล่นไม่ได้ ลองเลือกไฟล์ WAV หรือเปิดรุ่นในเครื่อง' : 'ยังเตรียมเสียงให้เล่นไม่ได้ ลองบันทึกใหม่ หรือเปิดบริการเสียงในเครื่องแล้วลองอีกครั้ง'), true);
               service.hidden = demoMode;
             }
           } finally {
@@ -1536,6 +1642,7 @@
             }
           }
         };
+        startedAt = win.performance.now();
         active.start();
         clearClip();
         requestingMic = false; recording = true; updateButtons();
@@ -1544,6 +1651,7 @@
       } catch (error) {
         if (disposed || attempt !== recordingVersion) return;
         stopTracks(); requestingMic = false; recording = false;
+        recorder = null;
         updateButtons();
         setStatus(error.name === 'NotAllowedError' ? 'ยังไม่ได้อนุญาตไมโครโฟน คุณเลือกไฟล์เสียงแทนได้ครับ' : 'เปิดไมโครโฟนไม่สำเร็จ ลองใหม่หรือเลือกไฟล์เสียง', true);
       }

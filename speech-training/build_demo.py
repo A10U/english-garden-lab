@@ -40,6 +40,7 @@ CSP = '<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="con
 MODEL_REPOSITORY = "https://huggingface.co/onnx-community/wav2vec2-lv-60-espeak-cv-ft-ONNX/"
 MODEL_URL = MODEL_REPOSITORY + "resolve/c69750f5043e5e1f8a71ab95dd3b98338c280c92/onnx/model_quantized.onnx"
 BROWSER_ASSETS = (
+    "app/microphone-processor.js",
     "app/sound-foundations.js", "app/vowel-pairs.js", "app/vowel-audio.js", "app/pronunciation-videos.js",
     "app/articulation-images.js", "app/spelling-guide.js", "app/spelling-feedback.js", "app/word-audio.js",
     "app/browser-phonetics.js", "app/browser-phonetics-worker.js", "app/browser-phoneme-model.js",
