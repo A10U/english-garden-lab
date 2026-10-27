@@ -85,10 +85,13 @@ function practice(app, text) {
 }
 function unassessed(app) {
   const observed = app.container.querySelector('.egl-ph-observed');
-  assert.equal(observed.querySelector('.egl-ph-percent').textContent, '—');
-  assert.ok(observed.querySelector('.egl-ph-agreement').classList.contains('egl-ph-unassessed'));
-  assert.ok([...observed.querySelectorAll('.egl-ph-word-percent')].every(node => node.textContent === '—'));
-  assert.ok([...app.container.querySelectorAll('.egl-ph-part-percent')].every(node => node.textContent === '—'));
+  const overall = observed.querySelector('.egl-ph-percent, .egl-ph-evidence-status');
+  assert.ok(overall); assert.equal(overall.textContent, '—');
+  assert.ok(observed.querySelector('.egl-ph-agreement').classList.contains(overall.matches('.egl-ph-evidence-status') ? 'egl-ph-evidence-unassessed' : 'egl-ph-unassessed'));
+  const words = [...observed.querySelectorAll('.egl-ph-word-percent, .egl-ph-word-evidence')];
+  assert.ok(words.length > 0); assert.ok(words.every(node => node.textContent === '—'));
+  assert.ok(app.container.querySelectorAll('.egl-ph-part-status').length >= 3);
+  assert.ok([...app.container.querySelectorAll('.egl-ph-part-status')].every(node => node.textContent === '—'));
   assert.equal(observed.querySelector('.egl-ph-phone-pairs'), null);
   assert.doesNotMatch(observed.querySelector('.egl-ph-spelling-summary')?.textContent || '', /ควรฝึกก่อน:|จับคู่ตรงดีแล้ว/);
   assert.equal(app.button('คำที่มีเสียงต่างถัดไป').disabled, true);
@@ -154,7 +157,8 @@ test('SW-005 actual mismatching phones without quality metadata retain genuine z
       assert.equal(app.container.querySelector('.egl-ph-word-percent').textContent, '0.0%');
       assert.equal(app.container.querySelector('.egl-ph-recognition-warning'), null);
       assert.ok(app.container.querySelector('.egl-ph-phone-pairs'));
-      assert.match(app.container.querySelector('.egl-ph-spelling-summary').textContent, /ควรฝึกก่อน:/);
+      assert.match(app.container.querySelector('.egl-ph-spelling-summary').textContent, /ฟังเทียบทีละเสียง/);
+      assert.doesNotMatch(app.container.querySelector('.egl-ph-spelling-summary').textContent, /ควรฝึกก่อน:/);
     });
   }
 });
@@ -238,7 +242,7 @@ test('SW-010 no recognition in single-phone practice leaves the selected phone a
   assert.deepEqual([...sent.words[0].phones], ['ɪ']); assert.equal(sent.context.phone_index, 0);
   assert.match(app.container.querySelector('.egl-ph-observed > h3').textContent, /ผลเฉพาะเสียง \/ɪ\//);
   const inspector = app.container.querySelector('.egl-ph-inspector');
-  assert.ok(inspector.querySelectorAll('.egl-ph-part-percent').length >= 3, 'the whole-word inspector retains the other unassessed slots');
+  assert.ok(inspector.querySelectorAll('.egl-ph-part-status').length >= 3, 'the whole-word inspector retains the other unassessed slots');
   assert.equal(app.network.length, 0);
 });
 

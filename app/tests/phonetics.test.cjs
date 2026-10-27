@@ -422,14 +422,15 @@ test('uncertain real-speech recognition leaves all visible scores unassessed and
   assert.equal(observed.querySelector('.egl-ph-word-percent').textContent, '—');
   assert.ok(observed.querySelector('.egl-ph-compare').classList.contains('egl-ph-unassessed'));
   assert.equal(observed.querySelector('.egl-ph-inspector-title').textContent, "It's · —");
-  assert.doesNotMatch(observed.textContent, /0\.0%/);
+  assert.equal(observed.querySelector('.egl-ph-spelling-group .egl-ph-part-percent'), null);
   assert.match(observed.querySelector('.egl-ph-recognition-warning').textContent, /ยังไม่น่าเชื่อถือพอ/);
   assert.match(observed.querySelector('.egl-ph-inspector .egl-ph-counts').textContent, /ยังประเมินคำนี้ไม่ได้/);
   assert.equal(observed.querySelector('.egl-ph-phone-pairs'), null, 'unreliable substitutions cannot become corrective phone pairs');
   assert.equal(app.button('คำที่มีเสียงต่างถัดไป').disabled, true);
   assert.doesNotMatch(observed.querySelector('.egl-ph-spelling-summary').textContent, /ควรฝึกก่อน:/);
-  assert.ok([...observed.querySelectorAll('.egl-ph-part-percent')].every(node => node.textContent === '—'));
-  assert.match(observed.querySelector('.egl-ph-part-advice').textContent, /ยังไม่มีผลที่ประเมินได้/);
+  assert.ok(observed.querySelectorAll('.egl-ph-part-status').length >= 3);
+  assert.ok([...observed.querySelectorAll('.egl-ph-part-status')].every(node => node.textContent === '—'));
+  assert.match(observed.querySelector('.egl-ph-part-advice').textContent, /ยังไม่มีผลจับคู่ที่ใช้ได้/);
   assert.equal(observed.querySelector('.egl-ph-detected').textContent, 'ʔ i', 'raw recognition remains inspectable');
   assert.match(app.container.querySelector('[role=status]').textContent, /ยังให้เปอร์เซ็นต์ไม่ได้/);
   app.button('ฟังเสียงของฉันทั้งคลิป').click();
@@ -444,7 +445,8 @@ test('uncertain recognition cannot turn a coincidental raw perfect alignment int
   const app = await analyzeFixture(data, recognitionUIOptions(data));
   assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '—');
   assert.equal(app.container.querySelector('.egl-ph-word-percent').textContent, '—');
-  assert.ok([...app.container.querySelectorAll('.egl-ph-part-percent')].every(node => node.textContent === '—'));
+  assert.ok(app.container.querySelectorAll('.egl-ph-part-status').length >= 3);
+  assert.ok([...app.container.querySelectorAll('.egl-ph-part-status')].every(node => node.textContent === '—'));
   assert.doesNotMatch(app.container.querySelector('.egl-ph-spelling-summary').textContent, /จับคู่ตรงดีแล้ว/);
   assert.equal(app.container.querySelector('.egl-ph-phone-pairs'), null);
   assert.equal(JSON.stringify(data), before);
@@ -460,14 +462,15 @@ test('recognized speech with genuine zero phone agreement retains zero scores an
   assert.ok(app.container.querySelector('.egl-ph-agreement').classList.contains('egl-ph-red'));
   assert.equal(app.container.querySelector('.egl-ph-recognition-warning'), null);
   assert.ok(app.container.querySelectorAll('.egl-ph-phone-pairs .egl-ph-phone-row').length > 1);
-  assert.match(app.container.querySelector('.egl-ph-spelling-summary').textContent, /ควรฝึกก่อน:/);
-  assert.ok([...app.container.querySelectorAll('.egl-ph-part-percent')].some(node => node.textContent === '0.0%'));
+  assert.match(app.container.querySelector('.egl-ph-spelling-summary').textContent, /ฟังเทียบทีละเสียง/);
+  assert.doesNotMatch(app.container.querySelector('.egl-ph-spelling-summary').textContent, /ควรฝึกก่อน:/);
+  assert.ok([...app.container.querySelectorAll('.egl-ph-part-status')].some(node => node.textContent === 'โมเดลถอดต่าง'));
   assert.equal(app.button('คำที่มีเสียงต่างถัดไป').disabled, false);
   assert.equal(JSON.stringify(data), before);
   app.cleanup(); app.dom.window.close();
 });
 
-test('a confident take after an uncertain take restores scores and coaching without keeping the previous warning', async () => {
+test('a confident take after an uncertain take restores raw word scores and qualitative part evidence without the previous warning', async () => {
   const weak = recognitionFixture(), recognized = recognitionFixture(['ɪ', 't', 's'], 'recognized');
   const before = [JSON.stringify(weak), JSON.stringify(recognized)], queue = [weak, recognized];
   const app = await analyzeFixture(weak, { ...recognitionUIOptions(weak), fetch: async () => ok(queue.shift()) });
@@ -477,8 +480,9 @@ test('a confident take after an uncertain take restores scores and coaching with
   assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '100.0%');
   assert.equal(app.container.querySelector('.egl-ph-word-percent').textContent, '100.0%');
   assert.equal(app.container.querySelector('.egl-ph-recognition-warning'), null);
-  assert.match(app.container.querySelector('.egl-ph-spelling-summary').textContent, /จับคู่ตรงดีแล้ว/);
-  assert.ok([...app.container.querySelectorAll('.egl-ph-part-percent')].every(node => node.textContent === '100.0%'));
+  assert.match(app.container.querySelector('.egl-ph-spelling-summary').textContent, /ฟังเทียบทีละเสียง/);
+  assert.ok(app.container.querySelectorAll('.egl-ph-part-status').length >= 3);
+  assert.ok([...app.container.querySelectorAll('.egl-ph-part-status')].every(node => node.textContent === 'จับคู่ตรง'));
   assert.ok(app.container.querySelector('.egl-ph-phone-pairs'));
   assert.equal(JSON.stringify(weak), before[0]); assert.equal(JSON.stringify(recognized), before[1]);
   app.cleanup(); app.dom.window.close();

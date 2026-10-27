@@ -825,14 +825,22 @@
       if (!disposed) [...spellingRefreshers].forEach(refresh => refresh());
     }
     function phoneResultText(result, phone) {
-      if (!result || validPercent(result.match_percent) == null) return 'ยังไม่มีผลที่ประเมินได้สำหรับเสียงนี้ บันทึกแล้วกดดูผล หรือบันทึกใหม่ให้ชัดขึ้น';
+      if (!result || validPercent(result.match_percent) == null) return 'ยังไม่มีผลจับคู่ที่ใช้ได้สำหรับเสียงนี้ ฟังคำตัวอย่างและเสียงของคุณเทียบกันได้ ไม่จำเป็นต้องอัดซ้ำเพื่อไล่ตัวเลข';
       const observed = Array.isArray(result.observed) ? result.observed.map(item => typeof item === 'string' ? item : item.phone).filter(Boolean).join(' ') : '';
       const counts = result.counts || {};
-      if (result.match_percent === 100) return 'โมเดลจับคู่เสียง /' + phone + '/ กับอ้างอิงได้ในคลิปนี้ ลองเชื่อมเสียงนี้กับคำเต็มต่อครับ';
-      if (counts.deleted_phones) return 'โมเดลยังไม่พบเสียง /' + phone + '/ ที่ตำแหน่งนี้ ลองดูวิธีวางปาก แล้วออกเสียงในคำเต็มให้ชัดขึ้น';
-      if (counts.substituted_phones) return 'อ้างอิง /' + phone + '/ แต่โมเดลตรวจพบ /' + (observed || 'เสียงอื่น') + '/ ลองเปรียบเทียบตำแหน่งลิ้นและการปล่อยลมด้านล่าง';
-      if (counts.inserted_phones) return 'โมเดลพบเสียงเพิ่มใกล้ /' + phone + '/ ลองฟังคำเต็มช้า ๆ และระวังเติมสระหรือเสียงอื่นแทรก';
-      return 'ลองฝึก /' + phone + '/ แยก แล้วเชื่อมกลับเป็นคำเต็ม เปอร์เซ็นต์นี้นับการจับคู่เสียงที่โมเดลตรวจพบ';
+      if (result.match_percent === 100) return 'โมเดลถอดเป็น /' + (observed || phone) + '/ ตรงกับอ้างอิง /' + phone + '/ ในคลิปนี้ การจับคู่ตรงยังไม่ยืนยันคุณภาพการออกเสียงทั้งหมด';
+      if (counts.deleted_phones) return 'โมเดลยังจับคู่กับ /' + phone + '/ ไม่ได้ ไม่ได้ยืนยันว่าคุณไม่ได้ออกเสียงนี้ ลองฟังคลิปเต็มเทียบกับตัวอย่าง';
+      if (counts.substituted_phones) return 'อ้างอิง /' + phone + '/ · โมเดลถอดเป็น /' + (observed || 'เสียงอื่น') + '/ ผลถอดอาจคลาดเคลื่อน จึงยังสรุปไม่ได้ว่าคุณต้องแก้เสียงนี้';
+      if (counts.inserted_phones) return 'โมเดลถอดเสียงเพิ่มใกล้ /' + phone + '/ ผลนี้อาจมาจากเสียงเชื่อมหรือความคลาดเคลื่อนของโมเดล ฟังคำเต็มเทียบได้ก่อนเลือกฝึก';
+      return 'ผลนี้เป็นการจับคู่สิ่งที่โมเดลถอดได้กับอ้างอิง ฟังคำเต็มเทียบกันก่อนเลือกส่วนที่ต้องการฝึก';
+    }
+    function phoneEvidence(result) {
+      if (!result || validPercent(result.match_percent) == null) return { state: 'unassessed', label: '—' };
+      const counts = result.counts || {};
+      if (counts.reference_phones > 0 && counts.matched_phones === counts.reference_phones && !counts.inserted_phones) return { state: 'matched', label: 'จับคู่ตรง' };
+      if (counts.matched_phones > 0) return { state: 'partial', label: 'จับคู่บางส่วน' };
+      if (counts.deleted_phones && !counts.substituted_phones && !counts.inserted_phones) return { state: 'missing', label: 'ยังจับคู่ไม่ได้' };
+      return { state: 'different', label: 'โมเดลถอดต่าง' };
     }
     function singlePhoneHint(phone) {
       const stop = preferWordPractice(phone);
@@ -890,7 +898,7 @@
       if (!source) return null;
       const section = el('section', 'egl-ph-spelling');
       section.setAttribute('aria-label', 'แยกตัวสะกดและฝึกเสียงของ ' + source.text);
-      section.append(el('h4', 'egl-ph-heading', 'แกะตัวสะกด · ' + source.text), el('p', 'egl-ph-note', 'แตะส่วนตัวสะกดเพื่อดูเปอร์เซ็นต์และวิธีฝึก ตัวอักษรหลายตัวอาจรวมเป็นเสียงเดียว'));
+      section.append(el('h4', 'egl-ph-heading', 'แกะตัวสะกด · ' + source.text), el('p', 'egl-ph-note', 'แตะส่วนตัวสะกดเพื่อฟังเทียบและดูสิ่งที่โมเดลถอดได้ ตัวอักษรหลายตัวอาจรวมเป็นเสียงเดียว'));
       const alphabet = el('details', 'egl-ph-letter-names');
       alphabet.append(el('summary', '', 'ชื่ออักษรที่ใช้สะกด ' + source.text.toUpperCase().split('').join('–')));
       const letters = el('div', 'egl-ph-letter-strip');
@@ -898,12 +906,14 @@
         const name = button(letter.toUpperCase(), () => playLetterName(letter), 'egl-ph-letter-name', bucket);
         name.setAttribute('aria-label', 'ฟังชื่ออักษร ' + letter.toUpperCase()); letters.append(name);
       });
-      alphabet.append(letters, el('p', 'egl-ph-note', 'ชื่ออักษรใช้สะกดคำ ส่วนเปอร์เซ็นต์ด้านล่างเปรียบเทียบเสียงในคำ'));
+      alphabet.append(letters, el('p', 'egl-ph-note', 'ชื่ออักษรใช้สะกดคำ ส่วนช่องด้านล่างแสดงการจับคู่เสียงที่โมเดลถอดได้'));
       section.append(alphabet);
       const spelling = spellingFor(source);
       const groups = spelling && spelling.available ? spelling.groups : source.phones.map((phone, index) => ({ letters: '', phoneIndices: [index], phones: [phone], silent: false }));
-      if (!spelling || !spelling.available) section.append(el('p', 'egl-ph-note', 'คำนี้ยังไม่ได้ตรวจการจับคู่ตัวสะกดกับเสียง จึงให้เปอร์เซ็นต์รายหน่วยเสียง โดยไม่เดาว่าตัวอักษรใดแทนเสียงอะไร'));
+      if (!spelling || !spelling.available) section.append(el('p', 'egl-ph-note', 'คำนี้ยังไม่ได้ตรวจการจับคู่ตัวสะกดกับเสียง จึงแสดงผลทีละหน่วยเสียง โดยไม่เดาว่าตัวอักษรใดแทนเสียงอะไร'));
       const summary = el('div', 'egl-ph-spelling-summary'), strip = el('div', 'egl-ph-spelling-groups'), panel = el('div', 'egl-ph-spelling-detail');
+      const rawDetails = el('details', 'egl-ph-technical egl-ph-alignment-details'), rawContent = el('div', 'egl-ph-raw-alignment');
+      rawDetails.append(el('summary', '', 'ดูข้อมูลจับคู่ดิบของโมเดล'), el('p', 'egl-ph-note', 'ตัวเลขดิบเป็นการนับสัญลักษณ์ที่ตรงกัน เสียงเดียวจึงมีค่า 0% หรือ 100% ได้ ไม่ใช่คะแนนความถูกต้องของผู้พูดหรือความมั่นใจรายเสียง'), rawContent);
       const buttons = [], detailListeners = [], summaryListeners = [];
       let feedback = null, currentGroup = null, currentPhone = null;
       bucket.push(() => detailListeners.splice(0).forEach(remove => remove()));
@@ -916,9 +926,6 @@
       function assessedPhones() {
         return feedback && Array.isArray(feedback.phones) ? feedback.phones.filter(item => validPercent(item.match_percent) != null) : [];
       }
-      function priorities() {
-        return assessedPhones().filter(item => item.match_percent < 95).sort((a, b) => a.match_percent - b.match_percent || a.phoneIndex - b.phoneIndex);
-      }
       function choose(group, phoneIndex) {
         stopExample();
         detailListeners.splice(0).forEach(remove => remove());
@@ -926,24 +933,23 @@
         currentPhone = phoneIndex == null ? group.phoneIndices[0] : phoneIndex;
         buttons.forEach(item => item.node.setAttribute('aria-pressed', String(item.group === group)));
         panel.replaceChildren();
-        if (group.silent) { panel.append(el('strong', '', 'ตัวสะกด ' + group.letters + ' ไม่ออกเสียงแยกในคำนี้'), el('p', 'egl-ph-note', 'ส่วนนี้แสดง — เพราะไม่มีหน่วยเสียงให้เทียบ ไม่ใช่ 0% หรือ 100% ลองฟังคำเต็มโดยไม่เติมเสียงให้ตัวอักษรนี้')); return; }
-        const index = currentPhone, phone = source.phones[index], result = phoneData(index), percent = result ? validPercent(result.match_percent) : null;
+        if (group.silent) { panel.append(el('strong', '', 'ตัวสะกด ' + group.letters + ' ไม่ออกเสียงแยกในคำนี้'), el('p', 'egl-ph-note', 'ส่วนนี้แสดง — เพราะไม่มีหน่วยเสียงแยกให้เทียบ ฟังรวมอยู่ในคำเต็มได้')); return; }
+        const index = currentPhone, phone = source.phones[index], result = phoneData(index), evidence = phoneEvidence(result);
         panel.append(el('strong', 'egl-ph-spelling-focus', (group.letters ? group.letters + ' → ' : '') + '/' + phone + '/'));
         if (group.phoneIndices.length > 1) {
-          panel.append(el('p', 'egl-ph-note', 'เปอร์เซ็นต์ช่องบนรวมเสียงทั้งกลุ่ม ด้านล่างเลือกดูผลทีละเสียงได้'));
+          panel.append(el('p', 'egl-ph-note', 'ช่องบนแสดงการจับคู่รวมทั้งกลุ่ม ด้านล่างเลือกฟังเทียบทีละเสียงได้'));
           const parts = el('div', 'egl-ph-actions');
           group.phoneIndices.forEach(at => {
-            const item = phoneData(at), score = item ? validPercent(item.match_percent) : null;
-            const node = button('/' + source.phones[at] + '/ · ' + percentText(score), () => choose(group, at), 'egl-ph-button egl-ph-' + percentLevel(score), detailListeners);
+            const item = phoneEvidence(phoneData(at));
+            const node = button('/' + source.phones[at] + '/ · ' + item.label, () => choose(group, at), 'egl-ph-button egl-ph-evidence-' + item.state, detailListeners);
             node.setAttribute('aria-pressed', String(at === index)); parts.append(node);
           });
           panel.append(parts);
         }
-        const resultBox = el('div', 'egl-ph-part-result egl-ph-' + percentLevel(percent));
-        resultBox.append(el('strong', 'egl-ph-part-percent', percentText(percent)), el('span', 'egl-ph-part-result-label', 'หน่วยเสียงตรงกับอ้างอิง'));
-        if (result && result.counts && percent != null) resultBox.append(el('small', 'egl-ph-part-counts', countsText(result.counts, result.operations)));
+        const resultBox = el('div', 'egl-ph-part-result egl-ph-evidence-' + evidence.state);
+        resultBox.append(el('strong', 'egl-ph-part-status', evidence.label), el('span', 'egl-ph-part-result-label', 'การจับคู่ของโมเดล · ไม่ใช่คะแนนการออกเสียง'));
         const advice = el('p', 'egl-ph-part-advice', phoneResultText(result, phone));
-        resultBox.append(advice, el('p', 'egl-ph-part-method', 'วิธีฝึก: ' + recommendedMethod(phone, source.text))); panel.append(resultBox);
+        resultBox.append(advice, el('p', 'egl-ph-part-method', 'หากต้องการฝึกส่วนนี้: ' + recommendedMethod(phone, source.text))); panel.append(resultBox);
         const guide = el('div', 'egl-ph-guide'); showPhoneGuide(guide, phone, null, detailListeners); panel.append(guide);
         const actions = el('div', 'egl-ph-actions');
         actions.append(button('ฟังเสียง /' + phone + '/ ในคำ', () => playPhoneExample(source, index), 'egl-ph-button', detailListeners),
@@ -953,48 +959,64 @@
       }
       groups.forEach(group => {
         const node = button('', () => choose(group), 'egl-ph-spelling-group' + (group.silent ? ' egl-ph-silent' : ''), bucket);
-        const score = el('span', 'egl-ph-part-percent', '—'), counts = el('small', 'egl-ph-part-counts');
+        const score = el('span', 'egl-ph-part-status', '—'), counts = el('small', 'egl-ph-part-counts');
         node.append(el('strong', 'egl-ph-grapheme', group.letters || group.phones.join(' ')), el('span', 'egl-ph-grapheme-sound', group.silent ? 'ไม่ออกเสียง' : '/' + group.phones.join(' ') + '/'), score, counts);
         node.setAttribute('aria-pressed', 'false'); strip.append(node); buttons.push({ node, group, score, counts });
       });
-      function update(initial) {
+      function update() {
         summaryListeners.splice(0).forEach(remove => remove());
         feedback = spellingFeedback(source, groups);
         buttons.forEach((item, at) => {
-          const result = feedback && feedback.groups && feedback.groups[at], percent = result ? validPercent(result.match_percent) : null;
-          item.node.className = 'egl-ph-spelling-group egl-ph-' + percentLevel(percent) + (item.group.silent ? ' egl-ph-silent' : '');
-          item.score.textContent = percentText(percent);
-          item.counts.textContent = item.group.silent ? 'ไม่มีเสียงแยก' : result && result.counts && percent != null ? result.counts.matched_phones + ' / ' + result.counts.compared_phones + ' เสียง' : 'ยังประเมินไม่ได้';
-          item.node.setAttribute('aria-label', (item.group.letters || item.group.phones.join(' ')) + ' · ' + percentText(percent) + ' หน่วยเสียงตรงกับอ้างอิง');
+          const result = feedback && feedback.groups && feedback.groups[at], evidence = phoneEvidence(result);
+          item.node.className = 'egl-ph-spelling-group egl-ph-evidence-' + evidence.state + (item.group.silent ? ' egl-ph-silent' : '');
+          item.score.textContent = evidence.label;
+          item.counts.textContent = item.group.silent ? 'ไม่มีเสียงแยก' : evidence.state === 'unassessed' ? 'ยังไม่มีข้อมูลพอ' : 'ผลจากโมเดล';
+          item.node.setAttribute('aria-label', (item.group.letters || item.group.phones.join(' ')) + (item.group.silent ? ' · ไม่ออกเสียงแยก' : '') + ' · ' + evidence.label + ' · การจับคู่ของโมเดล ไม่ใช่คะแนนความถูกต้อง');
         });
-        const weak = priorities(), known = assessedPhones();
+        const known = assessedPhones();
         summary.replaceChildren();
-        summary.className = 'egl-ph-spelling-summary egl-ph-' + percentLevel(weak.length ? weak[0].match_percent : known.length ? 100 : null);
+        summary.className = 'egl-ph-spelling-summary egl-ph-evidence-unassessed';
         const sourceLabel = analysisData ? (mode === 'ai' || analysisData.precomputed === true ? 'ผลจากเสียงตัวอย่าง AI' : 'ผลจากเสียงของฉัน') : 'ยังไม่ได้วิเคราะห์เสียง';
         summary.append(el('small', 'egl-ph-feedback-source', sourceLabel));
-        if (weak.length) {
-          summary.append(el('strong', '', 'ควรฝึกก่อน: ' + labelFor(weak[0].phoneIndex) + ' · ' + percentText(weak[0].match_percent)), el('p', 'egl-ph-note', phoneResultText(weak[0], weak[0].expected)), el('p', 'egl-ph-part-method', 'วิธีฝึก: ' + recommendedMethod(weak[0].expected, source.text)));
-          const actions = el('div', 'egl-ph-actions');
-          weak.slice(0, 4).forEach(item => {
-            const group = groups.find(candidate => candidate.phoneIndices.includes(item.phoneIndex));
-            if (group) actions.append(button('ดู ' + labelFor(item.phoneIndex) + ' · ' + percentText(item.match_percent), () => choose(group, item.phoneIndex), 'egl-ph-button egl-ph-' + percentLevel(item.match_percent), summaryListeners));
-          });
-          actions.append(button(preferWordPractice(weak[0].expected) ? 'ฝึกคำเต็มโดยเน้นเสียงที่แนะนำ' : 'ฝึกเสียงที่แนะนำ', () => {
-            const item = weak[0], group = groups.find(candidate => candidate.phoneIndices.includes(item.phoneIndex));
-            if (preferWordPractice(item.expected)) practice(source);
-            else startPhonePractice(source, item.phoneIndex, group && group.letters);
-          }, 'egl-ph-button egl-ph-primary', summaryListeners));
-          summary.append(actions);
-        } else if (known.length) summary.append(el('strong', '', 'ส่วนที่ประเมินได้จับคู่ตรงดีแล้ว ลองฝึกเชื่อมเป็นคำเต็มต่อครับ'));
-        else summary.append(el('p', 'egl-ph-note', 'บันทึกเสียงแล้วกดดูผล จะเห็นว่าส่วนไหนควรฝึกก่อน · — หมายถึงยังไม่มีข้อมูลพอ ไม่ใช่ออกเสียงผิด'));
-        summary.append(el('p', 'egl-ph-feedback-explainer', 'เปอร์เซ็นต์นับเสียงที่จับคู่ตรง ไม่ใช่ความมั่นใจของโมเดล เสียงเดี่ยวจึงอาจได้ 0% หรือ 100%; เสียงเพิ่มทำให้เปอร์เซ็นต์ลดลง'));
+        summary.append(el('strong', '', 'ฟังเทียบทีละเสียง'), el('p', 'egl-ph-feedback-explainer', 'ป้ายบอกสิ่งที่โมเดลจับคู่ได้ โมเดลอาจถอดผิดหรือข้ามเสียง จึงยังใช้จัดอันดับว่าคุณควรแก้เสียงไหนก่อนไม่ได้'));
+        if (!known.length) summary.append(el('p', 'egl-ph-note', '— หมายถึงยังไม่มีข้อมูลจับคู่ที่ใช้ได้ ฟังตัวอย่างและฝึกต่อได้โดยไม่ต้องรอผลอัตโนมัติ'));
+        const actions = el('div', 'egl-ph-actions');
+        source.phones.forEach((phone, index) => {
+          const group = groups.find(candidate => candidate.phoneIndices.includes(index));
+          if (group) actions.append(button('ดู ' + labelFor(index), () => choose(group, index), 'egl-ph-button', summaryListeners));
+        });
+        actions.append(button('ฝึกคำเต็ม', () => practice(source), 'egl-ph-button egl-ph-primary', summaryListeners));
+        summary.append(actions);
         if (feedback && feedback.note && feedback.phones.some(item => item.match_percent == null)) summary.append(el('p', 'egl-ph-note', feedback.note));
-        const first = initial && weak.length ? groups.find(group => group.phoneIndices.includes(weak[0].phoneIndex)) : currentGroup;
-        if (groups.length) choose(first || groups[0], initial && weak.length ? weak[0].phoneIndex : currentPhone);
+        rawContent.replaceChildren();
+        if (feedback && Array.isArray(feedback.phones) && feedback.phones.length) {
+          const list = el('dl', 'egl-ph-raw-phone-list');
+          feedback.phones.forEach(item => {
+            list.append(el('dt', '', labelFor(item.phoneIndex)), el('dd', '', 'อ้างอิง /' + item.expected + '/ · โมเดล /' + (item.observed.join(' ') || 'ยังไม่พบ') + '/'));
+            const value = el('dd');
+            value.append(el('span', 'egl-ph-raw-phone-percent', percentText(validPercent(item.match_percent))));
+            if (item.counts) value.append(el('span', 'egl-ph-raw-phone-counts', ' · ' + countsText(item.counts, item.operations)));
+            list.append(value);
+          });
+          rawContent.append(list);
+        } else rawContent.append(el('p', 'egl-ph-note', 'ยังไม่มีข้อมูลจับคู่ดิบที่ใช้ได้'));
+        if (feedback && Array.isArray(feedback.groups)) {
+          const list = el('dl', 'egl-ph-raw-group-list');
+          feedback.groups.forEach((item, at) => {
+            list.append(el('dt', '', groups[at].letters || groups[at].phones.join(' ')));
+            const value = el('dd'); value.append(el('span', 'egl-ph-raw-group-percent', percentText(validPercent(item.match_percent))));
+            if (item.counts) value.append(el('span', 'egl-ph-raw-group-counts', ' · ' + countsText(item.counts, [])));
+            list.append(value);
+          });
+          rawContent.append(el('p', 'egl-ph-note', 'การจับคู่รวมกลุ่มตัวสะกด'), list);
+        }
+        const practicedGroup = practicePhone && source.phones[practicePhone.index] === practicePhone.phone
+          ? groups.find(group => group.phoneIndices.includes(practicePhone.index)) : null;
+        if (groups.length) choose(currentGroup || practicedGroup || groups[0], currentGroup ? currentPhone : practicedGroup ? practicePhone.index : null);
       }
-      section.append(summary, strip, panel);
-      update(true);
-      const refresh = () => { if (!section.isConnected) { spellingRefreshers.delete(refresh); return; } update(false); };
+      section.append(summary, strip, panel, rawDetails);
+      update();
+      const refresh = () => { if (!section.isConnected) { spellingRefreshers.delete(refresh); return; } update(); };
       spellingRefreshers.add(refresh); bucket.push(() => spellingRefreshers.delete(refresh));
       return section;
     }
@@ -1323,12 +1345,13 @@
       selectedIndex = index;
       const item = wordItems[index], word = item.word, operations = wordOperations(word);
       const uncertain = uncertainRecognition(analysisData);
+      const evidence = practicePhone ? phoneEvidence({ match_percent: item.percent, counts: word }) : null;
       selectedPhrase.textContent = 'คำที่เลือก: ' + word.text;
       wordItems.forEach((entry, i) => entry.button.setAttribute('aria-pressed', String(i === index)));
-      inspector.replaceChildren(el('h4', 'egl-ph-inspector-title', word.text + ' · ' + percentText(item.percent)));
+      inspector.replaceChildren(el('h4', 'egl-ph-inspector-title', word.text + ' · ' + (evidence ? evidence.label : percentText(item.percent))));
       const meaning = wordMeaning(practiceWord || word);
       if (meaning) inspector.append(el('p', 'egl-ph-word-meaning', meaning));
-      inspector.append(el('p', 'egl-ph-counts', uncertain ? 'ยังประเมินคำนี้ไม่ได้ เพราะระบบแยกหน่วยเสียงได้ไม่มั่นคง' : countsText(word, operations) + ' จับคู่กับอ้างอิง'));
+      inspector.append(el('p', 'egl-ph-counts', uncertain ? 'ยังประเมินคำนี้ไม่ได้ เพราะระบบแยกหน่วยเสียงได้ไม่มั่นคง' : practicePhone ? 'การจับคู่เฉพาะเสียงที่เลือก ไม่ใช่ผลของทั้งคำหรือคะแนนความถูกต้อง' : countsText(word, operations) + ' จับคู่กับอ้างอิง'));
       const controls = el('div', 'egl-ph-actions');
       const replay = button(mode === 'own' ? 'ฟังเสียงของฉันทั้งคลิป' : 'ฟังเสียง AI ทั้งคลิป', () => { playOwn(true); player.playbackRate = slow ? 0.75 : 1; }, 'egl-ph-button egl-ph-primary', inspectorListeners);
       replay.disabled = !clip;
@@ -1362,9 +1385,9 @@
       const guide = el('div', 'egl-ph-guide');
       const messages = {
         match: 'ระบบจับคู่เสียงนี้กับอ้างอิงได้ ลองฟังจังหวะและความยาวเสียง',
-        substitute: 'ระบบได้ยินเสียงต่างจากอ้างอิง ลองฟังช่วงนี้แล้วเทียบวิธีวางปาก',
-        delete: 'ระบบยังไม่พบช่วงเสียงที่จับคู่กับหน่วยนี้ จึงไม่มีเสียงช่วงนี้ให้เล่น',
-        insert: 'ระบบตรวจพบเสียงเพิ่มในช่วงนี้ ลองฟังว่ามีเสียงเชื่อมระหว่างคำหรือไม่',
+        substitute: 'โมเดลถอดสัญลักษณ์ต่างจากอ้างอิง ผลถอดอาจคลาดเคลื่อน ฟังไฟล์เต็มเทียบกันก่อนเลือกฝึก',
+        delete: 'โมเดลยังจับคู่กับหน่วยเสียงนี้ไม่ได้ ไม่ได้ยืนยันว่าคุณไม่ได้ออกเสียงนี้ ฟังคลิปเต็มเพื่อตรวจต่อได้',
+        insert: 'โมเดลถอดเสียงเพิ่ม อาจเป็นเสียงเชื่อมหรือความคลาดเคลื่อนของโมเดล ฟังคำเต็มเทียบกันได้',
       };
       operations.forEach(op => {
         const row = el('div', 'egl-ph-phone-row egl-ph-op-' + (['match', 'substitute', 'delete', 'insert'].includes(op.type) ? op.type : 'unresolved'));
@@ -1410,9 +1433,10 @@
       const summary = alignment.summary || operationCounts(operations);
       const uncertain = uncertainRecognition(data);
       const overall = uncertain ? null : percentage(summary, operations);
-      const score = el('div', 'egl-ph-agreement egl-ph-' + percentLevel(overall));
-      score.append(el('strong', 'egl-ph-percent', percentText(overall)), el('span', 'egl-ph-agreement-label', uncertain ? 'ยังประเมินการออกเสียงไม่ได้' : 'หน่วยเสียงจับคู่กับอ้างอิง'));
-      score.append(el('span', 'egl-ph-counts', uncertain ? issue === 'insufficient_audio_signal' ? 'สัญญาณเสียงยังไม่เพียงพอสำหรับเปรียบเทียบ' : 'ระบบยังแยกหน่วยเสียงสำหรับเปรียบเทียบไม่ได้อย่างมั่นคง' : countsText(summary, operations)));
+      const evidence = practicePhone ? phoneEvidence({ match_percent: overall, counts: summary }) : null;
+      const score = el('div', 'egl-ph-agreement egl-ph-' + (evidence ? 'evidence-' + evidence.state : percentLevel(overall)));
+      score.append(el('strong', evidence ? 'egl-ph-evidence-status' : 'egl-ph-percent', evidence ? evidence.label : percentText(overall)), el('span', 'egl-ph-agreement-label', uncertain ? 'ยังประเมินการออกเสียงไม่ได้' : evidence ? 'การจับคู่เฉพาะเสียงของโมเดล · ไม่ใช่คะแนนความถูกต้อง' : 'หน่วยเสียงจับคู่กับอ้างอิง'));
+      score.append(el('span', 'egl-ph-counts', uncertain ? issue === 'insufficient_audio_signal' ? 'สัญญาณเสียงยังไม่เพียงพอสำหรับเปรียบเทียบ' : 'ระบบยังแยกหน่วยเสียงสำหรับเปรียบเทียบไม่ได้อย่างมั่นคง' : evidence ? 'ตัวเลขจับคู่ดิบอยู่ในรายละเอียดด้านล่าง' : countsText(summary, operations)));
       observed.replaceChildren(el('h3', 'egl-ph-step-title', practicePhone ? '3 · ผลเฉพาะเสียง /' + practicePhone.phone + '/ ในคำ ' + practiceWord.text : practiceWord ? '3 · ผลคำว่า ' + practiceWord.text : '3 · ดูผลทีละคำ'), score);
       if (uncertain) {
         const explanation = issue === 'insufficient_audio_signal'
@@ -1429,25 +1453,28 @@
       }
       if (practicePhone) observed.append(el('p', 'egl-ph-note', 'ผลนี้เปรียบเทียบเฉพาะเสียงที่เลือก ไม่ใช่ผลของทั้งคำ · เสียงเดี่ยวที่สั้นมากอาจตรวจไม่พบ'));
       if (demoMode && data.precomputed === true) observed.append(el('p', 'egl-ph-note egl-ph-demo-result', 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · ไม่ใช่ผลจากเสียงที่คุณบันทึก'));
-      observed.append(el('p', 'egl-ph-note', 'เปอร์เซ็นต์นับการจับคู่หน่วยเสียง ไม่ใช่คะแนนความสามารถหรือระดับเจ้าของภาษา'));
+      observed.append(el('p', 'egl-ph-note', practicePhone ? 'ป้ายนี้อธิบายการจับคู่ที่โมเดลทำได้ ยังไม่ใช่ผลรับรองความถูกต้องของการออกเสียง' : 'เปอร์เซ็นต์นับการจับคู่หน่วยเสียง ไม่ใช่คะแนนความสามารถหรือระดับเจ้าของภาษา'));
       observed.append(el('p', 'egl-ph-note', 'ไฟล์ที่เปรียบเทียบ: ' + clipLabel));
       const phones = Array.isArray(found.phones) ? found.phones : [];
       const words = Array.isArray(alignment.words) ? alignment.words : [];
       if (words.length) {
+        if (!practicePhone) {
         const legend = el('details', 'egl-ph-technical egl-ph-color-legend');
         legend.append(el('summary', '', 'ความหมายของสีและเปอร์เซ็นต์'));
         const tiers = [['purple', '95–100%'], ['blue', '90–<95%'], ['indigo', '80–<90%'], ['sky', '70–<80%'], ['green', '60–<70%'], ['yellow', '50–<60%'], ['orange', '40–<50%'], ['red', '0–<40%'], ['unassessed', '— ยังเทียบไม่ได้']];
         const labels = el('div', 'egl-ph-legend-items');
         tiers.forEach(([tier, text]) => labels.append(el('span', 'egl-ph-legend-item egl-ph-' + tier, text)));
         legend.append(labels); observed.append(legend);
+        }
         const grid = el('div', 'egl-ph-comparison');
         words.slice(0, 200).forEach(word => {
           const relevant = operations.filter(op => String(op.word_index) === String(word.index));
           const percent = uncertain ? null : percentage(word, relevant), index = wordItems.length;
-          const token = button('', () => selectWord(index), 'egl-ph-word egl-ph-compare egl-ph-' + percentLevel(percent), observedListeners);
+          const evidence = practicePhone ? phoneEvidence({ match_percent: percent, counts: word }) : null;
+          const token = button('', () => selectWord(index), 'egl-ph-word egl-ph-compare egl-ph-' + (evidence ? 'evidence-' + evidence.state : percentLevel(percent)), observedListeners);
           token.setAttribute('aria-pressed', 'false');
-          token.setAttribute('aria-label', word.text + ': ' + percentText(percent) + ' หน่วยเสียงตรงกับอ้างอิง ดูรายละเอียด');
-          token.append(el('span', 'egl-ph-token', word.text), el('span', 'egl-ph-word-percent', percentText(percent)));
+          token.setAttribute('aria-label', word.text + ': ' + (evidence ? evidence.label + ' ผลจับคู่เฉพาะเสียงที่ฝึก' : percentText(percent) + ' หน่วยเสียงตรงกับอ้างอิง') + ' ดูรายละเอียด');
+          token.append(el('span', 'egl-ph-token', word.text), el('span', evidence ? 'egl-ph-word-evidence' : 'egl-ph-word-percent', evidence ? evidence.label : percentText(percent)));
           wordItems.push({ word, percent, button: token });
           grid.append(token);
         });
@@ -1455,12 +1482,22 @@
       } else observed.append(el('p', 'egl-ph-note', 'ยังแบ่งช่วงคำไม่ได้ คุณฟังไฟล์เสียงเต็มจากแถบด้านบนได้'));
       inspector = el('section', 'egl-ph-inspector'); inspector.hidden = true;
       inspector.setAttribute('aria-label', 'แยกหน่วยเสียงของคำที่เลือก'); observed.append(inspector);
-      const details = el('details', 'egl-ph-technical');
+      const details = el('details', 'egl-ph-technical egl-ph-analysis-details');
       details.append(el('summary', '', 'ดู IPA และรายละเอียดการเปรียบเทียบ'));
       details.append(el('h4', 'egl-ph-heading', 'เสียงที่ระบบตรวจพบจากไฟล์'), el('p', 'egl-ph-ipa egl-ph-detected', found.ipa || phones.map(phone => typeof phone === 'string' ? phone : phone.phone).join(' ') || 'ยังตรวจแยกหน่วยเสียงไม่ได้'));
       const duration = Number(metrics.duration_seconds == null ? found.duration_seconds : metrics.duration_seconds);
       if (Number.isFinite(duration)) details.append(el('p', 'egl-ph-note', 'ความยาวเสียง ' + duration.toFixed(2) + ' วินาที'));
       details.append(el('p', 'egl-ph-note', 'วิธีนับ: จำนวนเสียงที่จับคู่ตรง ÷ (จำนวนเสียงอ้างอิง + เสียงที่ตรวจพบเพิ่ม) × 100'));
+      if (practicePhone) {
+        const raw = el('p', 'egl-ph-note', 'การจับคู่ดิบของเสียงที่ฝึก: ');
+        raw.append(el('span', 'egl-ph-raw-analysis-percent egl-ph-raw-summary-percent', percentText(percentage(summary, operations))));
+        details.append(raw, el('p', 'egl-ph-note', 'เสียงอ้างอิงเดียวอาจมีค่าจับคู่ 0% หรือ 100% ได้ ตัวเลขนี้ไม่ใช่คะแนนคุณภาพหรือความมั่นใจรายเสียง'));
+        words.slice(0, 200).forEach(word => {
+          const row = el('p', 'egl-ph-note', word.text + ' · การจับคู่ดิบ: ');
+          const value = el('span', 'egl-ph-raw-word-percent', percentText(percentage(word, operations.filter(op => String(op.word_index) === String(word.index)))));
+          value.dataset.wordIndex = String(word.index); row.append(value); details.append(row);
+        });
+      }
       if (uncertain) details.append(el('p', 'egl-ph-note', 'หน่วยเสียงที่แสดงด้านบนเป็นผลคาดเดาที่ไม่มั่นคง จึงไม่นำมาให้เปอร์เซ็นต์หรือแนะนำว่าออกเสียงส่วนใดผิด'));
       const limits = Array.isArray(data.limitations) ? data.limitations : [];
       if (limits.length) {
