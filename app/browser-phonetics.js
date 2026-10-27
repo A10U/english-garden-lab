@@ -7,6 +7,23 @@
   function friendly(message) { const error = new Error(message); error.userMessage = message; return error; }
   function aborted() { return new root.DOMException('Analysis canceled', 'AbortError'); }
   function checkAbort(signal) { if (signal && signal.aborted) throw aborted(); }
+  function waitFor(promise, signal) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (done, value) => {
+        if (settled) return;
+        settled = true;
+        if (signal) signal.removeEventListener('abort', cancel);
+        done(value);
+      };
+      const cancel = () => finish(reject, aborted());
+      if (signal) signal.addEventListener('abort', cancel, { once: true });
+      // Keep both handlers attached even after cancellation. An old native
+      // promise may settle much later; its rejection must still be handled.
+      Promise.resolve(promise).then(value => finish(resolve, value), error => finish(reject, error));
+      if (signal && signal.aborted) cancel();
+    });
+  }
   function supported() { return Boolean(workerURL && root.Worker && root.WebAssembly && (root.AudioContext || root.webkitAudioContext)); }
   function stopWorker() { if (worker) worker.terminate(); worker = null; }
   function getWorker() {
@@ -53,16 +70,21 @@
   async function decode(blob, signal) {
     if (!blob || !blob.size || blob.size > 10 * 1024 * 1024) throw friendly('เลือกเสียงที่ไม่ว่างและขนาดไม่เกิน 10 MB');
     checkAbort(signal);
-    const bytes = await blob.arrayBuffer();
+    const bytes = await waitFor(blob.arrayBuffer(), signal);
     checkAbort(signal);
     let audio = pcmWave(bytes);
     if (!audio) {
       const Context = root.AudioContext || root.webkitAudioContext;
       const context = new Context({ sampleRate: 16000 });
-      const close = () => { try { const done = context.close(); if (done && done.catch) done.catch(() => {}); } catch (_) {} };
+      let closed = false;
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        try { const done = context.close(); if (done && done.catch) done.catch(() => {}); } catch (_) {}
+      };
       if (signal) signal.addEventListener('abort', close, { once: true });
       try {
-        const decoded = await context.decodeAudioData(bytes);
+        const decoded = await waitFor(context.decodeAudioData(bytes), signal);
         checkAbort(signal);
         if (!decoded.numberOfChannels || !Number.isFinite(decoded.duration) || decoded.duration > 15) throw friendly('เลือกเสียงยาว 0.3 ถึง 15 วินาที');
         const samples = new Float32Array(decoded.length);
@@ -80,15 +102,55 @@
       const Offline = root.OfflineAudioContext || root.webkitOfflineAudioContext;
       if (!Offline) throw friendly('เบราว์เซอร์นี้ยังแปลงเสียงเพื่อวิเคราะห์ไม่ได้ ลองใช้ Chrome / Edge');
       const context = new Offline(1, Math.round(duration * 16000), 16000);
-      const buffer = context.createBuffer(1, audio.samples.length, audio.rate);
-      buffer.getChannelData(0).set(audio.samples);
-      const source = context.createBufferSource(); source.buffer = buffer; source.connect(context.destination); source.start();
-      const rendered = await context.startRendering();
-      checkAbort(signal);
-      audio = { samples: new Float32Array(rendered.getChannelData(0)), rate: rendered.sampleRate };
+      let source = null, released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        // OfflineAudioContext has no close(). Release its graph even when a
+        // browser never settles startRendering(); late results are ignored.
+        if (source) {
+          try { if (source.stop) source.stop(); } catch (_) {}
+          try { if (source.disconnect) source.disconnect(); } catch (_) {}
+          try { source.buffer = null; } catch (_) {}
+        }
+      };
+      if (signal) signal.addEventListener('abort', release, { once: true });
+      try {
+        const buffer = context.createBuffer(1, audio.samples.length, audio.rate);
+        buffer.getChannelData(0).set(audio.samples);
+        source = context.createBufferSource(); source.buffer = buffer; source.connect(context.destination); source.start();
+        const rendered = await waitFor(context.startRendering(), signal);
+        checkAbort(signal);
+        audio = { samples: new Float32Array(rendered.getChannelData(0)), rate: rendered.sampleRate };
+      } finally {
+        if (signal) signal.removeEventListener('abort', release);
+        release();
+      }
     }
     if (audio.rate !== 16000) throw friendly('เบราว์เซอร์แปลงอัตราเสียงไม่สำเร็จ กรุณาลองใหม่');
     return audio.samples;
+  }
+  async function prepare(blob, signal, releaseReservation) {
+    checkAbort(signal);
+    const controller = new root.AbortController();
+    let timedOut = false, finished = false;
+    const cancel = () => controller.abort();
+    if (signal) signal.addEventListener('abort', cancel, { once: true });
+    const timer = setTimeout(() => {
+      if (finished) return;
+      timedOut = true; releaseReservation(); controller.abort();
+    }, 30000);
+    try {
+      checkAbort(signal);
+      return await decode(blob, controller.signal);
+    } catch (error) {
+      checkAbort(signal);
+      if (timedOut) throw friendly('เตรียมไฟล์เสียงนานเกิน 30 วินาที ลองบันทึกใหม่หรือเลือกไฟล์ WAV แล้วกดดูผลอีกครั้ง');
+      throw error;
+    } finally {
+      finished = true; clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', cancel);
+    }
   }
   async function analyze(options) {
     const { blob, text, accent, reference, signal, onProgress } = options || {};
@@ -98,9 +160,11 @@
     checkAbort(signal);
     // Reserve before decoding too, so simultaneous widgets cannot overlap.
     const reservation = {}; pending = reservation;
+    const releaseReservation = () => { if (pending === reservation) pending = null; };
+    if (signal) signal.addEventListener('abort', releaseReservation, { once: true });
     try {
       if (onProgress) onProgress('กำลังเตรียมเสียงสำหรับวิเคราะห์ในเบราว์เซอร์…');
-      const samples = await decode(blob, signal);
+      const samples = await prepare(blob, signal, releaseReservation);
       checkAbort(signal);
       return await new Promise((resolve, reject) => {
         const id = ++sequence;
@@ -118,7 +182,10 @@
         try { checkAbort(signal); getWorker().postMessage({ id, samples, reference }, [samples.buffer]); }
         catch (error) { stopWorker(); finish(reject, error); }
       });
-    } finally { if (pending === reservation) pending = null; }
+    } finally {
+      if (signal) signal.removeEventListener('abort', releaseReservation);
+      releaseReservation();
+    }
   }
   root.EGLBrowserPhonetics = Object.freeze({ supported, analyze });
 })(globalThis);
