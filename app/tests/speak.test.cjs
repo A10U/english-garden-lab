@@ -6,11 +6,14 @@ const {JSDOM} = require('jsdom');
 const html = fs.readFileSync(path.join(__dirname, '../speak.html'), 'utf8');
 const source = fs.readFileSync(path.join(__dirname, '../speak.js'), 'utf8');
 const flush = () => new Promise(resolve => setImmediate(resolve));
-const health = (cloud = true) => ({mode: cloud ? 'configured' : 'not_configured', cloud: {conversation: cloud, transcription: cloud, speech: false}, assessment: {provider: 'local_browser', available: true}});
+const health = (cloud = true) => ({mode: cloud ? 'configured' : 'not_configured', cloud: {conversation: cloud, transcription: cloud, speech: false}, assessment: {provider: 'local_browser', available: true}, supportsPersonalKey: true, credential: {source: cloud ? 'server' : 'none', providerVerified: false}});
 const ok = value => ({ok: true, json: async () => value});
 function setup(options = {}) {
   const dom = new JSDOM(html, {url: options.url || 'https://garden.example/app/speak.html', runScripts: 'outside-only'});
-  const win = dom.window, calls = [], mounts = [], played = [], revoked = [], voices = [];
+  const win = dom.window, calls = [], mounts = [], played = [], revoked = [], voices = [], persistence = [];
+  win.Storage.prototype.setItem = function () {persistence.push('storage'); throw new Error('No credential persistence');};
+  Object.defineProperty(win.document, 'cookie', {get: () => '', set() {persistence.push('cookie');}});
+  win.indexedDB = {open() {persistence.push('indexedDB'); throw new Error('No credential persistence');}};
   let cleaned = 0, microphones = 0, nextURL = 0;
   win.URL.createObjectURL = () => 'blob:speak-' + ++nextURL;
   win.URL.revokeObjectURL = value => revoked.push(value);
@@ -25,7 +28,7 @@ function setup(options = {}) {
     return options.fetch ? options.fetch(url, init) : url === '/api/speak/health' ? ok(health(options.cloud !== false)) : Promise.reject(new Error('Unexpected request'));
   };
   win.eval(source);
-  return {dom, win, doc: win.document, calls, mounts, played, revoked, voices,
+  return {dom, win, doc: win.document, calls, mounts, played, revoked, voices, persistence,
     byId: id => win.document.getElementById(id), cleaned: () => cleaned, microphones: () => microphones,
     close() {win.dispatchEvent(new win.Event('pagehide')); win.close();}};
 }
@@ -52,7 +55,7 @@ test('loading mounts local practice and checks health without opening mic, uploa
   assert.equal(app.mounts[0].text, "This is a leaf. It's green and soft.");
   assert.equal(app.microphones(), 0); assert.equal(app.played.length, 0); assert.equal(app.voices.length, 0);
   assert.deepEqual(app.calls.map(([url, init]) => [url, init.method || 'GET']), [['/api/speak/health', 'GET']]);
-  assert.equal(app.byId('cloud-badge').textContent, 'Cloud พร้อม');
+  assert.equal(app.byId('cloud-badge').textContent, 'Cloud · key เซิร์ฟเวอร์');
   assert.equal(app.byId('send-message').disabled, true);
   assert.match(app.byId('conversation-thread').textContent, /ลองบทสนทนาตัวอย่าง/);
   assert.equal(app.doc.querySelectorAll('.chat-turn').length, 0);
@@ -178,4 +181,153 @@ test('pagehide aborts an in-flight transcription and late text cannot repopulate
   assert.equal(signal.aborted, true); assert.equal(app.cleaned(), 1);
   finish(ok({source: 'cloud', text: 'LATE PRIVATE TRANSCRIPT'})); await flush(); await flush();
   assert.doesNotMatch(app.byId('speak-transcript').value, /LATE PRIVATE/);
+});
+
+const personalKey = suffix => 'fixture-personal-key-not-real-' + suffix;
+const requestKey = init => new Headers(init.headers).get('X-Speak-Api-Key');
+function enterKey(app, key) {
+  app.byId('personal-api-key').value = key;
+  app.byId('personal-api-key').dispatchEvent(new app.win.Event('input', {bubbles: true}));
+}
+async function connectKey(app, key) {
+  enterKey(app, key); app.byId('connect-personal-key').click(); await flush(); await flush();
+}
+const personalFetch = async (url, init) => url === '/api/speak/health' ? ok(health(false))
+  : url === '/api/speak/transcribe' ? ok({source: 'cloud', text: 'Hello there.'}) : ok({source: 'cloud', reply: 'Hello!'});
+
+test('personal key is masked, connects explicitly, stays only in tab memory, and health never claims provider validation', async t => {
+  const app = await ready({fetch: personalFetch}); t.after(() => app.close());
+  const key = personalKey('memory'), input = app.byId('personal-api-key');
+  assert.equal(input.type, 'password'); assert.equal(input.autocomplete, 'off'); assert.equal(input.getAttribute('spellcheck'), 'false');
+  enterKey(app, key); assert.equal(app.calls.length, 1); assert.equal(app.byId('cloud-mode').disabled, true);
+  assert.doesNotMatch(app.byId('personal-key-status').textContent, /พร้อมลอง/);
+  app.byId('connect-personal-key').click(); await flush(); await flush();
+  assert.equal(input.value, ''); assert.equal(app.calls.length, 2);
+  assert.equal(app.calls[1][0], '/api/speak/health'); assert.equal(requestKey(app.calls[0][1]), null); assert.equal(requestKey(app.calls[1][1]), null);
+  assert.equal(app.calls[1][1].credentials, 'same-origin'); assert.equal(app.calls[1][1].redirect, 'error'); assert.equal(app.calls[1][1].cache, 'no-store');
+  assert.match(app.byId('personal-key-status').textContent, /พร้อมลองใช้งานด้วย key ของคุณ.*ยังไม่ได้ตรวจสอบกับ OpenAI/);
+  assert.equal(app.doc.documentElement.outerHTML.includes(key), false);
+  assert.equal(Object.values(app.win.EGLSpeak).includes(key), false); assert.deepEqual(app.persistence, []);
+  app.byId('try-sample').click(); app.doc.querySelector('.chat-actions button').click(); clip(app);
+  assert.equal(app.calls.length, 2, 'samples, local speech, and selecting a local clip do not transmit credentials');
+  assert.equal(JSON.stringify(app.mounts).includes(key), false); assert.equal(app.microphones(), 0);
+});
+
+test('malformed keys never fetch or enable Cloud and do not require an obsolete key prefix', async t => {
+  const app = await ready({fetch: personalFetch}); t.after(() => app.close());
+  for (const key of ['', 'short', 'key with whitespace should be rejected', 'x'.repeat(513), 'valid-looking-key-\x01-control']) {
+    enterKey(app, key); app.byId('connect-personal-key').click(); await flush();
+    assert.equal(app.calls.length, 1); assert.equal(app.byId('cloud-mode').disabled, true);
+  }
+  await connectKey(app, 'futureFormatOpaqueKey123456789');
+  assert.equal(app.calls.length, 2); assert.equal(app.byId('cloud-mode').disabled, false);
+  enterKey(app, 'invalid replacement'); app.byId('connect-personal-key').click(); await flush();
+  assert.equal(app.calls.length, 2); assert.equal(app.byId('cloud-mode').disabled, true, 'a rejected replacement must not silently keep billing the previous key');
+});
+
+test('separate tabs send only their own key on explicit Cloud chat and transcription', async t => {
+  const apps = await Promise.all([ready({fetch: personalFetch}), ready({fetch: personalFetch})]);
+  t.after(() => apps.forEach(app => app.close()));
+  const keys = [personalKey('alice'), personalKey('bob')];
+  await Promise.all(apps.map((app, index) => connectKey(app, keys[index])));
+  apps.forEach((app, index) => {app.byId('cloud-mode').click(); fill(app, 'Hello from ' + index); submit(app);});
+  await flush(); await flush();
+  for (let index = 0; index < apps.length; index++) {
+    const app = apps[index]; clip(app); app.byId('transcribe-audio').click(); await flush(); await flush();
+    assert.equal(app.calls.length, 4);
+    for (const [url, init] of app.calls.slice(1)) {
+      assert.equal(requestKey(init), url === '/api/speak/health' ? null : keys[index]); assert.ok(url.startsWith('/api/speak/'));
+      assert.equal(String(init.body).includes(keys[index]), false);
+    }
+    assert.equal(app.doc.documentElement.outerHTML.includes(keys[index]), false); assert.deepEqual(app.persistence, []);
+  }
+  apps[0].byId('clear-personal-key').click(); await flush(); await flush();
+  assert.equal(requestKey(apps[0].calls.at(-1)[1]), null); assert.equal(apps[0].byId('cloud-mode').disabled, true);
+  assert.equal(apps[1].byId('cloud-mode').disabled, false);
+});
+
+test('clearing a key aborts work, rechecks without credentials, and suppresses late private replies', async t => {
+  let finish;
+  const app = await ready({fetch: async (url, init) => url === '/api/speak/health' ? personalFetch(url, init) : new Promise(resolve => {finish = resolve;})}); t.after(() => app.close());
+  await connectKey(app, personalKey('clear')); app.byId('cloud-mode').click(); fill(app, 'Hello'); submit(app); await flush();
+  const signal = app.calls.at(-1)[1].signal;
+  app.byId('clear-personal-key').click(); await flush(); await flush();
+  assert.equal(signal.aborted, true); assert.equal(requestKey(app.calls.at(-1)[1]), null);
+  assert.equal(app.byId('personal-api-key').value, ''); assert.equal(app.byId('clear-personal-key').disabled, true);
+  assert.equal(app.byId('cloud-mode').disabled, true);
+  finish(ok({source: 'cloud', reply: 'STALE PRIVATE REPLY'})); await flush(); await flush();
+  assert.doesNotMatch(app.byId('conversation-thread').textContent, /STALE PRIVATE REPLY/);
+});
+
+test('clear and pagehide abort stale connect checks, and BFcache remount starts without a personal key', async t => {
+  const pending = []; let count = 0;
+  const app = await ready({fetch: async (url, init) => {
+    assert.equal(requestKey(init), null, 'even pending connect checks cannot carry credentials');
+    return ++count % 2 === 0 ? new Promise(resolve => pending.push(resolve)) : ok(health(false));
+  }}); t.after(() => app.close());
+  enterKey(app, personalKey('stale')); app.byId('connect-personal-key').click(); await flush();
+  const firstSignal = app.calls.at(-1)[1].signal;
+  app.byId('clear-personal-key').click(); await flush(); await flush();
+  assert.equal(firstSignal.aborted, true); pending[0](ok(health())); await flush(); await flush();
+  assert.equal(app.byId('cloud-mode').disabled, true); assert.doesNotMatch(app.byId('personal-key-status').textContent, /พร้อมลอง/);
+  enterKey(app, personalKey('pagehide')); app.byId('connect-personal-key').click(); await flush();
+  const secondSignal = app.calls.at(-1)[1].signal;
+  app.win.dispatchEvent(new app.win.Event('pagehide')); assert.equal(secondSignal.aborted, true);
+  assert.equal(app.byId('personal-api-key').value, ''); assert.equal(app.byId('cloud-mode').disabled, true);
+  app.win.EGLSpeak.mount(app.doc); await flush(); await flush();
+  assert.equal(requestKey(app.calls.at(-1)[1]), null);
+  pending[1](ok(health())); await flush(); await flush();
+  assert.equal(app.byId('cloud-mode').disabled, true); assert.doesNotMatch(app.byId('personal-key-status').textContent, /พร้อมลอง/);
+});
+
+test('personal connection clears the key if the same-origin service does not advertise support', async t => {
+  const app = await ready({fetch: async () => ok({...health(), supportsPersonalKey: undefined})}); t.after(() => app.close());
+  await connectKey(app, personalKey('ignored'));
+  assert.equal(app.byId('cloud-mode').disabled, true);
+  assert.match(app.byId('personal-key-status').textContent, /ล้าง key แล้ว.*ยังไม่ได้ส่ง/);
+  assert.equal(app.byId('personal-api-key').value, ''); assert.equal(app.byId('clear-personal-key').disabled, true);
+  assert.equal(app.byId('personal-key-hosted-link').hidden, false);
+  assert.ok(app.calls.every(([_url, init]) => requestKey(init) === null));
+});
+
+test('static GitHub Pages never receives an entered key and offers the hosted Speak link', async t => {
+  const app = await ready({url: 'https://a10u.github.io/english-garden-lab/app/speak.html', fetch: async () => ({ok: false, json: async () => {throw new Error('Static 404');}})}); t.after(() => app.close());
+  const key = personalKey('static'); await connectKey(app, key);
+  assert.equal(app.calls.length, 2);
+  for (const [url, init] of app.calls) {
+    assert.equal(url, '/api/speak/health'); assert.equal(requestKey(init), null);
+    assert.equal(JSON.stringify([url, init.body]).includes(key), false);
+  }
+  assert.equal(app.byId('personal-api-key').value, ''); assert.equal(app.byId('clear-personal-key').disabled, true);
+  assert.equal(app.byId('cloud-mode').disabled, true); assert.equal(app.byId('personal-key-hosted-link').hidden, false);
+  assert.equal(app.byId('personal-key-hosted-link').querySelector('a').href, 'https://english-garden-speech-demo-20261025.brainy-pine-0042.chatgpt.site/app/speak');
+  assert.equal(app.doc.documentElement.outerHTML.includes(key), false); assert.deepEqual(app.persistence, []);
+});
+
+test('HTTPS and localhost are required before sending a personal key; foreign origins never receive one', async t => {
+  const insecure = await ready({url: 'http://garden.example/app/speak.html', fetch: personalFetch}); t.after(() => insecure.close());
+  await connectKey(insecure, personalKey('insecure'));
+  assert.equal(insecure.calls.length, 1); assert.match(insecure.byId('personal-key-status').textContent, /HTTPS/);
+  assert.equal(insecure.byId('personal-api-key').value, '');
+  const local = await ready({url: 'http://localhost:5173/app/speak.html', fetch: personalFetch}); t.after(() => local.close());
+  await connectKey(local, personalKey('localhost'));
+  assert.equal(local.byId('cloud-mode').disabled, false);
+  for (const app of [insecure, local]) assert.equal(app.calls.some(([url]) => !url.startsWith('/api/speak/')), false);
+});
+
+test('provider errors and accidental key text cannot expose the active key in status or chat', async t => {
+  const key = personalKey('error'); let throws = false;
+  const app = await ready({fetch: async (url, init) => {
+    if (url === '/api/speak/health') return personalFetch(url, init);
+    if (throws) throw new Error('Network failure ' + key);
+    return {ok: false, json: async () => ({error: {message: 'Rejected ' + key}})};
+  }}); t.after(() => app.close());
+  await connectKey(app, key); app.byId('cloud-mode').click(); fill(app, 'Hello'); submit(app); await flush(); await flush();
+  assert.equal(app.doc.documentElement.outerHTML.includes(key), false); assert.equal(app.byId('send-message').disabled, false);
+  throws = true; submit(app); await flush(); await flush();
+  assert.equal(app.doc.documentElement.outerHTML.includes(key), false);
+  assert.match(app.byId('speak-action-status').textContent, /Network failure/);
+  const before = app.calls.length; fill(app, key); submit(app); await flush();
+  assert.equal(app.calls.length, before); assert.equal(app.byId('speak-transcript').value, '');
+  assert.equal(app.byId('conversation-thread').textContent.includes(key), false); assert.deepEqual(app.persistence, []);
 });

@@ -26,10 +26,90 @@ test('health reports actual configured capabilities without credentials or any p
     const response = await handleSpeakRequest(new Request(site + '/api/speak/health'), configuration, options);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { cloud: { conversation: ready, transcription: ready, speech: false },
-      assessment: { provider: 'local_browser', available: true }, mode: ready ? 'configured' : 'not_configured' });
+      assessment: { provider: 'local_browser', available: true }, mode: ready ? 'configured' : 'not_configured',
+      supportsPersonalKey: true,
+      credential: { source: ready ? 'server' : 'none', providerVerified: false } });
     assert.match(response.headers.get('cache-control'), /private, no-store/);
   }
   assert.equal(calls, 0);
+});
+
+const personalKey = suffix => 'fixture-personal-key-not-real-' + suffix;
+test('credential-free health advertises personal-key support without verification or provider calls', async () => {
+  let calls = 0;
+  const response = await handleSpeakRequest(new Request(site + '/api/speak/health'), {},
+    { fetch: () => { calls++; throw new Error('No provider validation on health'); } });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.mode, 'not_configured'); assert.equal(body.supportsPersonalKey, true);
+  assert.deepEqual(body.credential, { source: 'none', providerVerified: false });
+  assert.equal(body.cloud.conversation, false); assert.equal(body.cloud.transcription, false); assert.equal(calls, 0);
+  assert.match(response.headers.get('cache-control'), /private, no-store/);
+});
+
+test('two authenticated identities use only their request key concurrently; anonymous and later requests cannot inherit it', async () => {
+  const keys = [personalKey('alice'), personalKey('bob')], seen = [];
+  const sharedEnv = Object.freeze({ ...env });
+  const fetch = async (_url, init) => {
+    seen.push(init.headers.Authorization);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(JSON.stringify(JSON.parse(init.body)).includes('fixture-personal-key'), false);
+    assert.equal(init.headers['X-Speak-Api-Key'], undefined);
+    assert.equal(init.redirect, 'error');
+    return providerResponse();
+  };
+  const responses = await Promise.all(keys.map((key, index) => handleSpeakRequest(post(chatBody(), '/api/speak/chat',
+    { headers: { 'X-Speak-Api-Key': key } }), sharedEnv, { authenticatedUserId: ['alice', 'bob'][index], fetch })));
+  assert.deepEqual(responses.map(response => response.status), [200, 200]);
+  assert.deepEqual(seen.sort(), keys.map(key => 'Bearer ' + key).sort());
+  assert.equal(sharedEnv.OPENAI_API_KEY, env.OPENAI_API_KEY);
+  const absent = await handleSpeakRequest(post(), {}, { authenticatedUserId: 'bob', fetch });
+  assert.equal(absent.status, 503); assert.equal(seen.length, 2);
+  const fallback = await handleSpeakRequest(post(), sharedEnv, { authenticatedUserId: 'alice', fetch });
+  assert.equal(fallback.status, 200); assert.equal(seen.at(-1), 'Bearer ' + env.OPENAI_API_KEY);
+  const unsigned = await handleSpeakRequest(post(chatBody(), '/api/speak/chat', { headers: { 'X-Speak-Api-Key': keys[0] } }), {}, { fetch });
+  assert.equal(unsigned.status, 401); assert.equal(seen.length, 3);
+});
+
+test('invalid or duplicate personal headers reject without falling back to the server key', async () => {
+  let calls = 0;
+  const options = { ...user, fetch: () => { calls++; return providerResponse(); } };
+  for (const key of ['', 'short', 'has internal whitespace in key', 'key-with-a-control-\x01-character', 'x'.repeat(513), personalKey('a') + ', ' + personalKey('b')]) {
+    const response = await handleSpeakRequest(post(chatBody(), '/api/speak/chat', { headers: { 'X-Speak-Api-Key': key } }), env, options);
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, 'invalid_personal_key');
+  }
+  assert.equal(calls, 0);
+});
+
+test('personal keys require secure transport and same-origin requests; localhost development remains available', async () => {
+  const headers = { 'X-Speak-Api-Key': personalKey('transport') };
+  for (const origin of ['http://garden.example', 'http://127.0.0.1:5173', 'http://localhost:5173', 'http://[::1]:5173']) {
+    const response = await handleSpeakRequest(new Request(origin + '/api/speak/chat', { method: 'POST', headers: {...headers, Origin: origin, 'Content-Type': 'application/json'}, body: JSON.stringify(chatBody()) }), {},
+      { ...user, fetch: async () => providerResponse() });
+    assert.equal(response.status, origin === 'http://garden.example' ? 400 : 200);
+  }
+  const postForeign = await handleSpeakRequest(post(chatBody(), '/api/speak/chat', { headers: { ...headers, Origin: 'https://foreign.example' } }), env, user);
+  assert.equal(postForeign.status, 403);
+});
+
+test('personal keys authenticate transcription, never enter responses, errors, or conversation inputs', async () => {
+  const key = personalKey('redaction'), request = audioRequest(); request.headers.set('X-Speak-Api-Key', key);
+  const transcription = await handleSpeakRequest(request, {}, { ...user, fetch: async (_url, init) => {
+    assert.equal(init.headers.Authorization, 'Bearer ' + key);
+    return new Response(JSON.stringify({ text: 'Hello.' }), { headers: { 'Content-Type': 'application/json' } });
+  } });
+  assert.equal(transcription.status, 200); assert.equal((await transcription.text()).includes(key), false);
+  for (const fetch of [async () => new Response(key, { status: 401 }), async () => { throw new Error(key); },
+    async () => providerResponse({ ...turn(), reply: key }),
+    async () => providerResponse(turn(), {output: [{content: [{type: 'output_text', text: JSON.stringify({...turn(), reply: key}).replace(/[A-Za-z0-9-]/gu, character => '\\u' + character.charCodeAt(0).toString(16).padStart(4, '0'))}]}]})]) {
+    const response = await handleSpeakRequest(post(chatBody(), '/api/speak/chat', { headers: { 'X-Speak-Api-Key': key } }), env, { ...user, fetch });
+    assert.equal(response.status, 502); assert.equal((await response.text()).includes(key), false);
+  }
+  let calls = 0;
+  const credentialInChat = await handleSpeakRequest(post({ ...chatBody(), messages: [{ role: 'user', content: key }] }, '/api/speak/chat',
+    { headers: { 'X-Speak-Api-Key': key } }), {}, { ...user, fetch: async () => { calls++; return providerResponse(); } });
+  assert.equal(credentialInChat.status, 400); assert.equal((await credentialInChat.text()).includes(key), false); assert.equal(calls, 0);
 });
 
 test('POST authority comes only from trusted route identity and same-origin Origin', async () => {

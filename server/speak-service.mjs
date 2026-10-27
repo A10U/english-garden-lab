@@ -1,4 +1,4 @@
-/* Same-origin Speak API. Provider credentials never enter browser responses. */
+/* Same-origin Speak API. Credentials remain request-local and never enter responses. */
 const JSON_LIMIT = 16 * 1024;
 const AUDIO_LIMIT = 10 * 1024 * 1024;
 const PROVIDER_LIMIT = 64 * 1024;
@@ -38,6 +38,20 @@ const ownKeys = (value, names) => Object.keys(value).every(name => names.include
 const normalize = text => text.normalize('NFKC').toLowerCase().replace(/[’‘]/gu, "'").replace(/[^\p{L}\p{N}']+/gu, ' ').trim().replace(/\s+/gu, ' ');
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { ...NO_STORE, ...headers } });
 const configured = env => string(env?.OPENAI_API_KEY, 1024) && !/[\r\n]/u.test(env.OPENAI_API_KEY);
+const PERSONAL_KEY_HEADER = 'x-speak-api-key';
+const validPersonalKey = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._~+/=-]{19,511}$/u.test(value);
+function requestCredential(request, env) {
+  if (!request.headers.has(PERSONAL_KEY_HEADER)) return { apiKey: configured(env) ? env.OPENAI_API_KEY : '', source: configured(env) ? 'server' : 'none' };
+  const url = new URL(request.url);
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) {
+    throw new SpeakError(400, 'secure_connection_required', 'ใช้ key ส่วนตัวผ่าน HTTPS หรือ localhost เท่านั้น');
+  }
+  const origin = request.headers.get('origin');
+  if (origin !== null && origin !== url.origin) throw new SpeakError(403, 'origin_not_allowed', 'คำขอนี้ไม่ได้มาจากหน้า Speak ของเว็บไซต์');
+  const apiKey = request.headers.get(PERSONAL_KEY_HEADER);
+  if (!validPersonalKey(apiKey)) throw new SpeakError(400, 'invalid_personal_key', 'รูปแบบ key ยังไม่ถูกต้อง กรุณาตรวจ key แล้วลองใหม่');
+  return { apiKey, source: 'personal' };
+}
 
 function aborted(signal) {
   if (signal.aborted) throw signal.reason || new DOMException('Canceled', 'AbortError');
@@ -186,25 +200,33 @@ function responseText(value) {
   if (!fragments.length) throw invalidCloud();
   try { return JSON.parse(fragments.join('')); } catch { throw invalidCloud(); }
 }
-async function providerJson(path, init, env, options, signal) {
+async function providerJson(path, init, apiKey, options, signal) {
   const fetcher = options.fetch || globalThis.fetch;
   const response = await untilAbort(fetcher(ORIGIN + path, {
-    ...init, signal, headers: { ...init.headers, Authorization: `Bearer ${env.OPENAI_API_KEY}` },
+    ...init, signal, redirect: 'error', headers: { ...init.headers, Authorization: `Bearer ${apiKey}` },
   }), signal);
   if (!response.ok) {
     response.body?.cancel().catch(() => {});
-    if (response.status === 429) throw new SpeakError(429, 'cloud_rate_limited', 'บริการ cloud มีการใช้งานมาก กรุณารอสักครู่แล้วลองใหม่');
+    if ([401, 403].includes(response.status)) throw new SpeakError(502, 'cloud_authentication_failed', 'OpenAI ไม่ยอมรับ key หรือสิทธิ์ของบัญชีนี้ กรุณาตรวจ key และสิทธิ์แล้วลองใหม่');
+    if (response.status === 429) throw new SpeakError(429, 'cloud_rate_limited', 'OpenAI จำกัดการใช้งานหรือโควตาของบัญชี กรุณาตรวจโควตาหรือรอสักครู่แล้วลองใหม่');
     throw new SpeakError(502, 'cloud_unavailable', 'ยังติดต่อบริการ cloud ไม่สำเร็จ กรุณาลองใหม่ภายหลัง');
   }
   if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
     response.body?.cancel().catch(() => {}); throw invalidCloud();
   }
   const bytes = await boundedBytes(response, PROVIDER_LIMIT, signal, invalidCloud());
-  try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    if (text.includes(apiKey)) throw invalidCloud();
+    const value = JSON.parse(text);
+    if (JSON.stringify(value).includes(apiKey)) throw invalidCloud();
+    return value;
+  }
   catch { throw invalidCloud(); }
 }
-async function chat(request, env, options, signal) {
+async function chat(request, env, apiKey, options, signal) {
   const input = chatInput(await inputJson(request, signal));
+  if (JSON.stringify(input).includes(apiKey)) throw new SpeakError(400, 'credential_in_message', 'กรุณาอย่าใส่ key ในบทสนทนา ใช้ช่อง key ส่วนตัวเท่านั้น');
   const instructions = [
     'You are Mali, a warm English practice partner for a Thai-speaking adult. Keep replies short and useful.',
     SCENARIOS[input.scenario],
@@ -223,11 +245,13 @@ async function chat(request, env, options, signal) {
     body: JSON.stringify({ model: modelName(env.OPENAI_SPEAK_MODEL, DEFAULT_MODEL), instructions,
       input: messages, store: false, reasoning: { effort: 'none' }, max_output_tokens: 1000,
       text: { format: { type: 'json_schema', name: 'speak_turn', strict: true, schema: TURN_SCHEMA } } }),
-  }, env, options, signal);
-  return json(validateTurn(responseText(result), input));
+  }, apiKey, options, signal);
+  const turn = validateTurn(responseText(result), input);
+  if (JSON.stringify(turn).includes(apiKey)) throw invalidCloud();
+  return json(turn);
 }
 
-async function transcribe(request, env, options, signal) {
+async function transcribe(request, env, apiKey, options, signal) {
   const type = request.headers.get('content-type') || '';
   if (!/^multipart\/form-data\s*;/iu.test(type) || !/boundary=/iu.test(type)) throw new SpeakError(415, 'unsupported_type', 'กรุณาส่งไฟล์เสียงแบบ multipart');
   const bytes = await boundedBytes(request, AUDIO_LIMIT + JSON_LIMIT, signal, new SpeakError(413, 'audio_too_large', 'ไฟล์เสียงต้องไม่เกิน 10 MB'));
@@ -250,7 +274,7 @@ async function transcribe(request, env, options, signal) {
   upstream.append('model', modelName(env.OPENAI_TRANSCRIBE_MODEL, DEFAULT_TRANSCRIBE_MODEL));
   upstream.append('file', audio, 'recording.' + extension);
   upstream.append('languages[]', 'en');
-  const result = await providerJson('/v1/audio/transcriptions', { method: 'POST', body: upstream }, env, options, signal);
+  const result = await providerJson('/v1/audio/transcriptions', { method: 'POST', body: upstream }, apiKey, options, signal);
   if (!record(result) || !string(result.text, 4000)) throw invalidCloud();
   return json({ text: result.text.trim(), source: 'cloud' });
 }
@@ -263,14 +287,17 @@ export async function handleSpeakRequest(request, env = {}, options = {}) {
     if (path === '/api/speak/health') {
       if (request.method !== 'GET') return json({ error: { code: 'method_not_allowed', message: 'คำสั่งนี้ใช้ GET' } }, 405, { Allow: 'GET' });
       const ready = Boolean(configured(env));
-      return json({ cloud: { conversation: ready, transcription: ready, speech: false }, assessment: { provider: 'local_browser', available: true }, mode: ready ? 'configured' : 'not_configured' });
+      return json({ cloud: { conversation: ready, transcription: ready, speech: false }, assessment: { provider: 'local_browser', available: true },
+        mode: ready ? 'configured' : 'not_configured', supportsPersonalKey: true,
+        credential: { source: ready ? 'server' : 'none', providerVerified: false } });
     }
     if (request.method !== 'POST') return json({ error: { code: 'method_not_allowed', message: 'คำสั่งนี้ใช้ POST' } }, 405, { Allow: 'POST' });
     if (!string(options.authenticatedUserId, 512)) throw new SpeakError(401, 'authentication_required', 'กรุณาเข้าสู่ระบบก่อนใช้บริการ cloud');
     if (request.headers.get('origin') !== new URL(request.url).origin) throw new SpeakError(403, 'origin_not_allowed', 'คำขอนี้ไม่ได้มาจากหน้า Speak ของเว็บไซต์');
-    if (!configured(env)) throw new SpeakError(503, 'cloud_not_configured', 'ยังไม่ได้เชื่อมบริการ cloud คุณยังอัดเสียง ฟังซ้ำ และฝึกในเครื่องได้');
+    const { apiKey } = requestCredential(request, env);
+    if (!apiKey) throw new SpeakError(503, 'cloud_not_configured', 'ยังไม่ได้เชื่อมบริการ cloud คุณยังอัดเสียง ฟังซ้ำ และฝึกในเครื่องได้');
     task = operation(request, options);
-    return await (path === '/api/speak/chat' ? chat(request, env, options, task.signal) : transcribe(request, env, options, task.signal));
+    return await (path === '/api/speak/chat' ? chat(request, env, apiKey, options, task.signal) : transcribe(request, env, apiKey, options, task.signal));
   } catch (error) {
     if (task?.signal.aborted) {
       const timeout = task.signal.reason?.name === 'TimeoutError';

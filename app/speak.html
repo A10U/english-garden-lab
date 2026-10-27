@@ -49,6 +49,14 @@
         <div class="panel-heading conversation-heading"><div class="mali-identity"><span class="mali-avatar" aria-hidden="true">ม</span><div><h2 id="conversation-heading" tabindex="-1">คุยกับมะลิ</h2><p>เพื่อนฝึกอังกฤษในสวนของเรา</p></div></div><span id="cloud-badge" class="status-pill">กำลังตรวจ Cloud…</span></div>
         <div class="conversation-toolbar"><div class="mode-switch" role="group" aria-label="รูปแบบบทสนทนา"><button id="sample-mode" type="button" aria-pressed="true">ลองตัวอย่าง</button><button id="cloud-mode" type="button" aria-pressed="false" disabled>สนทนา Cloud</button></div><button id="new-conversation" class="text-button" type="button">เริ่มใหม่ ↺</button></div>
         <p id="connection-status" class="connection-status" role="status">กำลังตรวจว่าบริการสนทนาพร้อมใช้งานหรือไม่</p>
+        <section class="personal-key-panel" aria-labelledby="personal-key-heading">
+          <h3 id="personal-key-heading">ใช้ OpenAI API key ของคุณ</h3>
+          <p id="personal-key-help">key อยู่ในหน่วยความจำของแท็บนี้จนกดล้างหรือออกจากหน้า การตรวจบริการไม่ส่ง key เมื่อกดส่งข้อความหรือถอดเสียงผ่าน Cloud จึงส่ง key ผ่านเซิร์ฟเวอร์ของเว็บไป OpenAI อาจมีค่าใช้บริการในบัญชีของคุณ</p>
+          <label for="personal-api-key">API key ส่วนตัว</label>
+          <div class="personal-key-controls"><input id="personal-api-key" type="password" maxlength="512" autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="personal-key-help personal-key-status" placeholder="วาง key ที่นี่"><button id="connect-personal-key" class="secondary-button" type="button">ใช้ key นี้</button><button id="clear-personal-key" class="text-button" type="button" disabled>ล้าง key</button></div>
+          <p id="personal-key-status" class="personal-key-status" role="status" aria-live="polite">ยังไม่ได้ตั้ง key ส่วนตัว</p>
+          <p id="personal-key-hosted-link" hidden>หน้านี้ยังใช้ Cloud ไม่ได้ <a href="https://english-garden-speech-demo-20261025.brainy-pine-0042.chatgpt.site/app/speak" rel="noreferrer">เปิด Speak ที่รองรับ Cloud</a> แล้วใส่ key บนหน้านั้น</p>
+        </section>
         <div id="conversation-thread" class="conversation-thread" role="log" aria-label="บทสนทนา" aria-live="polite"></div>
         <div id="sample-controls" class="sample-controls"><div><span class="sample-label">บทสนทนาตัวอย่างที่เตรียมไว้</span><p>ลองดูว่าการคุยและคำช่วยทำงานอย่างไร</p></div><button id="try-sample" class="sample-start" type="button">ลองบทสนทนาตัวอย่าง <span aria-hidden="true">↗</span></button><div id="sample-replies" class="sample-replies" hidden></div></div>
         <form id="conversation-form" class="conversation-composer">
