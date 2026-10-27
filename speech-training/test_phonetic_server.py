@@ -22,6 +22,12 @@ class PhoneticAPITests(unittest.TestCase):
     def setUpClass(cls):
         cls.client = TestClient(app)
 
+    def test_microphone_worklet_is_available_to_local_practice_pages(self):
+        response = self.client.get('/app/microphone-processor.js')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('javascript', response.headers['content-type'])
+        self.assertIn("registerProcessor('egl-microphone'", response.text)
+
     def test_text_reference_is_explicitly_not_audio_analysis(self):
         response = self.client.post('/api/phonetics/text', json={'text': 'This is a leaf.', 'accent': 'en-us'})
         self.assertEqual(response.status_code, 200, response.text)

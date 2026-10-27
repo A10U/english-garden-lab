@@ -18,7 +18,7 @@ import math
 from pathlib import Path
 import re
 import struct
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 
 from export_demo_assets import assert_public, verify_export, wav_info
 from build_word_audio import filename as word_filename, normalize_word, verify_public as verify_word_audio
@@ -228,7 +228,7 @@ def disable_local_api_literals(text: str) -> str:
     return text
 
 
-def demo_html(source: str, *, data_url: str, trial: dict | None = None) -> str:
+def demo_html(source: str, *, data_url: str, trial: dict | None = None, runtime_version: str | None = None) -> str:
     if trial is not None:
         source, count = TRIAL_SCRIPT.subn(lambda match: match[1] + script_json(trial) + match[2], source)
         if count != 1:
@@ -248,6 +248,16 @@ def demo_html(source: str, *, data_url: str, trial: dict | None = None) -> str:
     source, count = PHONETICS_SCRIPT.subn(inject, source)
     if count != 1:
         raise ValueError("A runtime page must include phonetics.js exactly once")
+    if runtime_version:
+        def version_script(match):
+            prefix, quote, url = match.groups()
+            parsed = urlsplit(url)
+            if parsed.scheme or parsed.netloc or Path(parsed.path).name not in {"phonetics.js", "browser-phonetics.js", "spelling-feedback.js"}:
+                return match[0]
+            query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key != "v"]
+            versioned = parsed._replace(query=urlencode(query + [("v", runtime_version)])).geturl()
+            return prefix + quote + versioned + quote
+        source = re.sub(r"(<script\b[^>]*\bsrc\s*=\s*)(['\"])([^'\"]+)\2", version_script, source, flags=re.I)
     if 'id="egl-demo-csp"' not in source:
         source = re.sub(r"</head\s*>", CSP + "\n</head>", source, count=1, flags=re.I)
     if 'id="egl-hosted-demo-notice"' not in source:
@@ -374,11 +384,17 @@ def build(project_root: Path, output: Path) -> dict:
     files["app/phonetic-data.js"] = (
         "/* Precomputed expected text pronunciation references. */\nglobalThis.EGL_PHONETIC_DATA="
         + script_json(demo["texts"]) + ";\n").encode("utf-8")
+    # One content version also invalidates dynamically loaded workers/worklets
+    # when their implementation changes without a change to the entry scripts.
+    runtime_version = hashlib.sha256(b"".join(
+        name.encode("utf-8") + b"\0" + hashlib.sha256(content).digest()
+        for name, content in sorted(files.items()) if name.startswith("app/") and name.endswith(".js")
+    )).hexdigest()[:16]
     files["app/index.html"] = demo_html(files["app/index.html"].decode("utf-8"),
-        data_url="../speech-training/demo-assets/demo-data.js").encode("utf-8")
+        data_url="../speech-training/demo-assets/demo-data.js", runtime_version=runtime_version).encode("utf-8")
     files["speech-training/listen.html"] = demo_html(
         (root / "speech-training/listen.html").read_text(encoding="utf-8"),
-        data_url="demo-assets/demo-data.js", trial=public_trial_payload(demo)).encode("utf-8")
+        data_url="demo-assets/demo-data.js", trial=public_trial_payload(demo), runtime_version=runtime_version).encode("utf-8")
     validate_files(files)
     previous = set()
     if output.exists():

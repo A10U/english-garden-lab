@@ -9,6 +9,47 @@ ort.env.wasm.proxy = false; // Already running in a dedicated worker.
 ort.env.wasm.wasmPaths = new URL('vendor/onnxruntime/', self.location.href).href;
 ort.env.logLevel = 'error';
 let session = null, active = false;
+// A conservative recognition diagnostic, not a calibrated probability that a
+// pronunciation is correct. Blank CTC frames describe silence/timing and must
+// not increase this average. Keep raw phone alignment separate from this flag.
+const TOKEN_POSTERIOR_THRESHOLD = 0.65;
+
+function readLogits(logits) {
+  const dims = logits && logits.dims;
+  if (!Array.isArray(dims) || dims.length !== 3 || dims[0] !== 1
+    || !Number.isSafeInteger(dims[1]) || dims[1] <= 0 || dims[2] !== 392
+    || !logits.data || logits.data.length !== dims[1] * dims[2]) {
+    throw new Error('ผลลัพธ์จากโมเดลไม่ถูกต้อง กรุณาลองวิเคราะห์ใหม่');
+  }
+  const [, frames, width] = dims, values = logits.data, ids = new Array(frames);
+  let posteriorSum = 0, nonblankFrames = 0;
+  for (let frame = 0; frame < frames; frame++) {
+    const offset = frame * width;
+    let best = 0;
+    for (let token = 0; token < width; token++) {
+      if (!Number.isFinite(values[offset + token])) throw new Error('ผลลัพธ์จากโมเดลมีค่าที่ไม่ถูกต้อง กรุณาลองวิเคราะห์ใหม่');
+      if (values[offset + token] > values[offset + best]) best = token;
+    }
+    ids[frame] = best;
+    if (best !== model.blankId) {
+      // Stable softmax: subtract the maximum before exponentiating.
+      const maximum = values[offset + best];
+      let total = 0;
+      for (let token = 0; token < width; token++) total += Math.exp(values[offset + token] - maximum);
+      posteriorSum += 1 / total;
+      nonblankFrames++;
+    }
+  }
+  const mean = nonblankFrames ? posteriorSum / nonblankFrames : null;
+  const uncertain = mean === null || mean < TOKEN_POSTERIOR_THRESHOLD;
+  return { ids, quality: {
+    status: uncertain ? 'uncertain' : 'recognized',
+    mean_token_posterior: mean === null ? null : Number(mean.toFixed(6)),
+    nonblank_frames: nonblankFrames, threshold: TOKEN_POSTERIOR_THRESHOLD,
+    reason: uncertain ? (mean === null ? 'no_nonblank_frames' : 'low_token_posterior') : null,
+    calibrated: false,
+  } };
+}
 
 function progress(id, message) { self.postMessage({ id, type: 'progress', message }); }
 async function verifiedModel(bytes) {
@@ -77,26 +118,19 @@ self.onmessage = async event => {
     let outputs;
     try {
       outputs = await engine.run({ input_values: input });
-      const logits = outputs.logits;
-      if (!logits || logits.dims.length !== 3 || logits.dims[0] !== 1 || logits.dims[2] !== 392) throw new Error('ผลลัพธ์จากโมเดลไม่ถูกต้อง');
-      const [batch, frames, width] = logits.dims;
-      const ids = new Array(frames);
-      for (let frame = 0; frame < frames; frame++) {
-        let best = 0;
-        for (let token = 1; token < width; token++) if (logits.data[frame * width + token] > logits.data[frame * width + best]) best = token;
-        ids[frame] = best;
-      }
+      const { ids, quality } = readLogits(outputs && outputs.logits);
       const observed = alignment.decode_ctc_segments(ids, vocabulary, {
         blank_id: model.blankId, duration_seconds: metrics.duration_seconds, frame_seconds: model.frameSeconds,
       });
       const result = alignment.composeAnalysis(reference, observed, metrics);
       self.postMessage({ id, type: 'result', result: {
         ...result, precomputed: false, live_analysis: true, playback_source: 'learner_recording',
+        recognition_quality: quality,
         processing: 'browser_wasm', model: { id: model.modelId, revision: model.revision, quantization: 'q8' },
       } });
     } finally {
       if (input.dispose) input.dispose();
-      if (outputs) Object.values(outputs).forEach(tensor => { if (tensor.dispose) tensor.dispose(); });
+      if (outputs) Object.values(outputs).forEach(tensor => { if (tensor && tensor.dispose) tensor.dispose(); });
     }
   } catch (error) {
     const thai = error && /[\u0e00-\u0e7f]/.test(error.message || '');

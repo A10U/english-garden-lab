@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import unittest
 import wave
+from urllib.parse import parse_qs, urlsplit
 
 from build_demo import build, PRIVATE_PATH, LOOPBACK_URL, MODEL_URL, ogg_vorbis_info
 from build_listen import build as build_listen
@@ -134,22 +135,22 @@ class StaticDemoBuildTests(unittest.TestCase):
         for page in ('app/index.html', 'speech-training/listen.html'):
             text = (self.output / page).read_text()
             self.assertLess(text.index('id="egl-demo-runtime"'), text.index('demo-data.js'))
-            self.assertLess(text.index('demo-data.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
-            self.assertLess(text.index('browser-phonetics.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
+            self.assertLess(text.index('demo-data.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js?v='))
+            self.assertLess(text.index('browser-phonetics.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js?v='))
             self.assertLess(text.index('phone-guide.js'), text.index('sound-foundations.js'))
             self.assertLess(text.index('sound-foundations.js'), text.index('vowel-pairs.js'))
             self.assertLess(text.index('vowel-pairs.js'), text.index('vowel-audio.js'))
             self.assertLess(text.index('vowel-audio.js'), text.index('pronunciation-videos.js'))
-            self.assertLess(text.index('pronunciation-videos.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
-            self.assertLess(text.index('vowel-pairs.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
+            self.assertLess(text.index('pronunciation-videos.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js?v='))
+            self.assertLess(text.index('vowel-pairs.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js?v='))
             self.assertLess(text.index('sound-foundations.js'), text.index('articulation-images.js'))
-            self.assertLess(text.index('articulation-images.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
-            self.assertLess(text.index('sound-foundations.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
-            self.assertLess(text.index('spelling-guide.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
+            self.assertLess(text.index('articulation-images.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js?v='))
+            self.assertLess(text.index('sound-foundations.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js?v='))
+            self.assertLess(text.index('spelling-guide.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js?v='))
             self.assertLess(text.index('spelling-guide.js'), text.index('word-audio.js'))
             self.assertLess(text.index('spelling-guide.js'), text.index('spelling-feedback.js'))
-            self.assertLess(text.index('spelling-feedback.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
-            self.assertLess(text.index('word-audio.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js"'))
+            self.assertLess(text.index('spelling-feedback.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js?v='))
+            self.assertLess(text.index('word-audio.js'), text.index('src="' + ('../app/' if page.startswith('speech-training') else '') + 'phonetics.js?v='))
             self.assertNotIn('phone-examples.js', text)
             self.assertIn('id="egl-hosted-demo-notice"', text)
             self.assertIn("connect-src 'self' https://huggingface.co https://*.hf.co;", text)
@@ -189,6 +190,45 @@ class StaticDemoBuildTests(unittest.TestCase):
         first = (self.output / '.egl-demo-build.json').read_bytes()
         build(self.root, self.output)
         self.assertEqual(first, (self.output / '.egl-demo-build.json').read_bytes())
+
+    def test_shared_script_version_changes_for_worker_worklet_and_feedback_updates_on_both_pages(self):
+        pages = ('app/index.html', 'speech-training/listen.html')
+        source_pages = {page: (self.root / page).read_bytes() for page in pages}
+        targets = {'phonetics.js', 'browser-phonetics.js', 'spelling-feedback.js'}
+
+        def versions():
+            found = {}
+            for page in pages:
+                html = (self.output / page).read_text()
+                urls = re.findall(r'<script\b[^>]*\bsrc=["\']([^"\']+)["\']', html)
+                selected = [urlsplit(url) for url in urls if Path(urlsplit(url).path).name in targets]
+                self.assertEqual({Path(url.path).name for url in selected}, targets)
+                self.assertEqual(len(selected), 3)
+                values = []
+                for url in selected:
+                    prefix = '../app/' if page.startswith('speech-training') else ''
+                    self.assertEqual(url.path, prefix + Path(url.path).name)
+                    query = parse_qs(url.query)
+                    self.assertEqual(set(query), {'v'})
+                    self.assertEqual(len(query['v']), 1)
+                    self.assertRegex(query['v'][0], r'^[0-9a-f]{16}$')
+                    values.append(query['v'][0])
+                self.assertEqual(len(set(values)), 1)
+                found[page] = values[0]
+            self.assertEqual(len(set(found.values())), 1)
+            return found[pages[0]]
+
+        build(self.root, self.output)
+        previous = versions()
+        for script in ('browser-phonetics-worker.js', 'microphone-processor.js', 'spelling-feedback.js'):
+            path = self.root / 'app' / script
+            path.write_text(path.read_text() + '\n// changed runtime implementation\n')
+            build(self.root, self.output)
+            current = versions()
+            self.assertNotEqual(previous, current, script + ' must invalidate entry script URLs')
+            previous = current
+        for page in pages:
+            self.assertEqual((self.root / page).read_bytes(), source_pages[page], 'cache versions belong to generated HTML only')
 
     def test_stale_authoring_link_fails_before_output_writes(self):
         (self.root / 'index.html').write_text('<html><body><a href="SDLC/private.json">private</a></body></html>')

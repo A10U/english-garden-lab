@@ -102,6 +102,20 @@ PY
 
 ## ข้อมูลและสคริปต์
 
+### ฝึกตัวตรวจหน่วยเสียงภาษาอังกฤษบน M4
+
+สคริปต์ชุดนี้ฝึก acoustic CTC detector แยกจาก Qwen TTS โดยใช้ [LibriSpeech train-clean-100](https://www.openslr.org/12/) และ dev-clean/test-clean คนละผู้พูด ชุด train มีขนาดประมาณ 100 ชั่วโมง ดาวน์โหลดรวม dev/test ประมาณ 7 GB ตรวจ checksum ของต้นทางก่อนแตกไฟล์ เก็บข้อมูลและผลฝึกในโฟลเดอร์ที่ไม่ขึ้น repository
+
+```sh
+speech-training/.venv/bin/python speech-training/run_english_phoneme_training.py
+```
+
+ลำดับงานคือดาวน์โหลดต่อจากไฟล์ค้าง → ตรวจและเตรียมข้อมูล → ฝึกบน MPS → เทียบ phoneme error rate ของโมเดลเดิมกับตัวทดลอง ค่าเริ่มต้นฝึกหนึ่งรอบ ปรับสองชั้นท้ายกับ CTC head บันทึก checkpoint เพื่อฝึกต่อได้ และรายงานจำนวนชั่วโมงที่ใช้จริงกับไฟล์ที่คัดออก สถานะงานอยู่ที่ `runs/english-phoneme-librispeech100-job/status.json` และสถานะโมเดลที่ `runs/english-phoneme-librispeech100-v1/status.json` ควรเปิดเครื่องไว้จนจบ หากเริ่มงานใหม่เองให้เก็บ log โดย redirect stdout/stderr
+
+ป้ายหน่วยเสียงสร้างจาก transcript ด้วย eSpeak เป็น canonical text references ไม่ใช่หน่วยเสียงที่ผู้เชี่ยวชาญฟังและกำกับ โมเดลทดลองไม่ถูกนำขึ้นเว็บอัตโนมัติ การทดสอบ PER ยังไม่ใช่การสอบเทียบคะแนนการออกเสียง และไฟล์ที่ผู้เรียนส่งมาเพื่อตรวจบั๊กไม่ถูกใช้ฝึกชุดนี้
+
+เว็บ Sites กับ GitHub Pages มีขั้นตอนเผยแพร่แยกกัน: Sites ใช้ manifest `.openai/hosting.json` ส่วน GitHub Pages ใช้สาขา `gh-pages` ที่มีไฟล์จาก `dist/` การแก้ซอร์สบน `main` อย่างเดียวไม่อัปเดตหน้า GitHub Pages
+
 - [resources/evaluation-prompts.json](resources/evaluation-prompts.json): ข้อความทดสอบที่ไม่ใช้ฝึก
 - [resources/phonetics.json](resources/phonetics.json): IPA จากข้อความที่เตรียมไว้; สร้างซ้ำด้วย `build_phonetic_data.py` หลังติดตั้ง eSpeak NG
 - [resources/reference-audio.json](resources/reference-audio.json): ข้อมูลเวลาอ้างอิงจากคลิปประโยคสำหรับการตรวจสอบ; การฟังคำในหน้าฝึกใช้ไฟล์คำเต็มแยกต่างหาก

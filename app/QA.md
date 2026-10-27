@@ -2,8 +2,9 @@
 
 Checks for the portable App and Speech demo:
 
-- JavaScript unit and DOM integration suite: 256 passed.
-- Direct PCM microphone capture, AudioWorklet batching/tail flush, short-word timing, truncation, interruption recovery and repeated recording: 17 regressions passed. Static builder suite: 24 passed, including required microphone-worklet packaging.
+- JavaScript unit and DOM integration suite: 271 passed.
+- Recognition-quality regressions cover uncertain raw zero/100, preserved genuine zero, all score levels/coaching, later successful attempts, CTC blank exclusion and invalid logits. The supplied three learner files ran through the real q8 WASM worker twice with stable output; the short word is flagged uncertain while the two sentences remain recognized. This is regression evidence, not calibration of the experimental posterior threshold.
+- Direct PCM microphone capture, AudioWorklet batching/tail flush, short-word timing, truncation, interruption recovery and repeated recording: 17 regressions passed. Static builder suite: 25 passed, including required microphone-worklet packaging and cache version changes for worker/worklet/feedback edits.
 - Full Python engine, API, reference-audio, exporter and static-builder suite: 80 passed.
 - Browser client, alignment and hosted learner dispatch have regression coverage for cancellation, PCM resampling and separation from cached AI results.
 - All 62 sentence WAVs and 210 complete standalone word WAVs verified against manifests, PCM headers, duration, and SHA256SUMS.

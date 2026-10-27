@@ -111,6 +111,44 @@ test('a recording with no detected phones remains unassessed rather than scoring
   assert.deepEqual(result.priority, []);
 });
 
+test('uncertain recognition suppresses phone and spelling priorities without changing zero or perfect raw evidence', () => {
+  const word = {index: 0, text: "It's", ipa: 'ɪts', phones: ['ɪ', 't', 's']};
+  for (const phones of [['ʔ', 'i'], ['ɪ', 't', 's']]) {
+    const data = makeAnalysis([word], phones);
+    data.recognition_quality = {status: 'uncertain', mean_token_posterior: .542, threshold: .65, calibrated: false};
+    const groups = groupsFor(word), before = clone(data), originalGroups = clone(groups);
+    const result = feedback.analyzeWord(data, 0, groups);
+    assert.equal(result.available, false);
+    assert.deepEqual(result.priority, []);
+    assert.ok(result.phones.every(phone => phone.match_percent === null));
+    assert.equal(result.groups.length, groups.length);
+    assert.ok(result.groups.every(group => group.match_percent === null && group.counts === null && group.status === 'unassessed'));
+    assert.match(result.note, /ยังแยกหน่วยเสียงได้ไม่มั่นคง/);
+    assert.deepEqual(data, before); assert.deepEqual(groups, originalGroups);
+  }
+});
+
+test('recognized zero agreement remains assessed and a fresh recognized take restores feedback after uncertainty', () => {
+  const word = {index: 0, text: "It's", ipa: 'ɪts', phones: ['ɪ', 't', 's']}, groups = groupsFor(word);
+  const uncertain = makeAnalysis([word], ['ʔ', 'i']);
+  uncertain.recognition_quality = {status: 'uncertain'};
+  assert.equal(feedback.analyzeWord(uncertain, 0, groups).available, false);
+  const wrong = makeAnalysis([word], ['ʔ', 'i']);
+  wrong.recognition_quality = {status: 'recognized', mean_token_posterior: .86, calibrated: false};
+  const assessed = feedback.analyzeWord(wrong, 0, groups);
+  assert.equal(assessed.available, true);
+  assert.deepEqual(values(assessed), [0, 0, 0]);
+  assert.deepEqual(assessed.groups.map(group => group.match_percent), [0, 0, 0]);
+  assert.equal(assessed.priority.length, 3);
+  const correct = makeAnalysis([word], word.phones);
+  correct.recognition_quality = {status: 'recognized'};
+  const restored = feedback.analyzeWord(correct, 0, groups);
+  assert.equal(restored.available, true);
+  assert.deepEqual(values(restored), [100, 100, 100]);
+  assert.deepEqual(restored.groups.map(group => group.match_percent), [100, 100, 100]);
+  assert.deepEqual(restored.priority, []);
+});
+
 test('text references or missing acoustic provenance cannot obtain percentages from forged operations', () => {
   for (const change of [{audio_analyzed: false}, {audio_analyzed: undefined},
     {analysis_type: 'text_pronunciation_reference'}, {analysis_type: undefined}]) {

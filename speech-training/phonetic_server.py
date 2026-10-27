@@ -221,7 +221,7 @@ def static_asset(asset: str):
     allowed_app = {"index.html", "app.js", "content.js", "core.js", "storage.js", "garden.js",
         "styles.css", "phonetics.js", "phonetics.css", "phonetic-data.js", "phone-guide.js", "sound-foundations.js", "vowel-pairs.js", "vowel-audio.js", "pronunciation-videos.js", "articulation-images.js",
         "study-help.js", "reference-audio.js", "spelling-guide.js", "spelling-feedback.js", "word-audio.js", "browser-phonetics.js",
-        "browser-phonetics-worker.js", "browser-phoneme-model.js", "phonetic-alignment.js",
+        "browser-phonetics-worker.js", "browser-phoneme-model.js", "phonetic-alignment.js", "microphone-processor.js",
         "vendor/onnxruntime/ort.wasm.min.js", "vendor/onnxruntime/ort-wasm-simd-threaded.mjs",
         "vendor/onnxruntime/ort-wasm-simd-threaded.wasm", "vendor/onnxruntime/LICENSE.txt",
         "vendor/onnxruntime/ThirdPartyNotices.txt"}

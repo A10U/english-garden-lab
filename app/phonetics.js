@@ -38,6 +38,9 @@
   }
 
   function percentText(value) { return value == null ? '—' : value.toFixed(1) + '%'; }
+  function uncertainRecognition(data) {
+    return Boolean(data && data.recognition_quality && data.recognition_quality.status === 'uncertain');
+  }
   function percentLevel(value) {
     if (value == null) return 'unassessed';
     return value >= 95 ? 'purple' : value >= 90 ? 'blue' : value >= 80 ? 'indigo' : value >= 70 ? 'sky' : value >= 60 ? 'green' : value >= 50 ? 'yellow' : value >= 40 ? 'orange' : 'red';
@@ -1255,12 +1258,13 @@
       inspectorListeners.splice(0).forEach(remove => remove());
       selectedIndex = index;
       const item = wordItems[index], word = item.word, operations = wordOperations(word);
+      const uncertain = uncertainRecognition(analysisData);
       selectedPhrase.textContent = 'คำที่เลือก: ' + word.text;
       wordItems.forEach((entry, i) => entry.button.setAttribute('aria-pressed', String(i === index)));
       inspector.replaceChildren(el('h4', 'egl-ph-inspector-title', word.text + ' · ' + percentText(item.percent)));
       const meaning = wordMeaning(practiceWord || word);
       if (meaning) inspector.append(el('p', 'egl-ph-word-meaning', meaning));
-      inspector.append(el('p', 'egl-ph-counts', countsText(word, operations) + ' จับคู่กับอ้างอิง'));
+      inspector.append(el('p', 'egl-ph-counts', uncertain ? 'ยังประเมินคำนี้ไม่ได้ เพราะระบบแยกหน่วยเสียงได้ไม่มั่นคง' : countsText(word, operations) + ' จับคู่กับอ้างอิง'));
       const controls = el('div', 'egl-ph-actions');
       const replay = button(mode === 'own' ? 'ฟังเสียงของฉันทั้งคลิป' : 'ฟังเสียง AI ทั้งคลิป', () => { playOwn(true); player.playbackRate = slow ? 0.75 : 1; }, 'egl-ph-button egl-ph-primary', inspectorListeners);
       replay.disabled = !clip;
@@ -1271,7 +1275,7 @@
         examplePlayer.playbackRate = slow ? 0.75 : 1;
       }, 'egl-ph-button egl-ph-slow', inspectorListeners);
       slower.setAttribute('aria-pressed', String(slow));
-      const different = wordItems.map((entry, i) => ({ entry, i })).filter(x => x.entry.percent != null && x.entry.percent < 100 || x.entry.word.status === 'difference');
+      const different = uncertain ? [] : wordItems.map((entry, i) => ({ entry, i })).filter(x => x.entry.percent != null && x.entry.percent < 100 || x.entry.word.status === 'difference');
       const next = button('คำที่มีเสียงต่างถัดไป', () => {
         const following = different.find(x => x.i > selectedIndex) || different[0];
         if (following) selectWord(following.i);
@@ -1282,6 +1286,11 @@
       inspector.append(controls);
       const spelling = spellingSection(practiceWord || word, inspectorListeners);
       if (spelling) inspector.append(spelling);
+      if (uncertain) {
+        inspector.append(el('p', 'egl-ph-note', 'ฟังเสียงของคุณเทียบกับตัวอย่างได้ แล้วลองบันทึกใหม่ · ผลตรวจครั้งนี้ยังใช้ระบุว่าเสียงใดออกผิดไม่ได้'));
+        inspector.hidden = false;
+        return;
+      }
       inspector.append(el('p', 'egl-ph-note', 'แตะเสียงอ้างอิงเพื่อฟังตัวอย่างคำเดี่ยว หรือแตะเสียงที่ตรวจพบเพื่อฟังคลิปที่วิเคราะห์เต็มคลิป'));
       const pairs = el('div', 'egl-ph-phone-pairs');
       const headers = el('div', 'egl-ph-phone-row egl-ph-phone-head');
@@ -1333,11 +1342,13 @@
       const metrics = data.metrics || {};
       const alignment = data.alignment || {}, operations = Array.isArray(alignment.operations) ? alignment.operations : [];
       const summary = alignment.summary || operationCounts(operations);
-      const overall = percentage(summary, operations);
+      const uncertain = uncertainRecognition(data);
+      const overall = uncertain ? null : percentage(summary, operations);
       const score = el('div', 'egl-ph-agreement egl-ph-' + percentLevel(overall));
-      score.append(el('strong', 'egl-ph-percent', percentText(overall)), el('span', 'egl-ph-agreement-label', 'หน่วยเสียงจับคู่กับอ้างอิง'));
-      score.append(el('span', 'egl-ph-counts', countsText(summary, operations)));
+      score.append(el('strong', 'egl-ph-percent', percentText(overall)), el('span', 'egl-ph-agreement-label', uncertain ? 'ยังประเมินการออกเสียงไม่ได้' : 'หน่วยเสียงจับคู่กับอ้างอิง'));
+      score.append(el('span', 'egl-ph-counts', uncertain ? 'มีสัญญาณเสียง แต่ระบบยังแยกหน่วยเสียงได้ไม่มั่นคง' : countsText(summary, operations)));
       observed.replaceChildren(el('h3', 'egl-ph-step-title', practicePhone ? '3 · ผลเฉพาะเสียง /' + practicePhone.phone + '/ ในคำ ' + practiceWord.text : practiceWord ? '3 · ผลคำว่า ' + practiceWord.text : '3 · ดูผลทีละคำ'), score);
+      if (uncertain) observed.append(el('p', 'egl-ph-note egl-ph-recognition-warning', 'ผลครั้งนี้ยังไม่น่าเชื่อถือพอสำหรับให้เปอร์เซ็นต์ ลองฟังเสียงของคุณเทียบกับตัวอย่าง หรือบันทึกใหม่ในที่เงียบ โดยพูดคำหรือประโยคที่เลือกหนึ่งครั้ง'));
       if (practicePhone) observed.append(el('p', 'egl-ph-note', 'ผลนี้เปรียบเทียบเฉพาะเสียงที่เลือก ไม่ใช่ผลของทั้งคำ · เสียงเดี่ยวที่สั้นมากอาจตรวจไม่พบ'));
       if (demoMode && data.precomputed === true) observed.append(el('p', 'egl-ph-note egl-ph-demo-result', 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · ไม่ใช่ผลจากเสียงที่คุณบันทึก'));
       observed.append(el('p', 'egl-ph-note', 'เปอร์เซ็นต์นับการจับคู่หน่วยเสียง ไม่ใช่คะแนนความสามารถหรือระดับเจ้าของภาษา'));
@@ -1354,7 +1365,7 @@
         const grid = el('div', 'egl-ph-comparison');
         words.slice(0, 200).forEach(word => {
           const relevant = operations.filter(op => String(op.word_index) === String(word.index));
-          const percent = percentage(word, relevant), index = wordItems.length;
+          const percent = uncertain ? null : percentage(word, relevant), index = wordItems.length;
           const token = button('', () => selectWord(index), 'egl-ph-word egl-ph-compare egl-ph-' + percentLevel(percent), observedListeners);
           token.setAttribute('aria-pressed', 'false');
           token.setAttribute('aria-label', word.text + ': ' + percentText(percent) + ' หน่วยเสียงตรงกับอ้างอิง ดูรายละเอียด');
@@ -1372,6 +1383,7 @@
       const duration = Number(metrics.duration_seconds == null ? found.duration_seconds : metrics.duration_seconds);
       if (Number.isFinite(duration)) details.append(el('p', 'egl-ph-note', 'ความยาวเสียง ' + duration.toFixed(2) + ' วินาที'));
       details.append(el('p', 'egl-ph-note', 'วิธีนับ: จำนวนเสียงที่จับคู่ตรง ÷ (จำนวนเสียงอ้างอิง + เสียงที่ตรวจพบเพิ่ม) × 100'));
+      if (uncertain) details.append(el('p', 'egl-ph-note', 'หน่วยเสียงที่แสดงด้านบนเป็นผลคาดเดาที่ไม่มั่นคง จึงไม่นำมาให้เปอร์เซ็นต์หรือแนะนำว่าออกเสียงส่วนใดผิด'));
       const limits = Array.isArray(data.limitations) ? data.limitations : [];
       if (limits.length) {
         const list = el('ul', 'egl-ph-limitations');
@@ -1382,7 +1394,7 @@
       observed.hidden = false;
       resultPlaceholder.hidden = true;
       const silent = !phones.length || (metrics.voiced_seconds != null && Number(metrics.voiced_seconds) === 0) || (metrics.rms_dbfs != null && Number(metrics.rms_dbfs) < -60);
-      setStatus(demoMode && data.precomputed === true ? 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · แตะคำเพื่อดูรายละเอียด' : silent ? 'เสียงเบาหรือมีช่วงเงียบมาก ลองบันทึกในที่เงียบและพูดใกล้ไมโครโฟนขึ้น' : 'วิเคราะห์จากไฟล์เสียงแล้ว แตะคำเพื่อฟังและเปรียบเทียบด้วยตัวเอง', silent);
+      setStatus(uncertain ? 'มีสัญญาณเสียง แต่ผลตรวจยังไม่มั่นคง จึงยังให้เปอร์เซ็นต์ไม่ได้ · ฟังเทียบหรือลองบันทึกใหม่ได้' : demoMode && data.precomputed === true ? 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · แตะคำเพื่อดูรายละเอียด' : silent ? 'เสียงเบาหรือมีช่วงเงียบมาก ลองบันทึกในที่เงียบและพูดใกล้ไมโครโฟนขึ้น' : 'วิเคราะห์จากไฟล์เสียงแล้ว แตะคำเพื่อฟังและเปรียบเทียบด้วยตัวเอง', uncertain || silent);
       if (wordItems.length) selectWord(0);
     }
 
@@ -1579,7 +1591,7 @@
           try {
             if (!await resumed || context.state !== 'running') throw new Error('Microphone AudioContext could not resume');
             if (!current()) return;
-            const moduleURL = new win.URL('microphone-processor.js', runtimeScriptURL || doc.baseURI).href;
+            const moduleURL = new win.URL('microphone-processor.js' + (runtimeScriptURL ? new win.URL(runtimeScriptURL).search : ''), runtimeScriptURL || doc.baseURI).href;
             active = await pcmRecorder(win, context, acquired, moduleURL, current);
           } catch (error) {
             closeContext(context);

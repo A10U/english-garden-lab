@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "LibriSpeech English phoneme fine-tuning references",
+  "source": {
+    "name": "LibriSpeech ASR corpus (SLR12)",
+    "official_page": "https://www.openslr.org/12",
+    "checksum_url": "https://www.openslr.org/resources/12/md5sum.txt",
+    "download_base_url": "https://www.openslr.org/resources/12/",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution": "Vassil Panayotov, Guoguo Chen, Daniel Povey, and Sanjeev Khudanpur. LibriSpeech: an ASR corpus based on public domain audio books. ICASSP 2015.",
+    "checksum_verified_on": "2026-10-27"
+  },
+  "splits": {
+    "train": {"source_split": "train-clean-100", "archive": "train-clean-100.tar.gz", "md5": "2a93770f6d5c6c964bc36631d331a522", "max_archive_bytes": 8589934592},
+    "validation": {"source_split": "dev-clean", "archive": "dev-clean.tar.gz", "md5": "42e2234ba48799c1f50f24a7926300a1", "max_archive_bytes": 1073741824},
+    "test": {"source_split": "test-clean", "archive": "test-clean.tar.gz", "md5": "32fa31d27d2e1cad72775fee3f4849a9", "max_archive_bytes": 1073741824}
+  },
+  "labels": {
+    "source": "canonical_espeak",
+    "kind": "canonical_text_reference",
+    "language": "en-us",
+    "human_reviewed": false,
+    "warning": "Phones are generated from transcript text. They describe a canonical reference, not a human annotation of phones actually spoken or a validated pronunciation score."
+  }
+}

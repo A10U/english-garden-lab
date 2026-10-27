@@ -50,7 +50,7 @@ function setup(options = {}) {
     close() { this.closed++; return Promise.resolve(); }
   }
   const context = vm.createContext({
-    document: { currentScript: { src: 'https://garden.example/prefix/app/browser-phonetics.js' } },
+    document: { currentScript: { src: options.scriptURL || 'https://garden.example/prefix/app/browser-phonetics.js' } },
     Worker: FakeWorker, WebAssembly, AudioContext, Blob, URL, DOMException, AbortController,
     OfflineAudioContext: options.OfflineAudioContext,
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
@@ -86,6 +86,14 @@ test('loading and checking support do not create a worker, decoder, timer, or re
   assert.equal(app.workers.length, 0);
   assert.equal(app.contexts.length, 0);
   assert.equal(app.timers.size, 0);
+  assert.equal(app.requests.length, 0);
+});
+
+test('a published runtime version also refreshes the worker under the hosted prefix', async () => {
+  const app = setup({ scriptURL: 'https://garden.example/prefix/app/browser-phonetics.js?v=release-hash' });
+  const job = begin(app), worker = await waitForWorker(app);
+  assert.equal(worker.url, 'https://garden.example/prefix/app/browser-phonetics-worker.js?v=release-hash');
+  result(worker); await job;
   assert.equal(app.requests.length, 0);
 });
 
