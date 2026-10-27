@@ -836,10 +836,18 @@
     }
     function phoneEvidence(result) {
       if (!result || validPercent(result.match_percent) == null) return { state: 'unassessed', label: '—' };
-      const counts = result.counts || {};
+      const supplied = result.counts;
+      const validCounts = supplied && ['matched_phones', 'reference_phones', 'inserted_phones'].every(key => Number.isSafeInteger(supplied[key]) && supplied[key] >= 0);
+      // Older local services can return operations without count fields. Use
+      // that real evidence, never infer a match/difference from a percent alone.
+      const counts = validCounts ? supplied : operationCounts(result.operations);
+      if (!counts || !counts.reference_phones) return { state: 'unassessed', label: '—' };
+      const operations = Array.isArray(result.operations) ? result.operations : [];
+      const deleted = counts.deleted_phones == null ? operations.filter(op => op.type === 'delete').length : counts.deleted_phones;
+      const substituted = counts.substituted_phones == null ? operations.filter(op => op.type === 'substitute').length : counts.substituted_phones;
       if (counts.reference_phones > 0 && counts.matched_phones === counts.reference_phones && !counts.inserted_phones) return { state: 'matched', label: 'จับคู่ตรง' };
       if (counts.matched_phones > 0) return { state: 'partial', label: 'จับคู่บางส่วน' };
-      if (counts.deleted_phones && !counts.substituted_phones && !counts.inserted_phones) return { state: 'missing', label: 'ยังจับคู่ไม่ได้' };
+      if (deleted && !substituted && !counts.inserted_phones) return { state: 'missing', label: 'ยังจับคู่ไม่ได้' };
       return { state: 'different', label: 'โมเดลถอดต่าง' };
     }
     function singlePhoneHint(phone) {
@@ -1345,7 +1353,7 @@
       selectedIndex = index;
       const item = wordItems[index], word = item.word, operations = wordOperations(word);
       const uncertain = uncertainRecognition(analysisData);
-      const evidence = practicePhone ? phoneEvidence({ match_percent: item.percent, counts: word }) : null;
+      const evidence = practicePhone ? phoneEvidence({ match_percent: item.percent, counts: word, operations }) : null;
       selectedPhrase.textContent = 'คำที่เลือก: ' + word.text;
       wordItems.forEach((entry, i) => entry.button.setAttribute('aria-pressed', String(i === index)));
       inspector.replaceChildren(el('h4', 'egl-ph-inspector-title', word.text + ' · ' + (evidence ? evidence.label : percentText(item.percent))));
@@ -1433,7 +1441,7 @@
       const summary = alignment.summary || operationCounts(operations);
       const uncertain = uncertainRecognition(data);
       const overall = uncertain ? null : percentage(summary, operations);
-      const evidence = practicePhone ? phoneEvidence({ match_percent: overall, counts: summary }) : null;
+      const evidence = practicePhone ? phoneEvidence({ match_percent: overall, counts: summary, operations }) : null;
       const score = el('div', 'egl-ph-agreement egl-ph-' + (evidence ? 'evidence-' + evidence.state : percentLevel(overall)));
       score.append(el('strong', evidence ? 'egl-ph-evidence-status' : 'egl-ph-percent', evidence ? evidence.label : percentText(overall)), el('span', 'egl-ph-agreement-label', uncertain ? 'ยังประเมินการออกเสียงไม่ได้' : evidence ? 'การจับคู่เฉพาะเสียงของโมเดล · ไม่ใช่คะแนนความถูกต้อง' : 'หน่วยเสียงจับคู่กับอ้างอิง'));
       score.append(el('span', 'egl-ph-counts', uncertain ? issue === 'insufficient_audio_signal' ? 'สัญญาณเสียงยังไม่เพียงพอสำหรับเปรียบเทียบ' : 'ระบบยังแยกหน่วยเสียงสำหรับเปรียบเทียบไม่ได้อย่างมั่นคง' : evidence ? 'ตัวเลขจับคู่ดิบอยู่ในรายละเอียดด้านล่าง' : countsText(summary, operations)));
@@ -1470,7 +1478,7 @@
         words.slice(0, 200).forEach(word => {
           const relevant = operations.filter(op => String(op.word_index) === String(word.index));
           const percent = uncertain ? null : percentage(word, relevant), index = wordItems.length;
-          const evidence = practicePhone ? phoneEvidence({ match_percent: percent, counts: word }) : null;
+          const evidence = practicePhone ? phoneEvidence({ match_percent: percent, counts: word, operations: relevant }) : null;
           const token = button('', () => selectWord(index), 'egl-ph-word egl-ph-compare egl-ph-' + (evidence ? 'evidence-' + evidence.state : percentLevel(percent)), observedListeners);
           token.setAttribute('aria-pressed', 'false');
           token.setAttribute('aria-label', word.text + ': ' + (evidence ? evidence.label + ' ผลจับคู่เฉพาะเสียงที่ฝึก' : percentText(percent) + ' หน่วยเสียงตรงกับอ้างอิง') + ' ดูรายละเอียด');
