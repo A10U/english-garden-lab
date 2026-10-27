@@ -38,9 +38,18 @@
   }
 
   function percentText(value) { return value == null ? '—' : value.toFixed(1) + '%'; }
-  function uncertainRecognition(data) {
-    return Boolean(data && data.recognition_quality && data.recognition_quality.status === 'uncertain');
+  function recognitionIssue(data) {
+    const metrics = data && data.metrics || {};
+    // A decoder can emit phones even over silence, and older services may
+    // return an explicit zero after emitting none. Neither is score evidence.
+    if (typeof metrics.voiced_seconds === 'number' && Number.isFinite(metrics.voiced_seconds) && metrics.voiced_seconds <= 0
+      || typeof metrics.rms_dbfs === 'number' && Number.isFinite(metrics.rms_dbfs) && metrics.rms_dbfs < -60) return 'insufficient_audio_signal';
+    const phones = data && data.observed && data.observed.phones;
+    if (!Array.isArray(phones) || !phones.some(item => typeof item === 'string' ? item.trim() : item && typeof item.phone === 'string' && item.phone.trim())) return 'no_detected_phones';
+    const quality = data && data.recognition_quality;
+    return quality && quality.status === 'uncertain' ? quality.reason || 'uncertain_recognition' : null;
   }
+  function uncertainRecognition(data) { return Boolean(recognitionIssue(data)); }
   function percentLevel(value) {
     if (value == null) return 'unassessed';
     return value >= 95 ? 'purple' : value >= 90 ? 'blue' : value >= 80 ? 'indigo' : value >= 70 ? 'sky' : value >= 60 ? 'green' : value >= 50 ? 'yellow' : value >= 40 ? 'orange' : 'red';
@@ -116,14 +125,36 @@
     let node;
     try { node = new win.AudioWorkletNode(context, 'egl-microphone'); }
     catch (error) { source.disconnect(); throw error; }
-    let blocks = [], frames = 0, collecting = false, finished = false, released = false, stopTimer = null;
+    let blocks = [], frames = 0, collecting = false, finished = false, released = false, stopTimer = null, startTimer = null;
+    let readiness = null, resolveReady = null, rejectReady = null;
     const clearStopTimer = () => { if (stopTimer !== null) win.clearTimeout(stopTimer); stopTimer = null; };
+    const settleReady = error => {
+      if (startTimer !== null) win.clearTimeout(startTimer);
+      startTimer = null;
+      const resolve = resolveReady, reject = rejectReady;
+      resolveReady = null; rejectReady = null;
+      if (error) { if (reject) reject(error); }
+      else if (resolve) resolve();
+    };
     const active = {
       state: 'inactive', prepared: null,
-      start() { collecting = true; this.state = 'recording'; node.port.postMessage({ type: 'start' }); },
+      start() {
+        if (readiness) return readiness;
+        if (finished) return Promise.reject(new win.DOMException('Recording canceled', 'AbortError'));
+        collecting = true; this.state = 'recording';
+        readiness = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
+        startTimer = win.setTimeout(() => {
+          const error = new Error('ไมโครโฟนยังไม่ส่งเสียงเข้ามา ลองกดบันทึกใหม่แล้วรอข้อความ “เริ่มพูดได้” ก่อนครับ');
+          error.userMessage = error.message; fail(error);
+        }, 2000);
+        try { node.port.postMessage({ type: 'start' }); }
+        catch (error) { fail(error); }
+        return readiness;
+      },
       stop() {
         if (this.state !== 'recording') return;
         this.state = 'inactive';
+        settleReady(new win.DOMException('Recording stopped before ready', 'AbortError'));
         stopTimer = win.setTimeout(() => fail(new Error('Microphone stop timed out')), 2000);
         node.port.postMessage({ type: 'stop' });
       },
@@ -131,6 +162,7 @@
         if (released) return;
         released = true; clearStopTimer();
         finished = true; collecting = false; blocks = [];
+        settleReady(new win.DOMException('Recording canceled', 'AbortError'));
         node.port.onmessage = null; node.onprocessorerror = null;
         source.disconnect(); node.disconnect(); node.port.close();
       }
@@ -138,6 +170,7 @@
     const fail = error => {
       if (finished) return;
       finished = true; clearStopTimer();
+      settleReady(error);
       active.state = 'inactive';
       if (active.onerror) active.onerror(error);
     };
@@ -146,12 +179,15 @@
       if (!collecting || finished) return;
       const data = event.data || {};
       try {
-        if (data.type === 'samples') {
+        if (data.type === 'started') {
+          if (active.state === 'recording') settleReady();
+        } else if (data.type === 'samples') {
           const samples = new Float32Array(data.samples);
           if (frames + samples.length > Math.floor(context.sampleRate * 14.5)) throw new Error('Too many microphone frames');
           blocks.push(samples); frames += samples.length;
         } else if (data.type === 'stopped') {
           clearStopTimer();
+          settleReady(new win.DOMException('Recording stopped before ready', 'AbortError'));
           finished = true; collecting = false; active.state = 'inactive';
           const samples = new Float32Array(frames);
           let offset = 0;
@@ -743,7 +779,8 @@
       soundTarget.replaceChildren(); soundTarget.hidden = !practicePhone;
       targetBanner.hidden = !practiceWord;
       targetText.textContent = practicePhone ? 'กำลังฝึกเสียง /' + practicePhone.phone + '/ · ' + (practicePhone.letters || 'ส่วนหนึ่งของ') + ' ในคำ ' + practiceWord.text : practiceWord ? 'กำลังฝึกคำ: ' + practiceWord.text : '';
-      recordHint.textContent = practicePhone ? 'ออกเสียงเฉพาะ /' + practicePhone.phone + '/ แล้วกดหยุด ไม่ต้องพูดชื่ออักษรหรือทั้งคำ' : practiceWord ? 'พูดเฉพาะคำว่า “' + practiceWord.text + '” แล้วกดหยุด' : 'พูดประโยคด้านบนให้จบ แล้วกดหยุด';
+      recordHint.textContent = practicePhone ? 'รอ “เริ่มพูดได้” แล้วออกเสียงเฉพาะ /' + practicePhone.phone + '/ ไม่ต้องพูดชื่ออักษรหรือทั้งคำ แล้วเว้นจังหวะก่อนกดหยุด' : practiceWord ? 'รอ “เริ่มพูดได้” แล้วพูดคำว่า “' + practiceWord.text + '” ตามธรรมชาติหนึ่งครั้ง เว้นจังหวะก่อนกดหยุด' : 'รอ “เริ่มพูดได้” แล้วพูดประโยคด้านบนให้จบ เว้นจังหวะก่อนกดหยุด';
+      wordPracticeHint.hidden = !practiceWord || Boolean(practicePhone);
       selectedPhrase.textContent = practicePhone ? 'ฝึกเสียง /' + practicePhone.phone + '/ ของ ' + practiceWord.text : practiceWord ? 'กำลังฝึกคำ: ' + practiceWord.text : 'แตะคำเพื่อดูเสียงทีละส่วน';
       if (practicePhone) {
         const word = { ...practiceWord }, selected = { ...practicePhone }, guide = el('div', 'egl-ph-guide');
@@ -1358,6 +1395,8 @@
     }
     function renderAnalysis(data) {
       clearObserved();
+      const issue = recognitionIssue(data);
+      if (issue) data = { ...data, recognition_quality: { ...data.recognition_quality, status: 'uncertain', reason: issue, calibrated: false } };
       if (practiceWord && practiceWord.isolated && !practicePhone && data.reference && data.reference.text === practiceWord.text && data.reference.accent === accent.value && Array.isArray(data.reference.words) && data.reference.words.length === 1) {
         practiceWord.targetReference = data.reference;
         practiceWord.phones = data.reference.words[0].phones.slice();
@@ -1373,9 +1412,21 @@
       const overall = uncertain ? null : percentage(summary, operations);
       const score = el('div', 'egl-ph-agreement egl-ph-' + percentLevel(overall));
       score.append(el('strong', 'egl-ph-percent', percentText(overall)), el('span', 'egl-ph-agreement-label', uncertain ? 'ยังประเมินการออกเสียงไม่ได้' : 'หน่วยเสียงจับคู่กับอ้างอิง'));
-      score.append(el('span', 'egl-ph-counts', uncertain ? 'มีสัญญาณเสียง แต่ระบบยังแยกหน่วยเสียงได้ไม่มั่นคง' : countsText(summary, operations)));
+      score.append(el('span', 'egl-ph-counts', uncertain ? issue === 'insufficient_audio_signal' ? 'สัญญาณเสียงยังไม่เพียงพอสำหรับเปรียบเทียบ' : 'ระบบยังแยกหน่วยเสียงสำหรับเปรียบเทียบไม่ได้อย่างมั่นคง' : countsText(summary, operations)));
       observed.replaceChildren(el('h3', 'egl-ph-step-title', practicePhone ? '3 · ผลเฉพาะเสียง /' + practicePhone.phone + '/ ในคำ ' + practiceWord.text : practiceWord ? '3 · ผลคำว่า ' + practiceWord.text : '3 · ดูผลทีละคำ'), score);
-      if (uncertain) observed.append(el('p', 'egl-ph-note egl-ph-recognition-warning', 'ผลครั้งนี้ยังไม่น่าเชื่อถือพอสำหรับให้เปอร์เซ็นต์ ลองฟังเสียงของคุณเทียบกับตัวอย่าง หรือบันทึกใหม่ในที่เงียบ โดยพูดคำหรือประโยคที่เลือกหนึ่งครั้ง'));
+      if (uncertain) {
+        const explanation = issue === 'insufficient_audio_signal'
+          ? 'สัญญาณเสียงเบาหรือมีช่วงเสียงสั้นเกินกว่าจะประเมินได้ ลองกดฟังไฟล์ก่อน แล้วบันทึกใหม่เมื่อขึ้น “เริ่มพูดได้”'
+          : issue === 'no_detected_phones'
+            ? 'ระบบยังตรวจแยกหน่วยเสียงจากคลิปนี้ไม่ได้ จึงยังประเมินไม่ได้ ไม่ได้หมายความว่าคุณออกเสียงผิด ลองฟังเสียงเทียบกับตัวอย่างได้'
+            : 'ผลครั้งนี้ยังไม่น่าเชื่อถือพอสำหรับให้เปอร์เซ็นต์ ลองฟังเสียงของคุณเทียบกับตัวอย่าง คำสั้นอาจตรวจพลาดได้โดยไม่ใช่ความผิดของผู้เรียน';
+        observed.append(el('p', 'egl-ph-note egl-ph-recognition-warning', explanation));
+        if (practiceWord && textarea.value.trim().split(/\s+/).length > 1) observed.append(button('ลองฝึกคำนี้ในประโยคเดิม', () => {
+          backToSentence();
+          setStatus('กลับมาฝึกประโยคด้านบนแล้ว · กดบันทึกใหม่ รอ “เริ่มพูดได้” แล้วพูดทั้งประโยคตามธรรมชาติ');
+          recordButton.focus();
+        }, 'egl-ph-button', observedListeners));
+      }
       if (practicePhone) observed.append(el('p', 'egl-ph-note', 'ผลนี้เปรียบเทียบเฉพาะเสียงที่เลือก ไม่ใช่ผลของทั้งคำ · เสียงเดี่ยวที่สั้นมากอาจตรวจไม่พบ'));
       if (demoMode && data.precomputed === true) observed.append(el('p', 'egl-ph-note egl-ph-demo-result', 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · ไม่ใช่ผลจากเสียงที่คุณบันทึก'));
       observed.append(el('p', 'egl-ph-note', 'เปอร์เซ็นต์นับการจับคู่หน่วยเสียง ไม่ใช่คะแนนความสามารถหรือระดับเจ้าของภาษา'));
@@ -1420,8 +1471,10 @@
       observed.append(details);
       observed.hidden = false;
       resultPlaceholder.hidden = true;
-      const silent = !phones.length || (metrics.voiced_seconds != null && Number(metrics.voiced_seconds) === 0) || (metrics.rms_dbfs != null && Number(metrics.rms_dbfs) < -60);
-      setStatus(uncertain ? 'มีสัญญาณเสียง แต่ผลตรวจยังไม่มั่นคง จึงยังให้เปอร์เซ็นต์ไม่ได้ · ฟังเทียบหรือลองบันทึกใหม่ได้' : demoMode && data.precomputed === true ? 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · แตะคำเพื่อดูรายละเอียด' : silent ? 'เสียงเบาหรือมีช่วงเงียบมาก ลองบันทึกในที่เงียบและพูดใกล้ไมโครโฟนขึ้น' : 'วิเคราะห์จากไฟล์เสียงแล้ว แตะคำเพื่อฟังและเปรียบเทียบด้วยตัวเอง', uncertain || silent);
+      setStatus(uncertain ? issue === 'insufficient_audio_signal'
+        ? 'สัญญาณเสียงยังไม่เพียงพอ จึงยังให้เปอร์เซ็นต์ไม่ได้ · กดฟังไฟล์แล้วลองบันทึกเมื่อขึ้น “เริ่มพูดได้”'
+        : 'ระบบยังแยกหน่วยเสียงได้ไม่มั่นคง จึงยังให้เปอร์เซ็นต์ไม่ได้ · ฟังเทียบหรือลองฝึกในประโยคได้'
+        : demoMode && data.precomputed === true ? 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · แตะคำเพื่อดูรายละเอียด' : 'วิเคราะห์จากไฟล์เสียงแล้ว แตะคำเพื่อฟังและเปรียบเทียบด้วยตัวเอง', uncertain);
       if (wordItems.length) selectWord(0);
       notifyHost('onAnalysis', { data, clipKind, target: data.reference && data.reference.text || '', clipId });
     }
@@ -1487,7 +1540,9 @@
     const aiPanel = el('div', 'egl-ph-mode-panel'); aiPanel.id = id + '-ai'; aiPanel.setAttribute('role', 'tabpanel');
     const targetBanner = el('div', 'egl-ph-target'); targetBanner.hidden = true;
     const targetText = el('strong');
-    targetBanner.append(targetText, button('กลับไปฝึกทั้งประโยค', backToSentence, 'egl-ph-button egl-ph-return'));
+    const wordPracticeHint = el('p', 'egl-ph-note', 'คำเดี่ยวมีช่วงเสียงให้ระบบใช้สั้น และโมเดลอาจแยกเสียงพลาดได้ ฟังเทียบกับคำตัวอย่าง หรือกลับไปฝึกคำนี้ในประโยคเดิมได้ ไม่ต้องลากเสียงหรือพูดซ้ำหลายครั้ง');
+    wordPracticeHint.hidden = true;
+    targetBanner.append(targetText, wordPracticeHint, button('กลับไปฝึกทั้งประโยค', backToSentence, 'egl-ph-button egl-ph-return'));
     const soundTarget = el('div', 'egl-ph-sound-target'); soundTarget.hidden = true; targetBanner.append(soundTarget);
     const recordHint = el('p', 'egl-ph-record-hint', 'พูดประโยคด้านบนให้จบ แล้วกดหยุด');
     const audioControls = el('div', 'egl-ph-actions');
@@ -1599,6 +1654,7 @@
       stopExample(); stopPlayback();
       doc.querySelectorAll('audio, video').forEach(media => media.pause());
       requestingMic = true; updateButtons();
+      setStatus('กำลังเปิดไมโครโฟน… รอข้อความ “เริ่มพูดได้” ก่อนครับ');
       const attempt = ++recordingVersion;
       const current = () => !disposed && attempt === recordingVersion;
       let context = null, resumed = null;
@@ -1635,6 +1691,29 @@
           const types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'];
           const mimeType = types.find(type => win.MediaRecorder.isTypeSupported && win.MediaRecorder.isTypeSupported(type));
           active = new win.MediaRecorder(stream, mimeType ? { mimeType: mimeType } : undefined);
+          // Native recorders acknowledge start asynchronously. Older wrappers
+          // without an onstart event keep their existing synchronous contract.
+          if ('onstart' in active) {
+            const native = active, nativeStart = native.start.bind(native);
+            let timer = null, rejectReady = null;
+            const settle = error => {
+              if (timer !== null) win.clearTimeout(timer);
+              timer = null; native.onstart = null;
+              const reject = rejectReady; rejectReady = null;
+              if (error && reject) reject(error);
+            };
+            native.start = () => new Promise((resolve, reject) => {
+              rejectReady = reject;
+              native.onstart = () => { settle(); resolve(); };
+              timer = win.setTimeout(() => {
+                const error = friendly('ไมโครโฟนยังไม่พร้อม ลองกดบันทึกใหม่แล้วรอข้อความ “เริ่มพูดได้” ก่อนครับ');
+                settle(error);
+                if (native.onerror) native.onerror(error);
+              }, 2000);
+              try { nativeStart(); } catch (error) { settle(error); }
+            });
+            native.release = () => settle(new win.DOMException('Recording canceled', 'AbortError'));
+          }
         }
         recorder = active;
         let startedAt = null, stoppedAt = null;
@@ -1685,18 +1764,21 @@
             }
           }
         };
-        startedAt = win.performance.now();
-        active.start();
+        const ready = active.start();
         clearClip();
+        if (ready && typeof ready.then === 'function') await ready;
+        if (!current()) return;
+        startedAt = win.performance.now();
         requestingMic = false; recording = true; updateButtons();
-        setStatus('กำลังบันทึก… กดหยุดเมื่อพูดจบ (หยุดอัตโนมัติภายใน 15 วินาที)');
+        setStatus('เริ่มพูดได้… กำลังบันทึกเสียง กดหยุดเมื่อพูดจบ (หยุดอัตโนมัติภายใน 15 วินาที)');
         recordTimer = win.setTimeout(() => { if (active.state !== 'inactive') active.stop(); }, 14500);
       } catch (error) {
-        if (disposed || attempt !== recordingVersion) return;
-        stopTracks(); requestingMic = false; recording = false;
+        if (disposed || attempt !== recordingVersion || error.name === 'AbortError') return;
+        if (recorder && recorder.state !== 'inactive') { try { recorder.stop(); } catch (_) {} }
+        stopTracks(); requestingMic = false; recording = false; preparing = false;
         recorder = null;
         updateButtons();
-        setStatus(error.name === 'NotAllowedError' ? 'ยังไม่ได้อนุญาตไมโครโฟน คุณเลือกไฟล์เสียงแทนได้ครับ' : 'เปิดไมโครโฟนไม่สำเร็จ ลองใหม่หรือเลือกไฟล์เสียง', true);
+        setStatus(error.userMessage || (error.name === 'NotAllowedError' ? 'ยังไม่ได้อนุญาตไมโครโฟน คุณเลือกไฟล์เสียงแทนได้ครับ' : 'เปิดไมโครโฟนไม่สำเร็จ ลองใหม่หรือเลือกไฟล์เสียง'), true);
       }
     }
     on(textarea, 'input', changeText); on(accent, 'change', changeText);

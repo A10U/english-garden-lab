@@ -13,6 +13,31 @@ let session = null, active = false;
 // pronunciation is correct. Blank CTC frames describe silence/timing and must
 // not increase this average. Keep raw phone alignment separate from this flag.
 const TOKEN_POSTERIOR_THRESHOLD = 0.65;
+// Supported English units mirror phone-guide.js, independently of the current
+// target word. Common phonetic variants are included for recognition only:
+// this does not make e.g. /ɪ/ and /iː/ equivalent in the actual alignment.
+const ENGLISH_PHONE_UNITS = [
+  ...('iː i ɪ e ɛ æ ɑː ɑ ɔː ɔ ɒ ʊ uː u ʌ ə ɐ ɜː ɚ ɝ a o eː oː '
+    + 'eɪ aɪ ɔɪ əʊ oʊ aʊ ɪə iə eə ʊə p b t d k ɡ f v θ ð s z ʃ ʒ tʃ dʒ '
+    + 'm n ŋ h l ɹ r w j ɫ ɾ əl l̩ n̩ ɑːɹ ɑɹ ɔːɹ ɔɹ oːɹ ɪɹ ɛɹ ʊɹ aɪɚ aʊɚ').split(' '),
+  // Glottal/aspirated stops, reduced vowels, retroflex r, and vowel-length
+  // variants can occur in English without being separate learner targets.
+  ...'ʔ pʰ tʰ kʰ ᵻ ɜ ɻ ɝː əː æː ɛː ɪː ʊː'.split(' '),
+].sort((a, b) => b.length - a.length);
+const UNSUPPORTED_PHONE_NOTICE = 'หน่วยเสียงที่ตรวจพบบางส่วนอยู่นอกชุดเสียงอังกฤษที่เครื่องมือนี้รองรับ จึงยังใช้ประเมินไม่ได้ ไม่ได้ยืนยันว่าผู้พูดออกเสียงผิด';
+
+function supportedEnglishPhone(phone) {
+  const symbol = alignment.canonical_phone(phone);
+  let at = 0, units = 0;
+  // Composite CTC tokens such as /ts/ or /aɪə/ remain supported when every
+  // component is supported. Tonal/non-English tokens are never rewritten.
+  while (at < symbol.length && units < 4) {
+    const part = ENGLISH_PHONE_UNITS.find(unit => symbol.startsWith(unit, at));
+    if (!part) return false;
+    at += part.length; units++;
+  }
+  return units > 0 && at === symbol.length;
+}
 
 function readLogits(logits) {
   const dims = logits && logits.dims;
@@ -122,7 +147,17 @@ self.onmessage = async event => {
       const observed = alignment.decode_ctc_segments(ids, vocabulary, {
         blank_id: model.blankId, duration_seconds: metrics.duration_seconds, frame_seconds: model.frameSeconds,
       });
+      const unsupported = [...new Set(observed.map(item => item.phone).filter(phone => !supportedEnglishPhone(phone)))];
+      quality.unsupported_tokens = unsupported;
+      quality.inventory_scope = 'app_supported_english_phones';
+      if (unsupported.length) {
+        // A multilingual token can have a high posterior and still be unusable
+        // for this English tool. Preserve the raw output, never force a target.
+        quality.status = 'uncertain'; quality.reason = 'unsupported_english_tokens';
+        quality.limitation = UNSUPPORTED_PHONE_NOTICE;
+      }
       const result = alignment.composeAnalysis(reference, observed, metrics);
+      if (unsupported.length) result.limitations.push(UNSUPPORTED_PHONE_NOTICE);
       self.postMessage({ id, type: 'result', result: {
         ...result, precomputed: false, live_analysis: true, playback_source: 'learner_recording',
         recognition_quality: quality,
