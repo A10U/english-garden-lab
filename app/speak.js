@@ -30,6 +30,7 @@
   };
   const normalize = text => String(text || '').toLowerCase().replace(/’/g, "'").replace(/[^a-z0-9'\s]/g, '').replace(/\s+/g, ' ').trim();
   const bounded = (value, limit) => typeof value === 'string' ? value.slice(0, limit) : '';
+  const validPersonalKey = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._~+/=-]{19,511}$/u.test(value);
 
   function mount(doc) {
     doc = doc || global.document;
@@ -44,7 +45,8 @@
       samples: byId('sample-controls'), replies: byId('sample-replies'), trySample: byId('try-sample'),
       send: byId('send-message'), cancel: byId('cancel-request'), transcribe: byId('transcribe-audio'),
       note: byId('send-note'), action: byId('speak-action-status'), clip: byId('clip-status'),
-      attach: byId('attach-assessment'), assessment: byId('assessment-status'), practice: byId('local-practice')
+      attach: byId('attach-assessment'), assessment: byId('assessment-status'), practice: byId('local-practice'),
+      keyInput: byId('personal-api-key'), connectKey: byId('connect-personal-key'), clearKey: byId('clear-personal-key'), keyStatus: byId('personal-key-status'), hostedLink: byId('personal-key-hosted-link')
     };
     let disposed = false, scenario = 'garden', mode = 'sample', sampleStarted = false;
     let cloudMessages = [], sampleMessages = [], pendingMessage = null;
@@ -53,8 +55,7 @@
     let requestVersion = 0, controller = null, busy = false, requestTimer = null;
     let cloudAudio = null, audioURL = null, utterance = null;
     const listeners = [];
-    const healthController = new win.AbortController();
-    let healthTimer = null;
+    let personalApiKey = '', supportsPersonalKey = false, healthController = null, healthTimer = null, healthVersion = 0;
     const currentScenario = () => SCENARIOS[scenario];
     const listen = (target, event, callback) => {
       target.addEventListener(event, callback); listeners.push(() => target.removeEventListener(event, callback));
@@ -65,7 +66,90 @@
     };
     function actionStatus(message, error) {
       if (disposed) return;
-      ui.action.textContent = message || ''; ui.action.classList.toggle('is-error', Boolean(error));
+      ui.action.textContent = safeText(message || ''); ui.action.classList.toggle('is-error', Boolean(error));
+    }
+    const safeText = value => personalApiKey ? String(value).split(personalApiKey).join('[ซ่อน key]') : String(value);
+    function securePersonalTransport() {
+      return win.location.protocol === 'https:' || win.location.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(win.location.hostname);
+    }
+    function apiFetch(path, init = {}) {
+      const url = new win.URL(path, win.location.href);
+      if (url.origin !== win.location.origin || !['/api/speak/health', '/api/speak/chat', '/api/speak/transcribe', '/api/speak/speech'].includes(url.pathname) || url.search || url.hash) {
+        throw new Error('ติดต่อ Cloud ได้ผ่านบริการ Speak ของเว็บนี้เท่านั้น');
+      }
+      const headers = new win.Headers(init.headers);
+      // Probe host support without credentials, including after connect, clear, and BFcache restore.
+      if (url.pathname === '/api/speak/health') headers.delete('X-Speak-Api-Key');
+      else if (personalApiKey) {
+        if (!supportsPersonalKey) throw new Error('หน้านี้ยังไม่ยืนยันว่ารองรับ key ส่วนตัว');
+        if (!securePersonalTransport()) throw new Error('ใช้ key ส่วนตัวผ่าน HTTPS หรือ localhost เท่านั้น');
+        headers.set('X-Speak-Api-Key', personalApiKey);
+      }
+      return win.fetch(url.pathname, {...init, headers, credentials: 'same-origin', cache: 'no-store', redirect: 'error'});
+    }
+    function cancelHealth() {
+      healthVersion++; if (healthController) healthController.abort(); healthController = null;
+      if (healthTimer !== null) win.clearTimeout(healthTimer); healthTimer = null;
+    }
+    function resetCapabilities() {
+      capabilities = {conversation: false, transcription: false, speech: false};
+      ui.cloudBadge.textContent = 'Cloud ยังไม่เชื่อม'; ui.cloudBadge.className = 'status-pill is-unavailable';
+    }
+    async function checkHealth() {
+      cancelHealth();
+      const version = healthVersion, selectedPersonalKey = Boolean(personalApiKey);
+      supportsPersonalKey = false;
+      const currentController = new win.AbortController(); healthController = currentController;
+      const timer = win.setTimeout(() => currentController.abort(), 8000); healthTimer = timer;
+      try {
+        const value = await jsonResponse(await apiFetch('/api/speak/health', {signal: currentController.signal}));
+        if (disposed || version !== healthVersion || currentController.signal.aborted) return;
+        supportsPersonalKey = value.supportsPersonalKey === true;
+        ui.hostedLink.hidden = supportsPersonalKey;
+        if (selectedPersonalKey && !supportsPersonalKey) throw new Error('บริการหน้านี้ยังไม่รองรับ key ส่วนตัว');
+        capabilities = selectedPersonalKey ? {conversation: true, transcription: true, speech: false}
+          : {conversation: value.cloud?.conversation === true, transcription: value.cloud?.transcription === true, speech: value.cloud?.speech === true};
+        ui.cloudBadge.textContent = capabilities.conversation ? selectedPersonalKey ? 'Cloud · key ของคุณ' : 'Cloud · key เซิร์ฟเวอร์' : 'Cloud ยังไม่เชื่อม';
+        ui.cloudBadge.className = 'status-pill ' + (capabilities.conversation ? 'is-ready' : 'is-unavailable');
+        ui.keyStatus.textContent = selectedPersonalKey ? 'พร้อมลองใช้งานด้วย key ของคุณ · ยังไม่ได้ตรวจสอบกับ OpenAI' : 'ยังไม่ได้ตั้ง key ส่วนตัว';
+        ui.connection.textContent = capabilities.conversation ? selectedPersonalKey
+          ? 'เลือก “สนทนา Cloud” แล้วกดส่งเมื่อพร้อม ระบบจะทราบว่า key ใช้งานได้เมื่อมีคำขอไป OpenAI จริง'
+          : 'เว็บตั้ง key ของเซิร์ฟเวอร์ไว้แล้ว หรือคุณเลือกใช้ key ส่วนตัวด้านล่างได้ ยังไม่ได้ตรวจสอบกับ OpenAI'
+          : 'การสนทนา cloud ยังไม่เชื่อมต่อ ใส่ key ของคุณ หรือลองตัวอย่างและฝึกเสียงในเครื่องได้';
+      } catch (error) {
+        if (disposed || version !== healthVersion) return;
+        supportsPersonalKey = false; resetCapabilities(); ui.hostedLink.hidden = false;
+        ui.connection.textContent = 'หน้านี้ยังไม่เชื่อมบริการ cloud ลองบทสนทนาตัวอย่างและฝึกเสียงในเครื่องได้';
+        if (selectedPersonalKey) {
+          personalApiKey = ''; ui.keyInput.value = '';
+          ui.keyStatus.textContent = 'หน้านี้ยังไม่รองรับ key ส่วนตัวหรือตรวจบริการไม่ได้ ล้าง key แล้วโดยยังไม่ได้ส่งออกจากแท็บ';
+          actionStatus('ยังไม่ได้เชื่อม key ส่วนตัว เปิด Speak ที่รองรับ Cloud แล้วลองใหม่ได้');
+        }
+      } finally {
+        win.clearTimeout(timer);
+        if (version === healthVersion) { healthTimer = null; healthController = null; updateControls(); }
+      }
+    }
+    function connectPersonalKey() {
+      if (disposed) return;
+      const candidate = ui.keyInput.value;
+      cancelHealth(); cancelRequest(); personalApiKey = ''; resetCapabilities(); mode = 'sample'; cloudMessages = [];
+      renderThread(); updateControls();
+      if (!validPersonalKey(candidate)) { ui.keyStatus.textContent = 'รูปแบบ key ยังไม่ถูกต้อง ตรวจว่าไม่มีช่องว่างและวาง key ครบแล้ว'; ui.connection.textContent = 'ยังไม่ได้เชื่อม key ส่วนตัว ตรวจ key แล้วกดใช้ key อีกครั้ง'; return; }
+      if (!securePersonalTransport()) { ui.keyInput.value = ''; ui.keyStatus.textContent = 'ใช้ key ส่วนตัวผ่าน HTTPS หรือ localhost เท่านั้น'; return; }
+      personalApiKey = candidate; ui.keyInput.value = '';
+      ui.hostedLink.hidden = true;
+      ui.keyStatus.textContent = 'กำลังตรวจว่าหน้านี้รองรับ key ส่วนตัวหรือไม่ · ยังไม่ส่ง key และยังไม่ได้ตรวจสอบกับ OpenAI';
+      actionStatus('ตั้ง key ส่วนตัวแล้ว ข้อความและเสียงจะส่งเฉพาะเมื่อคุณเลือกใช้ Cloud'); renderThread(); updateControls();
+      checkHealth();
+    }
+    function clearPersonalKey() {
+      if (disposed) return;
+      cancelHealth(); cancelRequest(); personalApiKey = ''; ui.keyInput.value = '';
+      resetCapabilities(); mode = 'sample'; cloudMessages = [];
+      ui.keyStatus.textContent = 'ล้าง key ส่วนตัวแล้ว';
+      ui.connection.textContent = 'กำลังตรวจว่าบริการของเซิร์ฟเวอร์พร้อมใช้งานหรือไม่';
+      actionStatus('ล้าง key ส่วนตัวและยกเลิกคำขอแล้ว'); renderThread(); updateControls(); checkHealth();
     }
     function stopVoice() {
       if (utterance && win.speechSynthesis) { try { win.speechSynthesis.cancel(); } catch (_) {} }
@@ -113,6 +197,7 @@
       ui.cloud.disabled = !capabilities.conversation; ui.samples.hidden = mode !== 'sample';
       ui.send.disabled = busy || mode !== 'cloud' || !capabilities.conversation || !ui.input.value.trim();
       ui.input.disabled = busy; ui.cancel.hidden = !busy;
+      ui.clearKey.disabled = !personalApiKey && !ui.keyInput.value;
       ui.transcribe.disabled = busy || !capabilities.transcription || !validLearnerClip(clip);
       const assessment = matchingAssessment(); ui.attach.disabled = !assessment;
       ui.assessment.textContent = assessment ? 'จะแนบเฉพาะผลเสียงของคลิปและประโยคนี้' : assessed ? 'ผลเสียงจะใช้ได้เมื่อประโยคที่ส่งตรงกับคลิปที่วิเคราะห์' : 'บันทึกและวิเคราะห์ประโยคฝึกก่อน';
@@ -209,6 +294,7 @@
     }
     async function jsonResponse(response) {
       let value; try { value = await response.json(); } catch (_) { throw new Error('บริการตอบกลับไม่ครบ ลองใหม่อีกครั้งครับ'); }
+      if (personalApiKey && JSON.stringify(value).includes(personalApiKey)) throw new Error('บริการตอบกลับไม่ถูกต้อง กรุณาลองใหม่');
       if (!response.ok) throw new Error(bounded(value && (value.error && value.error.message || value.error || value.detail), 300) || 'บริการยังไม่พร้อม ลองใหม่อีกครั้งครับ');
       return value;
     }
@@ -235,13 +321,14 @@
       event.preventDefault();
       if (disposed || busy || mode !== 'cloud' || !capabilities.conversation) return;
       const text = ui.input.value.trim(); if (!text || text.length > 1200) return;
+      if (personalApiKey && text.includes(personalApiKey)) { ui.input.value = ''; actionStatus('อย่าใส่ key ในบทสนทนา ใช้ช่อง key ส่วนตัวเท่านั้น', true); updateControls(); return; }
       const user = {role: 'user', content: text, source: 'user'};
       const history = cloudMessages.slice(-10).map(item => ({role: item.role, content: item.content}));
       if (!history.length) history.push({role: 'assistant', content: currentScenario().welcome});
       const payload = {scenario, messages: [...history, {role: 'user', content: text}]};
       const assessment = ui.attach.checked && matchingAssessment(); if (assessment) payload.assessment = assessment;
       pendingMessage = user; renderThread();
-      runRequest('chat', async signal => jsonResponse(await win.fetch('/api/speak/chat', {
+      runRequest('chat', async signal => jsonResponse(await apiFetch('/api/speak/chat', {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload), signal
       })), value => {
         if (!value || value.source !== 'cloud' || typeof value.reply !== 'string' || !value.reply.trim()) throw new Error('ยังไม่ได้รับคำตอบจาก cloud ลองส่งใหม่ครับ');
@@ -257,7 +344,7 @@
       if (disposed || busy || !capabilities.transcription || !validLearnerClip(clip)) return;
       const selected = clip; const form = new win.FormData();
       form.append('audio', selected.blob, selected.blob.type === 'audio/wav' ? 'practice.wav' : 'practice-audio.webm');
-      runRequest('transcribe', async signal => jsonResponse(await win.fetch('/api/speak/transcribe', {method: 'POST', body: form, signal})), value => {
+      runRequest('transcribe', async signal => jsonResponse(await apiFetch('/api/speak/transcribe', {method: 'POST', body: form, signal})), value => {
         if (!clip || clip.clipId !== selected.clipId) throw new Error('คลิปเปลี่ยนแล้ว ลองเลือกถอดเสียงจากคลิปปัจจุบันอีกครั้ง');
         if (!value || value.source !== 'cloud' || typeof value.text !== 'string' || !value.text.trim()) throw new Error('ยังถอดคำพูดจากคลิปนี้ไม่ได้ ลองพิมพ์ประโยคหรือลองบันทึกใหม่');
         ui.input.value = bounded(value.text, 1200); actionStatus('ถอดเสียงแล้ว ตรวจหรือแก้ข้อความก่อนกดส่งให้มะลิได้ครับ');
@@ -266,7 +353,7 @@
     function cloudSpeech(text, owner) {
       if (disposed || busy || !capabilities.speech) return;
       runRequest('speech', async signal => {
-        const response = await win.fetch('/api/speak/speech', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text: bounded(text, 4000)}), signal});
+        const response = await apiFetch('/api/speak/speech', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text: bounded(text, 4000)}), signal});
         if (!response.ok) { await jsonResponse(response); throw new Error('ยังเตรียมเสียงจาก cloud ไม่ได้'); }
         const blob = await response.blob(); if (!blob.size || !/^audio\//.test(blob.type)) throw new Error('ไฟล์เสียงจาก cloud ยังเปิดไม่ได้'); return blob;
       }, async blob => {
@@ -281,6 +368,8 @@
       actionStatus('เริ่มบทสนทนาใหม่แล้ว'); showSamples(); renderThread(); updateControls();
     }
     listen(form, 'submit', sendMessage); listen(ui.input, 'input', updateControls);
+    listen(ui.connectKey, 'click', connectPersonalKey); listen(ui.clearKey, 'click', clearPersonalKey); listen(ui.keyInput, 'input', updateControls);
+    listen(ui.keyInput, 'keydown', event => { if (event.key === 'Enter') { event.preventDefault(); connectPersonalKey(); } });
     listen(ui.trySample, 'click', () => { if (mode !== 'sample') { cancelRequest(); mode = 'sample'; } chooseSample(0); });
     listen(ui.sample, 'click', () => { if (mode === 'sample') return; cancelRequest(); mode = 'sample'; actionStatus('โหมดตัวอย่างที่เตรียมไว้ · ยังไม่ได้เรียก cloud'); renderThread(); updateControls(); });
     listen(ui.cloud, 'click', () => { if (!capabilities.conversation || mode === 'cloud') return; cancelRequest(); mode = 'cloud'; actionStatus('พร้อมสนทนา เมื่อกดส่งจึงส่งข้อความไป cloud'); renderThread(); updateControls(); });
@@ -295,26 +384,15 @@
     }));
     function cleanup() {
       if (disposed) return;
-      disposed = true; healthController.abort(); if (healthTimer !== null) win.clearTimeout(healthTimer);
+      disposed = true; cancelHealth(); personalApiKey = ''; supportsPersonalKey = false; ui.keyInput.value = ''; resetCapabilities();
+      ui.keyStatus.textContent = 'ยังไม่ได้ตั้ง key ส่วนตัว'; ui.clearKey.disabled = true; ui.cloud.disabled = true;
       cancelRequest(); if (practiceCleanup) practiceCleanup(); practiceCleanup = null;
       listeners.splice(0).forEach(remove => remove()); form.removeAttribute('data-speak-mounted');
       clip = null; assessed = null; cloudMessages = []; sampleMessages = [];
     }
     listen(win, 'pagehide', cleanup);
     showSamples(); mountPractice(); renderThread(); updateControls();
-    healthTimer = win.setTimeout(() => healthController.abort(), 8000);
-    Promise.resolve().then(() => win.fetch('/api/speak/health', {signal: healthController.signal, credentials: 'same-origin'})).then(jsonResponse).then(value => {
-      if (disposed || healthController.signal.aborted) return;
-      capabilities = {conversation: value.cloud && value.cloud.conversation === true, transcription: value.cloud && value.cloud.transcription === true, speech: value.cloud && value.cloud.speech === true};
-      ui.cloudBadge.textContent = capabilities.conversation ? 'Cloud พร้อม' : 'Cloud ยังไม่เชื่อม';
-      ui.cloudBadge.className = 'status-pill ' + (capabilities.conversation ? 'is-ready' : 'is-unavailable');
-      ui.connection.textContent = capabilities.conversation ? 'บริการ cloud พร้อมแล้ว เลือก “สนทนา Cloud” เพื่อคุยจริง หรือดูตัวอย่างก่อนได้' : 'การสนทนา cloud ยังไม่เชื่อมต่อ ลองบทสนทนาที่เตรียมไว้และฝึกเสียงในเครื่องได้';
-      updateControls();
-    }).catch(() => {
-      if (disposed) return;
-      ui.cloudBadge.textContent = 'Cloud ยังไม่เชื่อม'; ui.cloudBadge.className = 'status-pill is-unavailable';
-      ui.connection.textContent = 'หน้านี้ยังไม่เชื่อมบริการ cloud ลองบทสนทนาตัวอย่างและฝึกเสียงในเครื่องได้'; updateControls();
-    }).finally(() => { if (healthTimer !== null) win.clearTimeout(healthTimer); healthTimer = null; });
+    checkHealth();
     return cleanup;
   }
   const api = Object.freeze({mount}); global.EGLSpeak = api;
