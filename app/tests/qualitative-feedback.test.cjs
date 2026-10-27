@@ -229,3 +229,41 @@ test('QE-009 a naturally one-phone word still uses the existing whole-word raw p
   assert.equal(app.container.querySelector('.egl-ph-evidence-status'), null);
   assert.deepEqual(statuses(section), ['จับคู่ตรง']); noLearningPercentages(section);
 });
+
+test('QE-010 legacy explicit-phone responses derive evidence from valid operations and never from a percentage alone', async t => {
+  for (const variant of [
+    { name: 'match operations without counts', phones: ['iː'], label: 'จับคู่ตรง', state: 'matched', raw: '100.0%' },
+    { name: 'substitution operations without counts', phones: ['ɪ'], label: 'โมเดลถอดต่าง', state: 'different', raw: '0.0%' },
+    { name: 'no counts and missing operations', phones: ['iː'], label: '—', state: 'unassessed', raw: '100.0%', removeOperations: true },
+    { name: 'no counts and empty operations', phones: ['iː'], label: '—', state: 'unassessed', raw: '100.0%', emptyOperations: true }
+  ]) {
+    await t.test(variant.name, async child => {
+      const expected = reference('leaf', ['l', 'iː', 'f']);
+      let raw, before;
+      const app = setup(child, expected, [options => {
+        raw = analysis(options.reference, variant.phones);
+        for (const counts of [raw.alignment.summary, ...raw.alignment.words]) {
+          for (const name of ['matched_phones', 'reference_phones', 'inserted_phones', 'substituted_phones', 'deleted_phones', 'compared_phones']) delete counts[name];
+        }
+        if (variant.removeOperations) delete raw.alignment.operations;
+        if (variant.emptyOperations) raw.alignment.operations = [];
+        before = JSON.stringify(raw); return raw;
+      }]);
+      app.container.querySelector('.egl-ph-ref-word').click();
+      const focus = app.container.querySelector('.egl-ph-reference-focus .egl-ph-spelling'); card(focus, 'ea').click();
+      app.button('ฝึกเฉพาะเสียง /iː/', focus.querySelector('.egl-ph-spelling-detail')).click();
+      const section = await analyze(app), observed = app.container.querySelector('.egl-ph-observed');
+      assert.equal(observed.querySelector('.egl-ph-evidence-status').textContent, variant.label);
+      assert.equal(observed.querySelector('.egl-ph-word-evidence').textContent, variant.label);
+      assert.equal(observed.querySelector('.egl-ph-inspector-title').textContent, 'leaf · ' + variant.label);
+      assert.ok(observed.querySelector('.egl-ph-agreement').classList.contains('egl-ph-evidence-' + variant.state));
+      assert.equal(card(section, 'ea').querySelector('.egl-ph-part-status').textContent, variant.label);
+      for (const selector of ['.egl-ph-raw-summary-percent', '.egl-ph-raw-word-percent']) {
+        const percent = observed.querySelector(selector); assert.ok(percent);
+        assert.equal(percent.textContent, variant.raw); assert.equal(percent.closest('details').open, false);
+      }
+      assert.equal(observed.querySelector('.egl-ph-percent'), null); assert.equal(observed.querySelector('.egl-ph-word-percent'), null);
+      assert.equal(JSON.stringify(raw), before); noLearningPercentages(section); assert.equal(app.network.length, 0);
+    });
+  }
+});
