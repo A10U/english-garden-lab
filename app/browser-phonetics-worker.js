@@ -47,6 +47,7 @@ function readLogits(logits) {
     throw new Error('ผลลัพธ์จากโมเดลไม่ถูกต้อง กรุณาลองวิเคราะห์ใหม่');
   }
   const [, frames, width] = dims, values = logits.data, ids = new Array(frames);
+  const framePosteriors = new Float64Array(frames);
   let posteriorSum = 0, nonblankFrames = 0;
   for (let frame = 0; frame < frames; frame++) {
     const offset = frame * width;
@@ -61,19 +62,51 @@ function readLogits(logits) {
       const maximum = values[offset + best];
       let total = 0;
       for (let token = 0; token < width; token++) total += Math.exp(values[offset + token] - maximum);
-      posteriorSum += 1 / total;
+      framePosteriors[frame] = 1 / total;
+      posteriorSum += framePosteriors[frame];
       nonblankFrames++;
     }
   }
   const mean = nonblankFrames ? posteriorSum / nonblankFrames : null;
   const uncertain = mean === null || mean < TOKEN_POSTERIOR_THRESHOLD;
-  return { ids, quality: {
+  return { ids, framePosteriors, quality: {
     status: uncertain ? 'uncertain' : 'recognized',
     mean_token_posterior: mean === null ? null : Number(mean.toFixed(6)),
     nonblank_frames: nonblankFrames, threshold: TOKEN_POSTERIOR_THRESHOLD,
     reason: uncertain ? (mean === null ? 'no_nonblank_frames' : 'low_token_posterior') : null,
     calibrated: false,
   } };
+}
+
+function tokenDiagnostics(ids, framePosteriors, observed, duration) {
+  const diagnostics = [];
+  for (let first = 0; first < ids.length;) {
+    let end = first + 1;
+    while (end < ids.length && ids[end] === ids[first]) end++;
+    const phone = vocabulary[ids[first]];
+    const startTime = Math.max(0, Math.min(first * model.frameSeconds, duration));
+    const endTime = Math.max(0, Math.min(end * model.frameSeconds, duration));
+    // Use the same CTC group/filter rules as decode_ctc_segments. In particular,
+    // repeated tokens separated by blank are distinct observed segments.
+    if (ids[first] !== model.blankId && typeof phone === 'string' && phone.trim() && phone !== '|'
+      && !(phone.startsWith('<') && phone.endsWith('>')) && endTime > startTime) {
+      const observedIndex = diagnostics.length, segment = observed[observedIndex];
+      if (!segment || segment.phone !== phone || Math.abs(segment.start - startTime) > 0.000001
+        || Math.abs(segment.end - endTime) > 0.000001) throw new Error('ข้อมูลช่วงหน่วยเสียงจากโมเดลไม่สอดคล้องกัน');
+      let sum = 0;
+      for (let frame = first; frame < end; frame++) sum += framePosteriors[frame];
+      const mean = sum / (end - first);
+      if (!Number.isFinite(mean) || mean < 0 || mean > 1) throw new Error('ข้อมูลหน่วยเสียงจากโมเดลไม่ถูกต้อง');
+      diagnostics.push({ observed_index: observedIndex, phone, start: segment.start, end: segment.end,
+        mean_token_posterior: Number(mean.toFixed(6)), frame_count: end - first,
+        calibrated: false, diagnostic_only: true });
+    }
+    first = end;
+  }
+  if (diagnostics.length !== observed.length) throw new Error('ข้อมูลช่วงหน่วยเสียงจากโมเดลไม่ครบ');
+  // These are observed CTC prediction spikes, never a measure of how long the
+  // learner sustained a sound or evidence that a missing target was omitted.
+  return diagnostics;
 }
 
 function progress(id, message) { self.postMessage({ id, type: 'progress', message }); }
@@ -143,10 +176,11 @@ self.onmessage = async event => {
     let outputs;
     try {
       outputs = await engine.run({ input_values: input });
-      const { ids, quality } = readLogits(outputs && outputs.logits);
+      const { ids, framePosteriors, quality } = readLogits(outputs && outputs.logits);
       const observed = alignment.decode_ctc_segments(ids, vocabulary, {
         blank_id: model.blankId, duration_seconds: metrics.duration_seconds, frame_seconds: model.frameSeconds,
       });
+      quality.token_diagnostics = tokenDiagnostics(ids, framePosteriors, observed, metrics.duration_seconds);
       const unsupported = [...new Set(observed.map(item => item.phone).filter(phone => !supportedEnglishPhone(phone)))];
       quality.unsupported_tokens = unsupported;
       quality.inventory_scope = 'app_supported_english_phones';

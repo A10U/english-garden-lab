@@ -6,6 +6,7 @@ human annotations of what a speaker actually pronounced. Nothing is deployed.
 
 Default Apple Silicon recipe: batch size 1, accumulate 8, train the final two
 encoder layers and CTC head; retain the other pretrained weights unchanged.
+CUDA is an explicit alternative backend using the same float32 recipe.
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ from typing import Any
 
 
 SPLITS = ("train", "validation", "test")
+DEVICES = ("mps", "cpu", "cuda")
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -183,13 +185,63 @@ def training_mode(model, layers: int) -> None:
     model.lm_head.train()
 
 
+def validate_device(device: str, torch) -> None:
+    """An unavailable requested accelerator is an error, never a CPU fallback."""
+    if device not in DEVICES:
+        raise ValueError("Expected an explicit mps, cpu or cuda device")
+    if device == "mps" and not torch.backends.mps.is_available():
+        raise RuntimeError("MPS is unavailable; select --device cpu explicitly if CPU training is intended")
+    if device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA is unavailable; use a CUDA-enabled PyTorch build and GPU, or select --device cpu explicitly")
+
+
+def seed_rng(seed: int, device: str, torch, numpy) -> None:
+    random.seed(seed)
+    numpy.random.seed(seed)
+    torch.manual_seed(seed)
+    if device == "mps":
+        torch.mps.manual_seed(seed)
+    elif device == "cuda":
+        torch.cuda.manual_seed_all(seed)
+
+
+def capture_rng_state(device: str, torch, numpy) -> dict:
+    result = {"python": random.getstate(), "numpy": numpy.random.get_state(), "torch": torch.get_rng_state()}
+    if device == "mps":
+        result["mps"] = torch.mps.get_rng_state()
+    elif device == "cuda":
+        # CUDA dropout and other stochastic kernels use per-device generators.
+        # Their ByteTensor states are serialized with the CPU checkpoint.
+        result["cuda"] = torch.cuda.get_rng_state_all()
+    return result
+
+
+def restore_rng_state(state: dict, device: str, torch, numpy) -> None:
+    if not isinstance(state, dict) or any(key not in state for key in ("python", "numpy", "torch")):
+        raise ValueError("Checkpoint RNG state is incomplete")
+    if device == "mps" and "mps" not in state:
+        raise ValueError("Checkpoint is missing the requested MPS RNG state")
+    if device == "cuda":
+        values = state.get("cuda")
+        if not isinstance(values, (list, tuple)) or not values or len(values) != torch.cuda.device_count():
+            raise ValueError("Checkpoint CUDA RNG states must match all visible CUDA devices")
+    # Validate accelerator coverage before changing any process RNG stream.
+    random.setstate(state["python"])
+    numpy.random.set_state(state["numpy"])
+    torch.set_rng_state(state["torch"])
+    if device == "mps":
+        torch.mps.set_rng_state(state["mps"])
+    elif device == "cuda":
+        torch.cuda.set_rng_state_all(state["cuda"])
+
+
 def main(argv: list[str] | None = None) -> int:
     base = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, default=base / "models/phoneme-ctc")
     parser.add_argument("--data", type=Path, default=base / "data/english-phoneme-librispeech")
     parser.add_argument("--output", type=Path, default=base / "runs/english-phoneme-librispeech100-v1")
-    parser.add_argument("--device", choices=("mps", "cpu"), default="mps")
+    parser.add_argument("--device", choices=DEVICES, default="mps")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--accumulate", type=int, default=8)
     parser.add_argument("--train-layers", type=int, default=2)
@@ -237,12 +289,9 @@ def main(argv: list[str] | None = None) -> int:
         import numpy as np
         import soundfile as sf
         import torch
+        validate_device(args.device, torch)
         from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2ForCTC
-        if args.device == "mps" and not torch.backends.mps.is_available():
-            raise RuntimeError("MPS is unavailable; select --device cpu explicitly if CPU training is intended")
-        random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
-        if args.device == "mps":
-            torch.mps.manual_seed(args.seed)
+        seed_rng(args.seed, args.device, torch, np)
         vocabulary = json.loads((args.model / "vocab.json").read_text())
         splits, statistics, manifest_hashes = load_splits(args.data, vocabulary, args.max_duration)
         validation = select_evaluation(splits["validation"], args.eval_max_utterances, args.seed)
@@ -283,6 +332,8 @@ def main(argv: list[str] | None = None) -> int:
                       **counts, "dataset": statistics, "planned_optimizer_steps": planned_steps,
                       "run_optimizer_steps": total_steps, "validation_utterances": len(validation), "test_utterances": len(test),
                       "label_limitation": "Canonical eSpeak labels from transcripts, not human observed-phone annotations",
+                      "rng_scope": "Python, NumPy, Torch CPU" + {"cpu": "", "mps": ", MPS", "cuda": ", all visible CUDA devices"}[args.device],
+                      "reproducibility_limitation": "Seeded/restorable RNG streams do not guarantee bitwise-identical CUDA CTC gradients or cross-device results",
                       "torch_version": torch.__version__, "python_version": sys.version.split()[0]}
         write_json(args.output / "run-config.json", run_config)
         print(json.dumps({"event": "configured", **counts, "dataset": statistics,
@@ -326,10 +377,7 @@ def main(argv: list[str] | None = None) -> int:
                     parameter.copy_(values[name].to(args.device))
 
         def rng_state():
-            result = {"python": random.getstate(), "numpy": np.random.get_state(), "torch": torch.get_rng_state()}
-            if args.device == "mps":
-                result["mps"] = torch.mps.get_rng_state()
-            return result
+            return capture_rng_state(args.device, torch, np)
 
         progress = {"step": 0, "epoch": 0, "cursor": 0, "best_per": None, "best_step": 0, "processed_audio_seconds": 0.0}
         baseline = best_metrics = None
@@ -346,9 +394,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("Resume requires the same base weights, manifests and training settings")
             restore_adapter(saved["adapter"]); optimizer.load_state_dict(saved["optimizer"]); scheduler.load_state_dict(saved["scheduler"])
             progress = saved["progress"]; baseline = saved["baseline"]; best_metrics = saved["best_metrics"]
-            random.setstate(saved["rng"]["python"]); np.random.set_state(saved["rng"]["numpy"]); torch.set_rng_state(saved["rng"]["torch"])
-            if args.device == "mps":
-                torch.mps.set_rng_state(saved["rng"]["mps"])
+            restore_rng_state(saved["rng"], args.device, torch, np)
         else:
             # A stop during baseline evaluation can restart from this initial
             # checkpoint rather than leaving an unusable occupied run folder.
@@ -447,7 +493,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as error:
         message = str(error)
         if "out of memory" in message.lower():
-            message += "; MPS memory exhausted. Resume with the identical recipe after closing other heavy apps, or start a new run with --train-layers 0 / a smaller --max-duration. No automatic CPU retry was performed."
+            message += "; " + args.device.upper() + " memory exhausted. Resume with the identical recipe after closing other heavy processes, or start a new run with --train-layers 0 / a smaller --max-duration. No automatic CPU retry was performed."
         status(status="failed", phase="error", error=message)
         print(message, file=sys.stderr, flush=True)
         return 1

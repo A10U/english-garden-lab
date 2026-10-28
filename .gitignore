@@ -26,6 +26,9 @@ __pycache__/
 .DS_Store
 .env
 .env.*
+# Personal API credentials for local speech development/training.
+.env.speech-cloud
+.env.speech-training
 !.env.example
 *.pem
 *.key

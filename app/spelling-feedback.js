@@ -64,9 +64,9 @@
       && !(group.silent === true && group.phoneIndices.length > 0);
   }
 
-  function analyzeWord(analysis, referenceWordIndex, groups) {
+  function projectWord(analysis, referenceWordIndex, groups, allowUncertain) {
     const suppliedGroups = Array.isArray(groups) ? groups : [];
-    if (record(analysis) && record(analysis.recognition_quality) && analysis.recognition_quality.status === 'uncertain') {
+    if (!allowUncertain && record(analysis) && record(analysis.recognition_quality) && analysis.recognition_quality.status === 'uncertain') {
       return empty(suppliedGroups, 'ระบบยังแยกหน่วยเสียงได้ไม่มั่นคง จึงยังให้เปอร์เซ็นต์หรือระบุส่วนที่ออกเสียงผิดไม่ได้');
     }
     if (!record(analysis) || analysis.audio_analyzed !== true || analysis.analysis_type !== 'acoustic_phone_comparison'
@@ -221,5 +221,81 @@
       note: baseNote + (single ? ' · วิเคราะห์เฉพาะหน่วยเสียงที่ฝึก ส่วนอื่นยังไม่ได้ประเมิน' : '')
         + (!available ? ' · ข้อมูลยังไม่พอประเมินรายเสียง' : resultPhones.some(value => value.match_percent === null) ? ' · บางส่วนยังไม่มีข้อมูลที่ครบสำหรับประเมิน' : '')};
   }
-  return Object.freeze({analyzeWord});
+  function analyzeWord(analysis, referenceWordIndex, groups) {
+    return projectWord(analysis, referenceWordIndex, groups, false);
+  }
+
+  // Describe only what the decoder and validated alignment contain. This API
+  // deliberately bypasses the assessment gate without producing a grade or a
+  // pronunciation diagnosis. An uncertain hypothesis remains provisional.
+  function observeWord(analysis, referenceWordIndex, groups) {
+    const projection = projectWord(analysis, referenceWordIndex, groups, true);
+    const reference = record(analysis) && record(analysis.reference) ? analysis.reference : {};
+    const context = record(reference.context) ? reference.context
+      : record(analysis) && record(analysis.context) ? analysis.context : null;
+    const single = reference.reference_context === 'phone_in_word' || Boolean(context && own(context, 'phone_index'));
+    const selectedPhoneIndex = single && context && index(context.phone_index)
+      && projection.phones.some(item => item.phoneIndex === context.phone_index) ? context.phone_index : null;
+    const segments = record(analysis) && record(analysis.observed) && Array.isArray(analysis.observed.phones)
+      ? analysis.observed.phones : null;
+    const heard = segments ? segments.map(item => typeof item === 'string' ? item : record(item) ? item.phone : null) : [];
+    const sequenceAvailable = record(analysis) && analysis.audio_analyzed === true
+      && analysis.analysis_type === 'acoustic_phone_comparison' && segments !== null && heard.every(phone);
+    const quality = record(analysis) && record(analysis.recognition_quality) ? analysis.recognition_quality : {};
+    const threshold = typeof quality.threshold === 'number' && Number.isFinite(quality.threshold)
+      && quality.threshold >= 0 && quality.threshold <= 1 ? quality.threshold : null;
+    const unsupported = new Set(Array.isArray(quality.unsupported_tokens) ? quality.unsupported_tokens.filter(phone) : []);
+    const diagnostics = new Map(), duplicateDiagnostics = new Set();
+    if (sequenceAvailable && Array.isArray(quality.token_diagnostics)) {
+      for (const item of quality.token_diagnostics) {
+        if (!record(item) || !index(item.observed_index) || item.observed_index >= segments.length) continue;
+        const at = item.observed_index;
+        if (diagnostics.has(at)) { duplicateDiagnostics.add(at); continue; }
+        // Reserve even a malformed entry's index: duplicate metadata is
+        // ambiguous, rather than permission to choose a more confident row.
+        diagnostics.set(at, null);
+        const segment = segments[at];
+        if (!record(segment) || item.phone !== heard[at] || unsupported.has(heard[at])
+          || !Number.isFinite(segment.start) || !Number.isFinite(segment.end) || segment.start < 0 || segment.end <= segment.start
+          || item.start !== segment.start || item.end !== segment.end
+          || typeof item.mean_token_posterior !== 'number' || !Number.isFinite(item.mean_token_posterior)
+          || item.mean_token_posterior < 0 || item.mean_token_posterior > 1
+          || !Number.isSafeInteger(item.frame_count) || item.frame_count <= 0
+          || item.calibrated !== false || item.diagnostic_only !== true) continue;
+        diagnostics.set(at, { observed_index: at, phone: item.phone, start: item.start, end: item.end,
+          mean_token_posterior: item.mean_token_posterior, frame_count: item.frame_count,
+          calibrated: false, diagnostic_only: true });
+      }
+    }
+    for (const at of duplicateDiagnostics) diagnostics.delete(at);
+    const phones = projection.phones.map(item => {
+      // counts exist only for a complete, validated consuming operation and
+      // its uniquely owned insertions. Do not publish damaged raw mappings.
+      const valid = sequenceAvailable && item.counts !== null;
+      const operations = valid ? item.operations.map(operation => ({ type: operation.type,
+        word_index: operation.word_index, expected_index: operation.expected_index,
+        observed_index: operation.observed_index, expected: operation.expected, observed: operation.observed })) : [];
+      const observed = operations.filter(operation => phone(operation.observed)).map(operation => operation.observed);
+      const observedIndices = [...new Set(operations.filter(operation => index(operation.observed_index)).map(operation => operation.observed_index))];
+      // A deletion has no observed segment and no posterior of its own. Even
+      // an adjacent inserted token must not become confidence for a deletion.
+      const tokenDiagnostics = valid && !item.counts.delete
+        ? observedIndices.map(at => diagnostics.get(at)).filter(Boolean).map(item => ({ ...item })) : [];
+      const relation = !valid ? 'unavailable' : item.counts.delete ? 'not_detected'
+        : item.counts.match === 1 && item.counts.insert === 0 ? 'match' : 'different';
+      return { phoneIndex: item.phoneIndex, expected: item.expected, observed, operations, relation, tokenDiagnostics,
+        diagnosticAvailable: threshold !== null && observedIndices.length > 0 && tokenDiagnostics.length === observedIndices.length,
+        tentative: threshold !== null && tokenDiagnostics.some(diagnostic => diagnostic.mean_token_posterior < threshold) };
+    });
+    const relevant = single ? phones.filter(item => item.phoneIndex === selectedPhoneIndex) : phones;
+    const observedMatchCount = relevant.filter(item => item.operations.some(operation => operation.type === 'match')).length;
+    const wordIndices = [...new Set(phones.flatMap(item => item.operations.filter(operation => index(operation.observed_index)).map(operation => operation.observed_index)))].sort((a, b) => a - b);
+    const completeObservationCoverage = !Array.isArray(reference.words) || reference.words.length !== 1 || wordIndices.length === heard.length;
+    return { provisional: true, assessmentAvailable: false, available: phones.some(item => item.relation !== 'unavailable'),
+      scope: single ? 'phone_in_word' : 'word', selectedPhoneIndex,
+      rawHeard: sequenceAvailable ? heard.slice() : [], wordRawHeard: wordIndices.map(at => heard[at]),
+      referenceCount: relevant.length, observedMatchCount,
+      completeRawMatch: !single && completeObservationCoverage && phones.length > 0 && phones.every(item => item.relation === 'match'), phones };
+  }
+  return Object.freeze({analyzeWord, observeWord});
 });

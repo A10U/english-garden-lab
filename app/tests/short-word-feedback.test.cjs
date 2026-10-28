@@ -64,7 +64,7 @@ function setup(t, responses = [], reference = publicExample.reference) {
   t.after(() => { cleanup(); win.close(); });
   return { win, container, dispatched, network, played, hostResults, revoked,
     button: (text, scope = container) => [...scope.querySelectorAll('button')].find(node => node.textContent === text),
-    status: () => container.querySelector('[role=status]').textContent };
+    status: () => container.querySelector('.egl-ph-status').textContent };
 }
 function selectFile(app, exampleKey = "it's") {
   const input = app.container.querySelector('input[type=file]');

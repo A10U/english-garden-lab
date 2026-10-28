@@ -59,7 +59,7 @@ function setup(outputFactory) {
   });
   vm.runInContext(source, context, { filename: 'browser-phonetics-worker.js' });
   return {
-    messages, inputs, outputDisposals, creates: () => creates, runs: () => runs,
+    context, messages, inputs, outputDisposals, creates: () => creates, runs: () => runs,
     async analyze(id = 1, expected = reference(), samples = waveform()) {
       await self.onmessage({ data: { id, samples, reference: expected } });
       return messages.filter(message => message.id === id && message.type !== 'progress').at(-1);
@@ -81,6 +81,63 @@ test('weak token evidence is marked uncertain without changing a raw perfect ali
   assert.equal(message.result.recognition_quality.calibrated, false);
   assert.equal(app.inputs[0].disposals, 1);
   assert.equal(app.outputDisposals[0].disposals, 1);
+});
+
+test('token diagnostics follow contiguous observed CTC groups, preserving repeats separated by blank and filtering special tokens', async () => {
+  const frames = [
+    { token: 0, posterior: .99 },
+    { token: 17, posterior: .6 }, { token: 17, posterior: .9 },
+    { token: 0, posterior: .99 }, { token: 17, posterior: .7 },
+    { token: 1, posterior: .99 }, { token: 2, posterior: .99 }, { token: 3, posterior: .9 },
+    { token: 6, posterior: .8 }, { token: 6, posterior: .6 },
+    { token: 0, posterior: .99 }, { token: 5, posterior: .9 },
+  ];
+  const app = setup(() => ({ logits: logits(frames) }));
+  const { result } = await app.analyze();
+  const diagnostics = JSON.parse(JSON.stringify(result.recognition_quality.token_diagnostics));
+  assert.deepEqual(diagnostics, [
+    { observed_index: 0, phone: 'ɪ', start: .02, end: .06, mean_token_posterior: .75, frame_count: 2, calibrated: false, diagnostic_only: true },
+    { observed_index: 1, phone: 'ɪ', start: .08, end: .1, mean_token_posterior: .7, frame_count: 1, calibrated: false, diagnostic_only: true },
+    { observed_index: 2, phone: 't', start: .16, end: .2, mean_token_posterior: .7, frame_count: 2, calibrated: false, diagnostic_only: true },
+    { observed_index: 3, phone: 's', start: .22, end: .24, mean_token_posterior: .9, frame_count: 1, calibrated: false, diagnostic_only: true },
+  ]);
+  for (const diagnostic of diagnostics) {
+    const observed = result.observed.phones[diagnostic.observed_index];
+    assert.deepEqual({ phone: diagnostic.phone, start: diagnostic.start, end: diagnostic.end }, observed);
+  }
+  assert.equal(result.recognition_quality.mean_token_posterior, .82, 'existing global calculation still includes every nonblank frame');
+  assert.equal(result.recognition_quality.nonblank_frames, 9);
+  assert.equal(app.inputs[0].disposals, 1);
+  assert.equal(app.outputDisposals[0].disposals, 1);
+});
+
+test('deleted reference phones receive no invented diagnostic and a changed target cannot alter observed evidence', async () => {
+  const app = setup(() => ({ logits: logits(phoneFrames(.8, [10, 6])) }));
+  const first = (await app.analyze(1)).result;
+  const differentTarget = (await app.analyze(2, reference(['h', 'ɛ', 'l']))).result;
+  assert.equal(first.alignment.summary.deleted_phones, 1);
+  assert.equal(first.recognition_quality.token_diagnostics.length, 2);
+  assert.deepEqual(Array.from(first.recognition_quality.token_diagnostics, item => item.phone), ['i', 't']);
+  assert.deepEqual(Array.from(first.recognition_quality.token_diagnostics, item => item.observed_index), [0, 1]);
+  assert.ok(first.recognition_quality.token_diagnostics.every(item => !('expected' in item) && !('expected_index' in item)));
+  assert.deepEqual(first.recognition_quality.token_diagnostics, differentTarget.recognition_quality.token_diagnostics);
+  assert.deepEqual(first.observed, differentTarget.observed);
+});
+
+test('diagnostic timestamps follow decoded clipping and blank-only output cannot manufacture evidence', async () => {
+  const frames = Array.from({ length: 32 }, () => ({ token: 0, posterior: .99 }));
+  frames[29] = { token: 17, posterior: .8 };
+  frames[30] = { token: 6, posterior: .9 }; // Its interval starts at the clip end and is discarded by CTC decoding.
+  const app = setup(() => ({ logits: logits(frames) }));
+  const { result } = await app.analyze();
+  assert.equal(result.observed.phones.length, 1);
+  const [diagnostic] = result.recognition_quality.token_diagnostics;
+  assert.equal(diagnostic.observed_index, 0); assert.equal(diagnostic.phone, 'ɪ');
+  assert.equal(diagnostic.start, .58); assert.equal(diagnostic.end, .6);
+  assert.equal(diagnostic.mean_token_posterior, .8); assert.equal(diagnostic.frame_count, 1);
+  assert.equal(result.recognition_quality.nonblank_frames, 2, 'diagnostics must not rewrite existing global quality');
+  assert.deepEqual(Array.from(app.context.tokenDiagnostics([], new Float64Array(), [], .6)), []);
+  assert.deepEqual(Array.from(app.context.tokenDiagnostics([0, 0], new Float64Array(2), [], .6)), []);
 });
 
 test('strong recognized speech can still have a genuine zero raw phone agreement', async () => {
@@ -105,6 +162,13 @@ test('high-posterior multilingual tokens remain raw evidence but cannot become a
     assert.equal(result.observed.phones[1].phone, result.recognition_quality.unsupported_tokens[0], 'do not substitute an English or target phone');
     assert.match(result.recognition_quality.limitation, /ไม่ได้ยืนยันว่าผู้พูดออกเสียงผิด/);
     assert.ok(result.limitations.includes(result.recognition_quality.limitation));
+    const foreign = result.recognition_quality.token_diagnostics[1];
+    assert.equal(foreign.observed_index, 1);
+    assert.equal(foreign.phone, result.observed.phones[1].phone);
+    assert.equal(foreign.start, result.observed.phones[1].start);
+    assert.equal(foreign.end, result.observed.phones[1].end);
+    assert.equal(foreign.mean_token_posterior, .95);
+    assert.equal(foreign.calibrated, false); assert.equal(foreign.diagnostic_only, true);
     assert.deepEqual(result.alignment, alignment.alignPhoneSequences(result.reference.words, result.observed.phones), 'raw phone edit agreement stays intact for diagnostics');
   }
 });

@@ -49,6 +49,18 @@
 .egl-ph-file { max-width: 100%; padding: 8px 0; font: inherit; font-weight: 400; }
 .egl-ph-file::file-selector-button { min-height: 40px; margin-right: 10px; padding: 7px 11px; border: 1px solid #b6c9ad; border-radius: 9px; background: #fffef9; color: #204e37; font: inherit; }
 .egl-ph-note,.egl-ph-limitations { color: #607160; font-size: 12px; line-height: 1.75; overflow-wrap: anywhere; }
+.egl-ph-observation,.egl-ph-practice-task { display: grid; gap: 10px; min-width: 0; padding: 14px; border: 1px solid #cbd9cf; border-radius: 12px; background: #f5f8f5; overflow-wrap: anywhere; }
+.egl-ph-observation[hidden],.egl-ph-practice-task[hidden] { display: none; }
+.egl-ph-observation { border-left: 4px solid #819888; }
+.egl-ph-observation p,.egl-ph-practice-task p,.egl-ph-practice-task h5 { margin: 0; }
+.egl-ph-model-reading { color: #284c3b; font-size: 15px; font-weight: 600; }
+.egl-ph-signal-facts,.egl-ph-model-uncertainty,.egl-ph-part-observation { font-size: 12px; line-height: 1.8; color: #526c5c; }
+.egl-ph-practice-task { background: #fffdf5; border-color: #ded9c2; }
+.egl-ph-practice-task h5 { color: #36563e; font-size: 15px; }
+.egl-ph-self-check [aria-pressed=true] { background: #dfead8; border-color: #52744d; box-shadow: inset 0 0 0 1px #52744d; }
+.egl-ph-self-check-status { color: #486446; font-size: 13px; }
+.egl-ph-task-sources { font-size: 12px; color: #526d55; }
+.egl-ph-task-sources a { display: inline-block; margin: 6px 12px 0 0; color: #315f43; overflow-wrap: anywhere; }
 .egl-ph-heading { color: #31543d; font-size: 15px; line-height: 1.6; font-weight: 700; }
 .egl-ph-reference { display: grid; gap: 10px; min-width: 0; }
 .egl-ph-reference-focus { display: grid; gap: 10px; padding: 13px; background: #f5f8f0; border: 1px solid #d9e3cf; border-radius: 12px; }

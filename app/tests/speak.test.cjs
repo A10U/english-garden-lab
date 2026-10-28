@@ -331,3 +331,71 @@ test('provider errors and accidental key text cannot expose the active key in st
   assert.equal(app.calls.length, before); assert.equal(app.byId('speak-transcript').value, '');
   assert.equal(app.byId('conversation-thread').textContent.includes(key), false); assert.deepEqual(app.persistence, []);
 });
+
+const authenticationRequired = () => ({ok: false, status: 401, json: async () => ({error: {code: 'authentication_required', message: 'กรุณาเข้าสู่ระบบก่อนใช้บริการ cloud'}})});
+
+test('an explicit Cloud authentication failure offers the same-origin Sites sign-in and clears after authenticated success', async t => {
+  for (const url of ['http://127.0.0.1:5173/app/speak.html', 'https://garden.example/app/speak']) {
+    let posts = 0;
+    const app = await ready({url, fetch: async path => path === '/api/speak/health' ? ok(health())
+      : ++posts === 1 ? authenticationRequired() : ok({source: 'cloud', reply: 'Hello!'})});
+    t.after(() => app.close());
+    const prompt = app.byId('cloud-signin-prompt');
+    assert.equal(prompt.hidden, true, 'public health does not infer an authenticated session');
+    app.byId('cloud-mode').click(); fill(app, 'Hello'); submit(app); await flush(); await flush();
+    assert.equal(prompt.hidden, false); assert.equal(app.byId('cloud-signin-key-reminder').hidden, true);
+    const signIn = new URL(app.byId('cloud-signin-link').href), page = new URL(url);
+    assert.equal(signIn.origin, page.origin); assert.equal(signIn.pathname, '/signin-with-chatgpt');
+    assert.deepEqual([...signIn.searchParams], [['return_to', page.pathname]]); assert.equal(signIn.hash, '');
+    assert.equal(posts, 1, 'showing the link never starts an automatic retry or sign-in request');
+    submit(app); await flush(); await flush();
+    assert.equal(prompt.hidden, true); assert.equal(posts, 2);
+  }
+});
+
+test('personal-key transcription explains re-entry after sign-in without placing credentials or arbitrary return URLs in navigation', async t => {
+  const key = personalKey('signin');
+  const app = await ready({url: 'http://localhost:5173/unexpected/path?return_to=https://outside.example#private-draft',
+    fetch: async url => url === '/api/speak/health' ? ok(health(false)) : authenticationRequired()});
+  t.after(() => app.close()); await connectKey(app, key);
+  assert.equal(app.byId('cloud-signin-prompt').hidden, true);
+  clip(app); app.byId('transcribe-audio').click(); await flush(); await flush();
+  assert.equal(app.byId('cloud-signin-prompt').hidden, false);
+  assert.equal(app.byId('cloud-signin-key-reminder').hidden, false);
+  const signIn = new URL(app.byId('cloud-signin-link').href);
+  assert.equal(signIn.origin, 'http://localhost:5173');
+  assert.deepEqual([...signIn.searchParams], [['return_to', '/app/speak.html']]);
+  assert.equal(signIn.hash, ''); assert.equal(signIn.href.includes(key), false);
+  assert.equal(app.doc.documentElement.outerHTML.includes(key), false); assert.deepEqual(app.persistence, []);
+  assert.equal(requestKey(app.calls.at(-1)[1]), key);
+  assert.equal(app.calls.length, 3, 'the failure and navigation hint make no extra request');
+});
+
+test('health, provider-key rejection and unrelated errors never masquerade as a Sites sign-in requirement', async t => {
+  for (const response of [
+    {ok: false, status: 502, json: async () => ({error: {code: 'cloud_authentication_failed', message: 'Provider rejected key'}})},
+    {ok: false, status: 401, json: async () => ({error: {code: 'unrelated_error', message: 'Other error'}})},
+    {ok: false, status: 403, json: async () => ({error: {code: 'authentication_required', message: 'Forbidden'}})}
+  ]) {
+    const app = await ready({fetch: async url => url === '/api/speak/health' ? ok(health()) : response});
+    t.after(() => app.close()); app.byId('cloud-mode').click(); fill(app, 'Hello'); submit(app); await flush(); await flush();
+    assert.equal(app.byId('cloud-signin-prompt').hidden, true);
+  }
+  const app = await ready({fetch: async () => authenticationRequired()}); t.after(() => app.close());
+  assert.equal(app.byId('cloud-signin-prompt').hidden, true);
+});
+
+test('cancelled and disposed requests cannot reveal a late authentication prompt', async t => {
+  for (const action of ['cancel', 'clear', 'scenario', 'pagehide']) {
+    let finish;
+    const app = await ready({fetch: async url => url === '/api/speak/health' ? ok(health(false)) : new Promise(resolve => {finish = resolve;})});
+    t.after(() => app.close()); await connectKey(app, personalKey(action));
+    app.byId('cloud-mode').click(); fill(app, 'Hello'); submit(app); await flush();
+    if (action === 'cancel') app.byId('cancel-request').click();
+    else if (action === 'clear') app.byId('clear-personal-key').click();
+    else if (action === 'scenario') app.doc.querySelector('[data-scenario="cafe"]').click();
+    else app.win.dispatchEvent(new app.win.Event('pagehide'));
+    finish(authenticationRequired()); await flush(); await flush();
+    assert.equal(app.byId('cloud-signin-prompt').hidden, true, action);
+  }
+});
