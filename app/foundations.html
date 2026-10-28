@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#24543e">
+  <title>เริ่มฝึกออกเสียงทีละคำ — สวนภาษา</title>
+  <link rel="stylesheet" href="foundations.css?v=bf1a4faecd86707a">
+  <link rel="stylesheet" href="phonetics.css?v=bf1a4faecd86707a">
+  <script src="core-word-data.js?v=bf1a4faecd86707a" defer></script>
+  <script src="phone-guide.js?v=bf1a4faecd86707a" defer></script>
+  <script src="sound-foundations.js" defer></script>
+  <script src="vowel-pairs.js" defer></script>
+  <script src="vowel-audio.js" defer></script>
+  <script src="articulation-images.js" defer></script>
+  <script src="spelling-guide.js" defer></script>
+  <script src="spelling-feedback.js?v=bf1a4faecd86707a" defer></script>
+  <script src="browser-phonetics.js?v=bf1a4faecd86707a" defer></script>
+  <script id="egl-demo-runtime">globalThis.EGL_DEMO_RUNTIME={mode:"demo",apiBase:null};</script>
+<script src="../speech-training/demo-assets/demo-data.js" defer></script>
+<script src="phonetics.js?v=bf1a4faecd86707a" defer></script>
+  <script src="foundations.js?v=bf1a4faecd86707a" defer></script>
+<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="connect-src 'self' https://huggingface.co https://*.hf.co; worker-src 'self' blob:; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'">
+</head>
+<body>
+  <a href="#lesson" class="skip-link">ข้ามไปคำที่กำลังฝึก</a>
+  <header class="foundation-top"><a href="index.html">สวนภาษา <span aria-hidden="true">❧</span></a><nav aria-label="พื้นที่เรียน"><a href="index.html">บทเรียน</a><a href="speak.html">Speak</a></nav></header>
+  <main class="foundation-main">
+    <div class="foundation-intro"><p class="eyebrow">พื้นฐานการออกเสียง · ครั้งละคำ</p><h1>ค่อย ๆ ออกเสียง<br>ในจังหวะของเรา</h1><p>ฟังคำเต็ม ลองวางปาก อัดเสียง แล้วฟังตัวเอง<br>ฝึกต่อได้โดยไม่ต้องรอคะแนนจาก AI</p></div>
+    <p id="egl-hosted-demo-notice">ฟังและอัดเสียงได้โดยไม่ใช้ Cloud · ตัวช่วยแยกหน่วยเสียงเป็นทางเลือกและอาจประเมินคำสั้นไม่ได้</p>
+    <p id="foundation-status" role="status" aria-live="polite">กำลังเตรียมแบบฝึก…</p>
+    <div class="foundation-layout">
+      <aside class="foundation-path" aria-label="ชุดฝึก"><h2>เลือกชุดฝึก</h2><div id="foundation-groups"></div><p id="foundation-progress"></p><small>“ฝึกแล้ว” เป็นบันทึกของคุณเอง<br>ไม่ใช่ผลสอบหรือการยืนยันว่าออกเสียงถูก</small><button type="button" id="foundation-reset" class="text-button">ล้างบันทึกการฝึก</button></aside>
+      <section id="lesson" class="foundation-lesson" aria-labelledby="foundation-word">
+        <div class="word-position"><span id="foundation-position"></span><span class="practice-tag">ฝึกคำเต็ม</span></div>
+        <div class="word-heading"><h2 id="foundation-word" tabindex="-1"></h2><p id="foundation-ipa" lang="en"></p><p id="foundation-meaning"></p></div>
+        <div id="foundation-word-choices" class="word-choices" aria-label="คำในชุดนี้"></div>
+        <section class="foundation-step"><h3><span>1</span> ฟังและดูวิธีออกเสียง</h3><div class="example-actions"><button id="foundation-listen" class="primary" type="button">ฟังคำตัวอย่าง</button><button id="foundation-slow" type="button" aria-pressed="false">ฟังช้า 0.75×</button></div><p id="foundation-source"></p><audio id="foundation-audio" controls preload="none" aria-label="เสียงคำตัวอย่างจากผู้พูดจริง"></audio><details class="audio-credit"><summary>ที่มาและสิทธิ์ของเสียงนี้</summary><div id="foundation-credit"></div></details><p id="foundation-contrast"></p><div id="foundation-phone-choices" class="phone-choices" aria-label="เลือกดูวิธีออกเสียง"></div><div id="foundation-guide" class="foundation-guide"></div></section>
+        <section class="foundation-step"><h3><span>2</span> ลองพูด แล้วฟังเสียงของฉัน</h3><p>พูดตามธรรมชาติหนึ่งครั้ง ไม่ต้องลากเสียงให้ยาวเพื่อให้ระบบจับได้</p><div id="foundation-recorder"></div></section>
+        <section class="foundation-step"><h3><span>3</span> คุณสังเกตอะไรจากการฟังเทียบ?</h3><p>ฟังตัวอย่าง อัดเสียง แล้วฟังคลิปของตัวเองก่อนเลือก</p><div id="foundation-reflection" class="reflection" role="group" aria-label="สิ่งที่ฉันสังเกตเอง"></div><p id="foundation-checklist"></p><button id="foundation-complete" class="primary" type="button" disabled>บันทึกว่าฝึกแล้ว</button></section>
+        <nav class="foundation-navigation" aria-label="เปลี่ยนคำ"><button id="foundation-prev" type="button">← คำก่อนหน้า</button><button id="foundation-next" type="button">คำถัดไป →</button></nav><p class="discard-note">เมื่อเปลี่ยนคำ คลิปที่อัดในคำนี้จะถูกล้าง เสียงของคุณไม่ถูกบันทึกในประวัติการฝึก</p>
+      </section>
+    </div>
+    <footer>เริ่มจากวันละไม่กี่คำก็ได้ · ป้าย IPA เป็นคำอ่านอ้างอิง ไม่ใช่ผลตรวจเสียงของคุณ<br><a href="assets/native-words/ATTRIBUTION.md">เครดิตเสียงและคำอ่านทั้งหมด</a></footer>
+  </main>
+  <noscript>เปิด JavaScript เพื่อใช้แบบฝึกและบันทึกเสียง</noscript>
+</body>
+</html>
