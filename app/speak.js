@@ -46,8 +46,13 @@
       send: byId('send-message'), cancel: byId('cancel-request'), transcribe: byId('transcribe-audio'),
       note: byId('send-note'), action: byId('speak-action-status'), clip: byId('clip-status'),
       attach: byId('attach-assessment'), assessment: byId('assessment-status'), practice: byId('local-practice'),
+      signinPrompt: byId('cloud-signin-prompt'), signinLink: byId('cloud-signin-link'), signinKeyReminder: byId('cloud-signin-key-reminder'),
       keyInput: byId('personal-api-key'), connectKey: byId('connect-personal-key'), clearKey: byId('clear-personal-key'), keyStatus: byId('personal-key-status'), hostedLink: byId('personal-key-hosted-link')
     };
+    const signIn = new win.URL('/signin-with-chatgpt', win.location.origin);
+    signIn.searchParams.set('return_to', win.location.pathname === '/app/speak' ? '/app/speak' : '/app/speak.html');
+    ui.signinLink.href = signIn.pathname + signIn.search;
+    ui.signinPrompt.hidden = true;
     let disposed = false, scenario = 'garden', mode = 'sample', sampleStarted = false;
     let cloudMessages = [], sampleMessages = [], pendingMessage = null;
     let capabilities = {conversation: false, transcription: false, speech: false};
@@ -295,7 +300,11 @@
     async function jsonResponse(response) {
       let value; try { value = await response.json(); } catch (_) { throw new Error('บริการตอบกลับไม่ครบ ลองใหม่อีกครั้งครับ'); }
       if (personalApiKey && JSON.stringify(value).includes(personalApiKey)) throw new Error('บริการตอบกลับไม่ถูกต้อง กรุณาลองใหม่');
-      if (!response.ok) throw new Error(bounded(value && (value.error && value.error.message || value.error || value.detail), 300) || 'บริการยังไม่พร้อม ลองใหม่อีกครั้งครับ');
+      if (!response.ok) {
+        const error = new Error(bounded(value && (value.error && value.error.message || value.error || value.detail), 300) || 'บริการยังไม่พร้อม ลองใหม่อีกครั้งครับ');
+        error.authenticationRequired = response.status === 401 && value?.error?.code === 'authentication_required';
+        throw error;
+      }
       return value;
     }
     async function runRequest(kind, request, apply) {
@@ -307,9 +316,16 @@
       try {
         const value = await request(signal);
         if (disposed || version !== requestVersion || signal.aborted) return;
+        ui.signinPrompt.hidden = true;
         await apply(value);
       } catch (error) {
-        if (!disposed && version === requestVersion) actionStatus(error.name === 'AbortError' ? 'หยุดคำขอแล้ว ลองส่งใหม่ได้ครับ' : bounded(error.message, 350) || 'ยังติดต่อ cloud ไม่ได้ ลองใหม่อีกครั้ง', true);
+        if (!disposed && version === requestVersion) {
+          if (error.authenticationRequired && !signal.aborted) {
+            ui.signinKeyReminder.hidden = !personalApiKey;
+            ui.signinPrompt.hidden = false;
+          }
+          actionStatus(error.name === 'AbortError' ? 'หยุดคำขอแล้ว ลองส่งใหม่ได้ครับ' : bounded(error.message, 350) || 'ยังติดต่อ cloud ไม่ได้ ลองใหม่อีกครั้ง', true);
+        }
       } finally {
         if (!disposed && version === requestVersion) {
           if (requestTimer !== null) win.clearTimeout(requestTimer); requestTimer = null; controller = null;
@@ -385,6 +401,7 @@
     function cleanup() {
       if (disposed) return;
       disposed = true; cancelHealth(); personalApiKey = ''; supportsPersonalKey = false; ui.keyInput.value = ''; resetCapabilities();
+      ui.signinPrompt.hidden = true;
       ui.keyStatus.textContent = 'ยังไม่ได้ตั้ง key ส่วนตัว'; ui.clearKey.disabled = true; ui.cloud.disabled = true;
       cancelRequest(); if (practiceCleanup) practiceCleanup(); practiceCleanup = null;
       listeners.splice(0).forEach(remove => remove()); form.removeAttribute('data-speak-mounted');

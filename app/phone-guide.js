@@ -98,6 +98,18 @@
   };
 
   const KEYS = Object.keys(GUIDE).sort((a, b) => b.length - a.length);
+  const PRACTICE_DISCLAIMER = 'เป็นแนวทางฝึกทั่วไปตามเสียงอ้างอิงที่ส่งมา ไม่ได้ชี้ว่าคุณออกเสียงส่วนใดผิด และไม่ได้ยืนยันคำอ่านของคำใหม่';
+  const PRACTICE_SOURCES = {
+    ipa: 'https://www.internationalphoneticassociation.org/content/ipa-chart-projects',
+    chart: 'https://www.teachingenglish.org.uk/teaching-resources/teaching-secondary/teaching-tools/phonemic-chart-english-teachers',
+    w: 'https://enunciate.arts.ubc.ca/w/',
+    labialVelar: 'https://www.internationalphoneticassociation.org/IPAcharts/IPA_charts_EI/IPA_charts_EI.html',
+    smallI: 'https://enunciate.arts.ubc.ca/%C9%AA/',
+    theta: 'https://enunciate.arts.ubc.ca/2016/04/07/33/',
+    eth: 'https://enunciate.arts.ubc.ca/2016/04/07/34/',
+    withOxford: 'https://www.oxfordlearnersdictionaries.com/definition/english/with?q=with',
+    withCambridge: 'https://dictionary.cambridge.org/us/dictionary/english/with'
+  };
 
   function normalize(phone) {
     if (typeof phone !== 'string' || phone.length > 64) return '';
@@ -135,5 +147,59 @@
       example: ''};
   }
 
-  return Object.freeze({describe});
+  // This supplies general exercises for a reference provided by the caller.
+  // It does not recognize speech, validate new words or locate learner errors.
+  function practiceForWord(text, phones) {
+    const word = typeof text === 'string' ? text.trim() : '';
+    const unavailable = () => ({available: false, word, steps: [], acceptedPronunciations: [], variantNote: '', sources: [],
+      disclaimer: PRACTICE_DISCLAIMER + ' · ยังไม่มีคำแนะนำที่อ้างอิงได้สำหรับข้อมูลนี้'});
+    if (!word || word.length > 80 || !/^[a-z]+(?:['’‘-][a-z]+)*$/i.test(word)
+      || !Array.isArray(phones) || !phones.length || phones.length > 64) return unavailable();
+    const symbols = Array.from(phones, normalize);
+    // Only authored single entries are suitable for individual practice steps.
+    // describe() can explain some composites, but it must not invent a lesson.
+    if (symbols.some(symbol => !Object.hasOwn(GUIDE, symbol))) return unavailable();
+    const isWith = word.toLowerCase() === 'with' && symbols.length === 3 && symbols[0] === 'w' && symbols[1] === 'ɪ'
+      && (symbols[2] === 'ð' || symbols[2] === 'θ');
+    const sources = new Set([PRACTICE_SOURCES.ipa, PRACTICE_SOURCES.chart]);
+    symbols.forEach(symbol => {
+      if (symbol === 'w') { sources.add(PRACTICE_SOURCES.w); sources.add(PRACTICE_SOURCES.labialVelar); }
+      if (symbol === 'ɪ') sources.add(PRACTICE_SOURCES.smallI);
+      if (symbol === 'θ') sources.add(PRACTICE_SOURCES.theta);
+      if (symbol === 'ð') sources.add(PRACTICE_SOURCES.eth);
+    });
+    const steps = symbols.map((phone, phoneIndex) => {
+      const fact = describe(phone);
+      return {phoneIndex, phone,
+        instruction: fact.tip + ' แล้วลองเชื่อมกลับเป็นคำ ' + word + ' ตามเสียงอ้างอิงที่เลือก',
+        selfCheck: 'ฟังเสียง /' + phone + '/ ในคำตัวอย่าง แล้วฟังคำของคุณเทียบกัน คุณสังเกตความใกล้เคียงได้หรือยัง หากยังไม่แน่ใจเลือกยังไม่แน่ใจหรือฟังใหม่ได้',
+        examples: [{text: fact.example, label: 'ฟัง /' + phone + '/ ในคำเต็ม ' + fact.example}]};
+    });
+    let variantNote = '';
+    if (isWith) {
+      sources.add(PRACTICE_SOURCES.withOxford); sources.add(PRACTICE_SOURCES.withCambridge);
+      sources.add(PRACTICE_SOURCES.theta); sources.add(PRACTICE_SOURCES.eth);
+      steps[0] = {phoneIndex: 0, phone: 'w',
+        instruction: 'ห่อริมฝีปากเล็กน้อยพร้อมยกส่วนหลังของลิ้น แล้วคลายเข้าหาสระ /ɪ/ ต่อเนื่องเป็นคำ with ไม่แยกเสียงต้นเป็นอีกพยางค์',
+        selfCheck: 'ลองสังเกตในกระจกว่าริมฝีปากเริ่มห่อแล้วคลายเข้าสระต่อเนื่องหรือยัง โดยฟันไม่แตะริมฝีปากล่าง หรือฟังเสียงต้นเทียบคำตัวอย่าง',
+        examples: [{text: 'water', label: 'ฟัง /w/ ที่ต้นคำเต็ม water'}]};
+      steps[1] = {phoneIndex: 1, phone: 'ɪ',
+        instruction: 'วางลิ้นค่อนหน้าและค่อนสูง แต่ผ่อนต่ำและเข้ากลางกว่า /iː/ ไม่ห่อปาก ฟัง sit เทียบ seat โดยสังเกตคุณภาพสระ ไม่ใช้ความยาวอย่างเดียว',
+        selfCheck: 'ฟังสระในคำของคุณเทียบ sit แล้วใช้ seat ช่วยฟังความต่าง หากยังแยกคุณภาพสระไม่ออกเลือกยังไม่แน่ใจได้',
+        examples: [{text: 'sit', label: 'ฟังคำเต็ม sit: สระ /ɪ/'}, {text: 'seat', label: 'ฟังคำเต็ม seat: สระ /iː/ เพื่อเปรียบเทียบ'}]};
+      const final = symbols[2], voiced = final === 'ð';
+      steps[2] = {phoneIndex: 2, phone: final,
+        instruction: 'วางปลายลิ้นชิดฟันบนเบา ๆ หรือระหว่างฟันเล็กน้อย เหลือช่องให้ลมผ่านต่อเนื่อง ไม่กัดลิ้น แล้วเชื่อมท้ายคำ with ตัวอย่างนี้ใช้ /' + final + '/ ' + (voiced ? 'ที่มีเสียงก้องเบา ๆ' : 'ที่เป็นเสียงลมโดยไม่เพิ่มเสียงก้อง'),
+        selfCheck: voiced ? 'ลองแตะด้านหน้าลำคอเบา ๆ เพื่อสังเกตการสั่นขณะทำ /ð/ ไม่ต้องกดหรือเกร็งคอ; /θ/ ก็เป็นรูปที่พจนานุกรมยอมรับใน with'
+          : 'ลองฟังเสียงลมของ /θ/ เทียบเสียงก้องของ /ð/ ในคำตัวอย่าง; ทั้งสองรูปใช้ได้ใน with จึงไม่ต้องเปลี่ยนเพียงเพื่อให้เหมือนตัวอย่างนี้',
+        examples: voiced ? [{text: 'this', label: 'ฟัง /ð/ ในคำเต็ม this'}, {text: 'thin', label: 'ฟัง /θ/ ในคำเต็ม thin เพื่อเปรียบเทียบ'}]
+          : [{text: 'thin', label: 'ฟัง /θ/ ในคำเต็ม thin'}, {text: 'this', label: 'ฟัง /ð/ ในคำเต็ม this เพื่อเปรียบเทียบ'}]};
+      variantNote = 'with มีคำอ่าน /wɪð/ และ /wɪθ/ ที่พจนานุกรมระบุทั้งสองแบบ ตัวอย่างนี้ใช้ /wɪ' + final + '/ ไม่ได้หมายความว่าอีกแบบผิด';
+    }
+    return {available: true, word, steps,
+      acceptedPronunciations: isWith ? [['w', 'ɪ', 'ð'], ['w', 'ɪ', 'θ']] : [],
+      variantNote, sources: [...sources], disclaimer: PRACTICE_DISCLAIMER};
+  }
+
+  return Object.freeze({describe, practiceForWord});
 });

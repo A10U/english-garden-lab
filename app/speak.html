@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#184d3c">
   <meta name="description" content="ฝึกพูดอังกฤษในเครื่อง แล้วคุยกับมะลิผ่าน cloud เมื่อพร้อม">
   <title>Speak — คุยให้กล้าขึ้น · สวนภาษา AI</title>
-  <link rel="stylesheet" href="phonetics.css?v=ac7e6289d79303d1">
-  <link rel="stylesheet" href="speak.css?v=ac7e6289d79303d1">
+  <link rel="stylesheet" href="phonetics.css?v=18bb9979ff457e8d">
+  <link rel="stylesheet" href="speak.css?v=18bb9979ff457e8d">
   <script src="phonetic-data.js" defer></script>
   <script src="phone-guide.js" defer></script>
   <script src="sound-foundations.js" defer></script>
@@ -17,14 +17,14 @@
   <script src="articulation-images.js" defer></script>
   <script src="study-help.js" defer></script>
   <script src="reference-audio.js" defer></script>
-  <script src="browser-phonetics.js?v=ac7e6289d79303d1" defer></script>
+  <script src="browser-phonetics.js?v=18bb9979ff457e8d" defer></script>
   <script src="spelling-guide.js" defer></script>
-  <script src="spelling-feedback.js?v=ac7e6289d79303d1" defer></script>
+  <script src="spelling-feedback.js?v=18bb9979ff457e8d" defer></script>
   <script src="word-audio.js" defer></script>
   <script id="egl-demo-runtime">globalThis.EGL_DEMO_RUNTIME={mode:"demo",apiBase:null};</script>
 <script src="../speech-training/demo-assets/demo-data.js" defer></script>
-<script src="phonetics.js?v=ac7e6289d79303d1" defer></script>
-  <script src="speak.js?v=ac7e6289d79303d1" defer></script>
+<script src="phonetics.js?v=18bb9979ff457e8d" defer></script>
+  <script src="speak.js?v=18bb9979ff457e8d" defer></script>
 <meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="connect-src 'self' https://huggingface.co https://*.hf.co; worker-src 'self' blob:; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'">
 </head>
 <body>
@@ -55,6 +55,7 @@
         <div class="panel-heading conversation-heading"><div class="mali-identity"><span class="mali-avatar" aria-hidden="true">ม</span><div><h2 id="conversation-heading" tabindex="-1">คุยกับมะลิ</h2><p>เพื่อนฝึกอังกฤษในสวนของเรา</p></div></div><span id="cloud-badge" class="status-pill">กำลังตรวจ Cloud…</span></div>
         <div class="conversation-toolbar"><div class="mode-switch" role="group" aria-label="รูปแบบบทสนทนา"><button id="sample-mode" type="button" aria-pressed="true">ลองตัวอย่าง</button><button id="cloud-mode" type="button" aria-pressed="false" disabled>สนทนา Cloud</button></div><button id="new-conversation" class="text-button" type="button">เริ่มใหม่ ↺</button></div>
         <p id="connection-status" class="connection-status" role="status">กำลังตรวจว่าบริการสนทนาพร้อมใช้งานหรือไม่</p>
+        <p id="cloud-signin-prompt" class="connection-status" role="status" hidden>บริการ Cloud ต้องเข้าสู่ระบบก่อน <a id="cloud-signin-link" href="#cloud-signin-prompt">เข้าสู่ระบบเพื่อใช้ Cloud</a><span id="cloud-signin-key-reminder" hidden> แล้วใส่ key ส่วนตัวอีกครั้งหลังกลับมาหน้านี้</span></p>
         <section class="personal-key-panel" aria-labelledby="personal-key-heading">
           <h3 id="personal-key-heading">ใช้ OpenAI API key ของคุณ</h3>
           <p id="personal-key-help">key อยู่ในหน่วยความจำของแท็บนี้จนกดล้างหรือออกจากหน้า การตรวจบริการไม่ส่ง key เมื่อกดส่งข้อความหรือถอดเสียงผ่าน Cloud จึงส่ง key ผ่านเซิร์ฟเวอร์ของเว็บไป OpenAI อาจมีค่าใช้บริการในบัญชีของคุณ</p>

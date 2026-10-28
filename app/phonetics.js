@@ -415,6 +415,7 @@
     function notifyClip() {
       notifyHost('onClipChange', { blob: clip, label: clipLabel, kind: clipKind, info: clipInfo,
         target: practiceWord ? practiceWord.text : textarea.value.trim(), clipId: ++clipId });
+      refreshSpellingScores();
     }
     function setClip(blob, label, kind, info) {
       checkBlob(blob);
@@ -810,17 +811,20 @@
     function spellingFor(word) {
       try { return global.EGLSpellingGuide && global.EGLSpellingGuide.forWord(word.text, word.phones); } catch (_) { return null; }
     }
-    function spellingFeedback(source, groups) {
+    function spellingProjection(source, groups, method) {
       const helper = global.EGLSpellingFeedback;
-      if (!analysisData || !helper || typeof helper.analyzeWord !== 'function') return null;
+      if (!analysisData || !helper || typeof helper[method] !== 'function') return null;
       const expected = analysisData.reference;
       if (!expected || !Array.isArray(expected.words) || expected.accent !== accent.value) return null;
       let index;
       if (expected.text === textarea.value.trim()) index = source.index;
       else if (practiceWord && wordKey(expected.text) === wordKey(source.text) && expected.words.length === 1) index = expected.words[0].index;
       else return null;
-      try { return helper.analyzeWord(analysisData, index, groups); } catch (_) { return null; }
+      const selected = expected.words.find(item => String(item.index) === String(index));
+      if (!selected || wordKey(selected.text) !== wordKey(source.text)) return null;
+      try { return helper[method](analysisData, index, groups); } catch (_) { return null; }
     }
+    function spellingFeedback(source, groups) { return spellingProjection(source, groups, 'analyzeWord'); }
     function refreshSpellingScores() {
       if (!disposed) [...spellingRefreshers].forEach(refresh => refresh());
     }
@@ -920,19 +924,89 @@
       const groups = spelling && spelling.available ? spelling.groups : source.phones.map((phone, index) => ({ letters: '', phoneIndices: [index], phones: [phone], silent: false }));
       if (!spelling || !spelling.available) section.append(el('p', 'egl-ph-note', 'คำนี้ยังไม่ได้ตรวจการจับคู่ตัวสะกดกับเสียง จึงแสดงผลทีละหน่วยเสียง โดยไม่เดาว่าตัวอักษรใดแทนเสียงอะไร'));
       const summary = el('div', 'egl-ph-spelling-summary'), strip = el('div', 'egl-ph-spelling-groups'), panel = el('div', 'egl-ph-spelling-detail');
+      const observationBox = el('div', 'egl-ph-observation'), taskBox = el('div', 'egl-ph-practice-task');
       const rawDetails = el('details', 'egl-ph-technical egl-ph-alignment-details'), rawContent = el('div', 'egl-ph-raw-alignment');
       rawDetails.append(el('summary', '', 'ดูข้อมูลจับคู่ดิบของโมเดล'), el('p', 'egl-ph-note', 'ตัวเลขดิบเป็นการนับสัญลักษณ์ที่ตรงกัน เสียงเดียวจึงมีค่า 0% หรือ 100% ได้ ไม่ใช่คะแนนความถูกต้องของผู้พูดหรือความมั่นใจรายเสียง'), rawContent);
-      const buttons = [], detailListeners = [], summaryListeners = [];
-      let feedback = null, currentGroup = null, currentPhone = null;
+      const buttons = [], detailListeners = [], summaryListeners = [], taskListeners = [];
+      let feedback = null, observation = null, currentGroup = null, currentPhone = null, selfCheckClip = clipId;
+      const selfChecks = new Map();
+      let exercise = null;
+      try { exercise = global.EGLPhoneGuide && global.EGLPhoneGuide.practiceForWord(source.text, source.phones); } catch (_) {}
       bucket.push(() => detailListeners.splice(0).forEach(remove => remove()));
       bucket.push(() => summaryListeners.splice(0).forEach(remove => remove()));
+      bucket.push(() => taskListeners.splice(0).forEach(remove => remove()));
       const phoneData = index => feedback && feedback.phones && feedback.phones.find(item => item.phoneIndex === index);
+      const phoneObservation = index => observation && observation.phones && observation.phones.find(item => item.phoneIndex === index);
       function labelFor(index) {
         const group = groups.find(item => item.phoneIndices.includes(index));
         return (group && group.letters ? group.letters + ' ' : '') + '/' + source.phones[index] + '/';
       }
       function assessedPhones() {
         return feedback && Array.isArray(feedback.phones) ? feedback.phones.filter(item => validPercent(item.match_percent) != null) : [];
+      }
+      function renderObservation() {
+        observationBox.replaceChildren(); observationBox.hidden = !analysisData;
+        if (!analysisData) return;
+        observationBox.append(el('strong', '', 'โมเดลได้ยินอะไร · ข้อมูลเบื้องต้น'));
+        const metrics = analysisData.metrics || {}, facts = [];
+        if (Number.isFinite(metrics.duration_seconds)) facts.push('คลิปยาว ' + metrics.duration_seconds.toFixed(2) + ' วินาที');
+        if (Number.isFinite(metrics.rms_dbfs)) facts.push('ระดับสัญญาณเฉลี่ย ' + metrics.rms_dbfs.toFixed(1) + ' dBFS');
+        if (facts.length) observationBox.append(el('p', 'egl-ph-signal-facts', facts.join(' · ') + ' · ค่าทั้งคลิป ไม่ใช่คะแนนการออกเสียง'));
+        if (recognitionIssue(analysisData) === 'insufficient_audio_signal') {
+          observationBox.append(el('p', 'egl-ph-model-reading', 'สัญญาณที่วัดได้ยังไม่เพียงพอ จึงไม่แสดงคำถอดของโมเดลเป็นหลักฐาน ลองฟังไฟล์เต็มและเปรียบเทียบไมค์ในเครื่องกับไมค์หูฟังก่อน'));
+          return;
+        }
+        if (!observation || !observation.available) {
+          observationBox.append(el('p', 'egl-ph-model-reading', 'ยังไม่มีคำถอดรายเสียงที่เชื่อมกับคำนี้ได้ คุณฝึกจากตัวอย่างและคำแนะนำด้านล่างได้ โดยยังสรุปไม่ได้ว่าต้องแก้เสียงใด'));
+          return;
+        }
+        const reading = observation.wordRawHeard.join(' ');
+        const scope = observation.scope === 'phone_in_word' ? 'เฉพาะเสียงที่เลือกใน ' : 'ของ ';
+        observationBox.append(el('p', 'egl-ph-model-reading', 'คำถอดเบื้องต้น' + scope + source.text + ': ' + (reading ? '/' + reading + '/' : 'ยังจับคู่กับคำนี้ไม่ได้')));
+        if (observation.completeRawMatch) observationBox.append(el('p', 'egl-ph-observation-match', 'โมเดลถอดตรงกับอ้างอิงครบ ' + observation.referenceCount + ' หน่วยเสียง แต่ยังใช้ยืนยันคะแนนการออกเสียงไม่ได้'));
+        const tentative = observation.phones.filter(item => item.diagnosticAvailable && item.tentative);
+        if (tentative.length) observationBox.append(el('p', 'egl-ph-model-uncertainty', 'ส่วนที่โมเดลยังไม่มั่นคง: ' + tentative.map(item => '/' + item.expected + '/').join(', ') + ' · เป็นข้อจำกัดการถอดเสียง ไม่ใช่การระบุว่าคุณพูดผิด'));
+        if (observation.phones.some(item => !item.diagnosticAvailable)) observationBox.append(el('p', 'egl-ph-model-uncertainty', 'บางเสียงยังไม่มีข้อมูลความมั่นคงรายส่วนเพียงพอ จึงยังระบุจุดที่ควรแก้จากผลอัตโนมัติไม่ได้'));
+        observationBox.append(el('p', 'egl-ph-note', 'คำถอดอาจผิดหรือข้ามเสียงได้ ฟังตัวอย่างกับเสียงของคุณ แล้วเลือกฝึกทีละส่วน โดยไม่ต้องไล่ตัวเลข'));
+      }
+      function renderTask(index) {
+        taskListeners.splice(0).forEach(remove => remove()); taskBox.replaceChildren();
+        if (selfCheckClip !== clipId) { selfChecks.clear(); selfCheckClip = clipId; }
+        const step = exercise && exercise.available && exercise.steps.find(item => item.phoneIndex === index);
+        taskBox.hidden = !step;
+        if (!step) return;
+        taskBox.append(el('h5', '', 'ลองฝึกทีละขั้น · /' + step.phone + '/ ใน ' + source.text),
+          el('p', 'egl-ph-note', 'แบบฝึกทั่วไปตามคำอ้างอิง คุณเลือกเสียงนี้เอง ยังไม่ได้วินิจฉัยว่าคุณออกเสียงส่วนนี้ผิด'),
+          el('p', 'egl-ph-task-instruction', step.instruction));
+        if (exercise.variantNote) taskBox.append(el('p', 'egl-ph-word-variants', exercise.variantNote));
+        const actions = el('div', 'egl-ph-actions');
+        actions.append(button('1. ฟังคำตัวอย่าง ' + source.text, () => playExample(source), 'egl-ph-button', taskListeners));
+        const own = button('2. ฟังคลิปของฉัน', () => playOwn(), 'egl-ph-button', taskListeners);
+        own.disabled = !clip; actions.append(own);
+        step.examples.forEach(example => actions.append(button(example.label, () => playExample({text: example.text}), 'egl-ph-button', taskListeners)));
+        taskBox.append(actions, el('p', 'egl-ph-task-self-check', '3. ลองสังเกต: ' + step.selfCheck));
+        const checks = el('div', 'egl-ph-actions egl-ph-self-check');
+        checks.setAttribute('role', 'group'); checks.setAttribute('aria-label', 'สิ่งที่ฉันสังเกตเองสำหรับ /' + step.phone + '/');
+        const status = el('p', 'egl-ph-self-check-status', selfChecks.has(index) ? 'คุณเลือก: ' + selfChecks.get(index) : 'ยังไม่ได้เลือก');
+        status.setAttribute('role', 'status');
+        ['ใกล้ตัวอย่าง', 'อยากฝึกเพิ่ม', 'ยังไม่แน่ใจ'].forEach(label => {
+          const choice = button(label, () => {
+            selfChecks.set(index, label);
+            [...checks.children].forEach(node => node.setAttribute('aria-pressed', String(node === choice)));
+            status.textContent = 'คุณเลือก: ' + label;
+          }, 'egl-ph-button', taskListeners);
+          choice.setAttribute('aria-pressed', String(selfChecks.get(index) === label)); checks.append(choice);
+        });
+        taskBox.append(checks, status, el('p', 'egl-ph-note', 'สิ่งที่เลือกเป็นการสังเกตของคุณเอง ไม่ใช่คะแนนหรือผลประเมิน AI เก็บเฉพาะในหน้านี้และล้างเมื่อเปลี่ยนคลิป'));
+        const nextIndex = source.phones.length > 1 ? (index + 1) % source.phones.length : null;
+        const nextGroup = nextIndex == null ? null : groups.find(group => group.phoneIndices.includes(nextIndex));
+        if (nextGroup) taskBox.append(button('ดูวิธีฝึกเสียงถัดไป /' + source.phones[nextIndex] + '/', () => choose(nextGroup, nextIndex), 'egl-ph-button', taskListeners));
+        if (practiceWord) taskBox.append(button('ลองฝึกคำนี้ในประโยคเดิม', backToSentence, 'egl-ph-button', taskListeners));
+        if (exercise.sources && exercise.sources.length) {
+          const references = el('details', 'egl-ph-task-sources'); references.append(el('summary', '', 'แหล่งอ้างอิงแบบฝึก'));
+          exercise.sources.forEach(url => { const link = el('a', '', new URL(url).hostname); link.href = url; link.target = '_blank'; link.rel = 'noreferrer'; references.append(link); });
+          taskBox.append(references);
+        }
       }
       function choose(group, phoneIndex) {
         stopExample();
@@ -941,7 +1015,7 @@
         currentPhone = phoneIndex == null ? group.phoneIndices[0] : phoneIndex;
         buttons.forEach(item => item.node.setAttribute('aria-pressed', String(item.group === group)));
         panel.replaceChildren();
-        if (group.silent) { panel.append(el('strong', '', 'ตัวสะกด ' + group.letters + ' ไม่ออกเสียงแยกในคำนี้'), el('p', 'egl-ph-note', 'ส่วนนี้แสดง — เพราะไม่มีหน่วยเสียงแยกให้เทียบ ฟังรวมอยู่ในคำเต็มได้')); return; }
+        if (group.silent) { taskListeners.splice(0).forEach(remove => remove()); taskBox.replaceChildren(); taskBox.hidden = true; panel.append(el('strong', '', 'ตัวสะกด ' + group.letters + ' ไม่ออกเสียงแยกในคำนี้'), el('p', 'egl-ph-note', 'ส่วนนี้แสดง — เพราะไม่มีหน่วยเสียงแยกให้เทียบ ฟังรวมอยู่ในคำเต็มได้')); return; }
         const index = currentPhone, phone = source.phones[index], result = phoneData(index), evidence = phoneEvidence(result);
         panel.append(el('strong', 'egl-ph-spelling-focus', (group.letters ? group.letters + ' → ' : '') + '/' + phone + '/'));
         if (group.phoneIndices.length > 1) {
@@ -958,12 +1032,15 @@
         resultBox.append(el('strong', 'egl-ph-part-status', evidence.label), el('span', 'egl-ph-part-result-label', 'การจับคู่ของโมเดล · ไม่ใช่คะแนนการออกเสียง'));
         const advice = el('p', 'egl-ph-part-advice', phoneResultText(result, phone));
         resultBox.append(advice, el('p', 'egl-ph-part-method', 'หากต้องการฝึกส่วนนี้: ' + recommendedMethod(phone, source.text))); panel.append(resultBox);
+        const raw = phoneObservation(index);
+        if (raw && observation.available) resultBox.append(el('p', 'egl-ph-part-observation', 'คำถอดเบื้องต้นส่วนนี้: ' + (raw.observed.length ? '/' + raw.observed.join(' ') + '/' : 'ยังไม่พบการจับคู่') + ' · ' + (raw.diagnosticAvailable && raw.tentative ? 'โมเดลยังไม่มั่นคง' : 'ยังไม่ใช่ผลประเมินการออกเสียง')));
         const guide = el('div', 'egl-ph-guide'); showPhoneGuide(guide, phone, null, detailListeners); panel.append(guide);
         const actions = el('div', 'egl-ph-actions');
         actions.append(button('ฟังเสียง /' + phone + '/ ในคำ', () => playPhoneExample(source, index), 'egl-ph-button', detailListeners),
           button('ฝึกเฉพาะเสียง /' + phone + '/', () => startPhonePractice(source, index, group.letters), 'egl-ph-button egl-ph-primary', detailListeners),
           button('ฟังรวมเป็นคำ', () => playExample(source), 'egl-ph-button', detailListeners));
         panel.append(actions, el('p', 'egl-ph-note', singlePhoneHint(phone)));
+        renderTask(index);
       }
       groups.forEach(group => {
         const node = button('', () => choose(group), 'egl-ph-spelling-group' + (group.silent ? ' egl-ph-silent' : ''), bucket);
@@ -974,6 +1051,8 @@
       function update() {
         summaryListeners.splice(0).forEach(remove => remove());
         feedback = spellingFeedback(source, groups);
+        observation = recognitionIssue(analysisData) === 'insufficient_audio_signal' ? null : spellingProjection(source, groups, 'observeWord');
+        renderObservation();
         buttons.forEach((item, at) => {
           const result = feedback && feedback.groups && feedback.groups[at], evidence = phoneEvidence(result);
           item.node.className = 'egl-ph-spelling-group egl-ph-evidence-' + evidence.state + (item.group.silent ? ' egl-ph-silent' : '');
@@ -1022,7 +1101,7 @@
           ? groups.find(group => group.phoneIndices.includes(practicePhone.index)) : null;
         if (groups.length) choose(currentGroup || practicedGroup || groups[0], currentGroup ? currentPhone : practicedGroup ? practicePhone.index : null);
       }
-      section.append(summary, strip, panel, rawDetails);
+      section.append(summary, observationBox, strip, taskBox, panel, rawDetails);
       update();
       const refresh = () => { if (!section.isConnected) { spellingRefreshers.delete(refresh); return; } update(); };
       spellingRefreshers.add(refresh); bucket.push(() => spellingRefreshers.delete(refresh));
