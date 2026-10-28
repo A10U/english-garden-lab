@@ -296,6 +296,7 @@
       aiTab.tabIndex = mode === 'ai' ? 0 : -1;
       ownPanel.hidden = mode !== 'own';
       aiPanel.hidden = mode !== 'ai';
+      notifyHost('onCaptureStateChange', { recording, requesting: requestingMic, preparing, busy: occupied });
     }
     function cancelRequest() {
       version += 1;
@@ -667,7 +668,8 @@
     }
     function wordAudioFor(word) {
       const key = wordKey(typeof word === 'string' ? word : word.text);
-      const catalog = global.EGL_WORD_AUDIO && global.EGL_WORD_AUDIO.by_word;
+      const selectedCatalog = options.wordAudio || global.EGL_WORD_AUDIO;
+      const catalog = selectedCatalog && selectedCatalog.by_word;
       const item = catalog && Object.prototype.hasOwnProperty.call(catalog, key) ? catalog[key] : null;
       return item && item.standalone === true && typeof item.url === 'string' && wordKey(item.text) === key ? item : null;
     }
@@ -747,7 +749,7 @@
       if (target) {
         const item = wordAudioFor(target);
         if (item && (!item.reference || item.reference.accent === accent.value)) {
-          playCompleteExample(item.url, 'เสียงคำเดี่ยว: ' + target.text + ' · สร้างเสียงคำนี้แยกต่างหาก');
+          playCompleteExample(item.url, 'เสียงคำเดี่ยว: ' + target.text + (item.source_kind === 'human' ? ' · ผู้พูดจริง ' + (item.author || '') : ' · สร้างเสียงคำนี้แยกต่างหาก'));
         } else speakEnglish(target.text, 'เสียงคำเดี่ยว: ' + target.text + ' · เสียงอังกฤษในเครื่อง');
         return;
       }
@@ -1744,6 +1746,16 @@
     secondStep.append(tabs, targetBanner, ownPanel, aiPanel,
       el('p', 'egl-ph-note', demoMode ? 'ไม่เกิน 15 วินาที / 10 MB · ขอใช้เฉพาะไมโครโฟนเมื่อกดบันทึก ไม่ใช้กล้อง · ไฟล์เสียงอยู่ในเบราว์เซอร์ กดดูผลจึงเริ่มวิเคราะห์' : 'ไม่เกิน 15 วินาที / 10 MB · เตรียมไฟล์เพื่อฟังในเบราว์เซอร์ หรือบริการในเครื่องเมื่อจำเป็น · กดดูผลเพื่อวิเคราะห์เสียง'), chosen, durationText, selfAudioControls, player);
     body.append(steps, firstStep, secondStep, status, service, resultPlaceholder, observed, examplePlayer);
+    if (options.recordingOnly === true) {
+      root.querySelector('.egl-ph-summary').textContent = 'บันทึกและฟังคำนี้';
+      steps.hidden = true; firstStep.hidden = true; tabs.hidden = true; resultPlaceholder.hidden = true;
+      secondStep.querySelector('h3').textContent = 'ลองพูดคำเต็ม แล้วฟังเสียงของฉัน';
+      const experimental = el('details', 'egl-ph-technical egl-ph-optional-analysis');
+      experimental.append(el('summary', '', 'ตัวช่วยแยกหน่วยเสียง (ทดลอง · ไม่จำเป็นต้องใช้เพื่อฝึกต่อ)'),
+        el('p', 'egl-ph-note', 'ผลอัตโนมัติอาจประเมินคำสั้นไม่ได้ คุณฝึกและฟังเทียบได้โดยไม่ต้องรอคะแนน'), analyzeButton, cancelBrowserButton);
+      if (browserNotice) experimental.append(browserNotice);
+      ownPanel.append(experimental);
+    }
     root.append(body); container.append(root);
 
     function stopCapture() {

@@ -22,6 +22,7 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 
 from export_demo_assets import assert_public, verify_export, wav_info
 from build_word_audio import filename as word_filename, normalize_word, verify_public as verify_word_audio
+from build_native_word_audio import verified_files as verified_native_word_files
 
 
 MARKER = ".egl-demo-build.json"
@@ -252,7 +253,7 @@ def demo_html(source: str, *, data_url: str, trial: dict | None = None, runtime_
         def version_script(match):
             prefix, quote, url = match.groups()
             parsed = urlsplit(url)
-            if parsed.scheme or parsed.netloc or (Path(parsed.path).name not in {"phonetics.js", "browser-phonetics.js", "spelling-feedback.js", "speak.js"} and Path(parsed.path).suffix != '.css'):
+            if parsed.scheme or parsed.netloc or (Path(parsed.path).name not in {"phonetics.js", "browser-phonetics.js", "spelling-feedback.js", "speak.js", "foundations.js", "core-word-data.js", "phone-guide.js"} and Path(parsed.path).suffix != '.css'):
                 return match[0]
             query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key != "v"]
             versioned = parsed._replace(query=urlencode(query + [("v", runtime_version)])).geturl()
@@ -348,12 +349,15 @@ def build(project_root: Path, output: Path) -> dict:
     files = {"index.html": (root / "index.html").read_bytes(), ".nojekyll": b""}
     files.update(word_files)
     files.update(vowel_files)
+    files.update(verified_native_word_files(root))
     app_source = root / "app"
     for path in sorted(app_source.rglob("*")):
         relative = path.relative_to(app_source)
         if relative.as_posix() == "phone-examples.js":
             continue
         if relative.parts[:2] == ("assets", "vowels"):
+            continue
+        if relative.parts[:2] == ("assets", "native-words"):
             continue
         public_credit = "app/" + relative.as_posix() in ARTICULATION_CREDIT_ASSETS
         if not path.is_file() or (path.suffix.lower() not in RUNTIME_SUFFIXES and not public_credit):
@@ -397,6 +401,9 @@ def build(project_root: Path, output: Path) -> dict:
     if "app/speak.html" in files:
         files["app/speak.html"] = demo_html(files["app/speak.html"].decode("utf-8"),
             data_url="../speech-training/demo-assets/demo-data.js", runtime_version=runtime_version, cloud_workspace=True).encode("utf-8")
+    if "app/foundations.html" in files:
+        files["app/foundations.html"] = demo_html(files["app/foundations.html"].decode("utf-8"),
+            data_url="../speech-training/demo-assets/demo-data.js", runtime_version=runtime_version).encode("utf-8")
     files["speech-training/listen.html"] = demo_html(
         (root / "speech-training/listen.html").read_text(encoding="utf-8"),
         data_url="demo-assets/demo-data.js", trial=public_trial_payload(demo), runtime_version=runtime_version).encode("utf-8")
