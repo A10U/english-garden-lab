@@ -1519,6 +1519,8 @@
       const found = data.observed || {};
       const metrics = data.metrics || {};
       const alignment = data.alignment || {}, operations = Array.isArray(alignment.operations) ? alignment.operations : [];
+      const phones = Array.isArray(found.phones) ? found.phones : [];
+      const rawPhones = phones.map(phone => typeof phone === 'string' ? phone : phone && phone.phone).filter(phone => typeof phone === 'string' && phone.trim());
       const summary = alignment.summary || operationCounts(operations);
       const uncertain = uncertainRecognition(data);
       const overall = uncertain ? null : percentage(summary, operations);
@@ -1528,6 +1530,21 @@
       score.append(el('span', 'egl-ph-counts', uncertain ? issue === 'insufficient_audio_signal' ? 'สัญญาณเสียงยังไม่เพียงพอสำหรับเปรียบเทียบ' : 'ระบบยังแยกหน่วยเสียงสำหรับเปรียบเทียบไม่ได้อย่างมั่นคง' : evidence ? 'ตัวเลขจับคู่ดิบอยู่ในรายละเอียดด้านล่าง' : countsText(summary, operations)));
       observed.replaceChildren(el('h3', 'egl-ph-step-title', practicePhone ? '3 · ผลเฉพาะเสียง /' + practicePhone.phone + '/ ในคำ ' + practiceWord.text : practiceWord ? '3 · ผลคำว่า ' + practiceWord.text : '3 · ดูผลทีละคำ'), score);
       if (uncertain) {
+        if (issue !== 'insufficient_audio_signal') {
+          // Capture and decoding are separate facts. Preserve provisional raw
+          // output without presenting an uncertain substitution as a diagnosis.
+          const received = el('section', 'egl-ph-recognition-evidence');
+          received.setAttribute('aria-label', 'คลิปที่ได้รับและคำถอดเบื้องต้น');
+          received.append(el('strong', 'egl-ph-capture-status', rawPhones.length
+            ? 'ได้รับคลิปแล้ว · โมเดลถอดเสียงได้ แต่ยังไม่มั่นคง'
+            : 'ได้รับคลิปแล้ว · โมเดลยังถอดหน่วยเสียงไม่ได้'));
+          if (rawPhones.length) {
+            received.append(el('p', 'egl-ph-note egl-ph-provisional-reading', 'คำถอดเบื้องต้นของโมเดล: /' + rawPhones.join(' ') + '/'));
+            if (data.reference && typeof data.reference.ipa === 'string') received.append(el('p', 'egl-ph-note egl-ph-target-reading', 'เสียงอ้างอิงที่เลือก: /' + data.reference.ipa.replace(/[ˈˌ]/g, '') + '/'));
+            received.append(el('p', 'egl-ph-note', 'คำถอดอาจมีเสียงเกิน ขาด หรือคลาดเคลื่อน จึงยังใช้ตัดสินว่าคุณออกเสียงผิดหรือชี้จุดที่ต้องแก้ไม่ได้'));
+          }
+          observed.append(received);
+        }
         const explanation = issue === 'insufficient_audio_signal'
           ? 'สัญญาณเสียงเบาหรือมีช่วงเสียงสั้นเกินกว่าจะประเมินได้ ลองกดฟังไฟล์ก่อน แล้วบันทึกใหม่เมื่อขึ้น “เริ่มพูดได้”'
           : issue === 'no_detected_phones'
@@ -1544,7 +1561,6 @@
       if (demoMode && data.precomputed === true) observed.append(el('p', 'egl-ph-note egl-ph-demo-result', 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · ไม่ใช่ผลจากเสียงที่คุณบันทึก'));
       observed.append(el('p', 'egl-ph-note', practicePhone ? 'ป้ายนี้อธิบายการจับคู่ที่โมเดลทำได้ ยังไม่ใช่ผลรับรองความถูกต้องของการออกเสียง' : 'เปอร์เซ็นต์นับการจับคู่หน่วยเสียง ไม่ใช่คะแนนความสามารถหรือระดับเจ้าของภาษา'));
       observed.append(el('p', 'egl-ph-note', 'ไฟล์ที่เปรียบเทียบ: ' + clipLabel));
-      const phones = Array.isArray(found.phones) ? found.phones : [];
       const words = Array.isArray(alignment.words) ? alignment.words : [];
       if (words.length) {
         if (!practicePhone) {
@@ -1599,7 +1615,8 @@
       resultPlaceholder.hidden = true;
       setStatus(uncertain ? issue === 'insufficient_audio_signal'
         ? 'สัญญาณเสียงยังไม่เพียงพอ จึงยังให้เปอร์เซ็นต์ไม่ได้ · กดฟังไฟล์แล้วลองบันทึกเมื่อขึ้น “เริ่มพูดได้”'
-        : 'ระบบยังแยกหน่วยเสียงได้ไม่มั่นคง จึงยังให้เปอร์เซ็นต์ไม่ได้ · ฟังเทียบหรือลองฝึกในประโยคได้'
+        : rawPhones.length ? 'ได้รับคลิปแล้ว · โมเดลถอดเสียงได้แต่ยังไม่มั่นคง จึงยังให้เปอร์เซ็นต์ไม่ได้ · ดูคำถอดเบื้องต้นและฟังเทียบได้'
+          : 'ได้รับคลิปแล้ว แต่โมเดลยังถอดหน่วยเสียงไม่ได้ จึงยังให้เปอร์เซ็นต์ไม่ได้ · ฟังคลิปเต็มเทียบกับตัวอย่างได้'
         : demoMode && data.precomputed === true ? 'ผลวิเคราะห์เสียงตัวอย่างที่เตรียมไว้ · แตะคำเพื่อดูรายละเอียด' : 'วิเคราะห์จากไฟล์เสียงแล้ว แตะคำเพื่อฟังและเปรียบเทียบด้วยตัวเอง', uncertain);
       if (wordItems.length) selectWord(0);
       notifyHost('onAnalysis', { data, clipKind, target: data.reference && data.reference.text || '', clipId });

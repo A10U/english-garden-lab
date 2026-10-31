@@ -232,10 +232,13 @@
   function composeAnalysis(reference, observed, metrics) {
     if (!reference || !Array.isArray(reference.words)) throw new TypeError('A text pronunciation reference is required');
     validateObserved(observed);
-    if (!observed.length) throw new AnalysisError('โมเดลยังตรวจไม่พบหน่วยเสียง กรุณาพูดให้ชัดและลองใหม่');
     if (!metrics || !Number.isFinite(metrics.duration_seconds) || metrics.duration_seconds <= 0) {
       throw new TypeError('Validated audio metrics are required');
     }
+    // An empty CTC decode is a recognition outcome, not proof that capture
+    // failed. Preserve the validated clip metrics and unresolved/null-score
+    // alignment so the UI can distinguish this from an absent audio signal.
+    // waveformMetrics still rejects silent/insufficient input before inference.
     const phones = observed.map(item => ({ ...item }));
     return { reference, observed: { ipa: phones.map(item => item.phone).join(' '), phones,
       duration_seconds: metrics.duration_seconds }, alignment: alignPhoneSequences(reference.words, phones),
