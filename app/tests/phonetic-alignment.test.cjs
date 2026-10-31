@@ -161,7 +161,7 @@ test('Wav2Vec2 normalization removes mean and uses population variance without c
   assert.ok(P.normalizeWaveform(new Float32Array(100).fill(0.05)).every(value => value === 0));
   assert.ok(P.normalizeWaveform(new Float32Array(100)).every(value => value === 0));
   // The original energy check permits DC energy, but normalization does not
-  // invent variance. A recognizer that emits no phones must still be rejected.
+  // invent variance. An empty recognition must never become a successful score.
   const [constant] = P.waveformMetrics(new Float32Array(16000).fill(0.05));
   assert.ok(P.normalizeWaveform(constant).every(value => value === 0));
   assert.throws(() => P.waveformMetrics(new Float32Array(16000)), P.AnalysisError);
@@ -181,8 +181,38 @@ test('full analysis keeps independent observed phones and supports live metadata
   assert.equal(result.precomputed, false);
   assert.equal(result.live_analysis, true);
   assert.equal('score' in result, false); assert.equal('confidence' in result, false);
-  assert.throws(() => P.composeAnalysis(reference, [], metrics), P.AnalysisError);
   assert.throws(() => P.composeAnalysis(reference, phones, { duration_seconds: NaN }), TypeError);
+});
+
+test('valid captured audio with an empty CTC decode preserves metrics and an unresolved null-score result', () => {
+  const reference = { text: 'ship', accent: 'en-us', ipa: 'ʃɪp', words: [word('ship', ['ʃ', 'ɪ', 'p'])] };
+  const signal = Float32Array.from({ length: 16000 }, (_, index) => .1 * Math.sin(index * .2));
+  const [, metrics] = P.waveformMetrics(signal);
+  const original = JSON.stringify({ reference, metrics });
+  const result = P.composeAnalysis(reference, [], metrics);
+  assert.equal(result.audio_analyzed, true);
+  assert.deepEqual(result.observed, { ipa: '', phones: [], duration_seconds: 1 });
+  assert.deepEqual(result.metrics, metrics);
+  assert.notEqual(result.metrics, metrics);
+  assert.equal(result.alignment.summary.match_percent, null);
+  assert.equal(result.alignment.summary.calibrated_pronunciation_grade, false);
+  assert.equal(result.alignment.words[0].status, 'unresolved');
+  assert.equal(result.alignment.words[0].match_percent, null);
+  assert.ok(result.alignment.operations.every(operation => operation.observed === null));
+  assert.equal(JSON.stringify({ reference, metrics }), original);
+  assert.equal('score' in result, false);
+  assert.equal('confidence' in result, false);
+  assert.throws(() => P.waveformMetrics(new Float32Array(16000)), P.AnalysisError);
+});
+
+test('empty recognition does not bypass malformed clip metrics or reference validation', () => {
+  const reference = { text: 'ship', words: [word('ship', ['ʃ', 'ɪ', 'p'])] };
+  for (const metrics of [null, {}, { duration_seconds: 0 }, { duration_seconds: -1 },
+    { duration_seconds: NaN }, { duration_seconds: Infinity }, { duration_seconds: '1' }]) {
+    assert.throws(() => P.composeAnalysis(reference, [], metrics), TypeError);
+  }
+  assert.throws(() => P.composeAnalysis({ words: [{ text: 'ship', phones: ['ʃ'] }] }, [], { duration_seconds: 1 }), TypeError);
+  assert.throws(() => P.composeAnalysis(reference, null, { duration_seconds: 1 }), TypeError);
 });
 
 test('alignment leaves frozen caller data intact and browser global exports need no browser services', () => {

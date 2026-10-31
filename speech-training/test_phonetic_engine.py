@@ -234,12 +234,36 @@ class PhoneticEngineTests(unittest.TestCase):
         self.assertEqual(result["alignment"]["words"][0]["status"], "difference")
         self.assertNotIn("score", result)
         self.assertNotIn("confidence", result)
+        self.assertNotIn("recognition_quality", result)
 
     def test_model_empty_decode_is_not_replaced_by_text_ipa(self):
         analyzer = PhoneticAnalyzer()
+        audio = (0.1 * np.sin(2 * np.pi * 220 * np.arange(16000) / 16000)).astype(np.float32)
         with patch.object(analyzer, "_phonemize_words", return_value=([["h"]], ["h"], "sentence")), \
-                patch.object(analyzer, "_recognize", return_value=[]), self.assertRaises(AnalysisError):
-            analyzer.analyze_waveform(np.full(16000, 0.05), "hello")
+                patch.object(analyzer, "_recognize", return_value=[]) as recognize:
+            result = analyzer.analyze_waveform(audio, "hello")
+        recognize.assert_called_once()
+        self.assertTrue(result["audio_analyzed"])
+        self.assertEqual(result["observed"], {"ipa": "", "phones": [], "duration_seconds": 1.0})
+        self.assertEqual(result["metrics"], waveform_metrics(audio)[1])
+        self.assertEqual(result["alignment"]["words"][0]["status"], "unresolved")
+        self.assertIsNone(result["alignment"]["words"][0]["match_percent"])
+        self.assertIsNone(result["alignment"]["summary"]["match_percent"])
+        self.assertFalse(result["alignment"]["summary"]["calibrated_pronunciation_grade"])
+        self.assertEqual(result["recognition_quality"], {
+            "status": "uncertain", "reason": "no_detected_phones", "calibrated": False,
+        })
+        self.assertNotIn("score", result)
+        self.assertNotIn("confidence", result)
+
+    def test_empty_decode_handling_does_not_bypass_silence_check(self):
+        analyzer = PhoneticAnalyzer()
+        with patch.object(analyzer, "annotate_text") as annotate, \
+                patch.object(analyzer, "_recognize", return_value=[]) as recognize:
+            with self.assertRaises(AnalysisError):
+                analyzer.analyze_waveform(np.zeros(16000, np.float32), "hello")
+        annotate.assert_not_called()
+        recognize.assert_not_called()
 
     @unittest.skipUnless(importlib.util.find_spec("phonemizer") is not None and (
         shutil.which("espeak-ng") or Path("/opt/homebrew/opt/espeak-ng/lib/libespeak-ng.dylib").exists()

@@ -396,9 +396,10 @@ class PhoneticAnalyzer:
             raise
         except (OSError, RuntimeError, ValueError) as exc:
             raise AnalysisError("วิเคราะห์ไฟล์เสียงไม่สำเร็จ กรุณาลองไฟล์เสียงสั้นลง") from exc
-        if not phones:
-            raise AnalysisError("โมเดลยังตรวจไม่พบหน่วยเสียง กรุณาพูดให้ชัดและลองใหม่")
-        return {
+        # Adequate captured audio can still decode to no CTC phones. Preserve
+        # that recognition outcome and its metrics instead of treating it as a
+        # recording failure or substituting the expected text's pronunciation.
+        result = {
             "reference": reference,
             "observed": {
                 "ipa": " ".join(phone["phone"] for phone in phones), "phones": phones,
@@ -408,3 +409,8 @@ class PhoneticAnalyzer:
             "metrics": metrics, "analysis_type": "acoustic_phone_comparison",
             "audio_analyzed": True, "limitations": list(LIMITATIONS),
         }
+        if not phones:
+            result["recognition_quality"] = {
+                "status": "uncertain", "reason": "no_detected_phones", "calibrated": False,
+            }
+        return result

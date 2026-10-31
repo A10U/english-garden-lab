@@ -1135,3 +1135,50 @@ test('hosted learner route refuses prerecorded AI results even when their text m
   assert.equal(app.calls.length, 0);
   app.cleanup(); app.dom.window.close();
 });
+
+test('an uncertain short word reports received audio and raw phones without claiming no capture or diagnosing the extra token', async () => {
+  // Synthetic phoneme fixture only; no learner audio, trace, or identifiers.
+  const aligner = require('../phonetic-alignment.js');
+  const expected = {text:'ship',accent:'en-us',ipa:'ʃɪp',words:[{index:0,text:'ship',ipa:'ʃɪp',phones:['ʃ','ɪ','p']}]};
+  const heard = ['ʃ','tʃ','ɪ','p'].map((phone,index)=>({phone,start:.2+index*.1,end:.3+index*.1}));
+  const data = {...analysis({reference:expected,observed:{ipa:'ʃ tʃ ɪ p',phones:heard,duration_seconds:1.5},
+    alignment:aligner.alignPhoneSequences(expected.words,heard),metrics:{duration_seconds:1.5,voiced_seconds:.5,rms_dbfs:-24}}),
+    recognition_quality:{status:'uncertain',reason:'low_token_posterior',mean_token_posterior:.57,threshold:.65,calibrated:false}};
+  const before=JSON.stringify(data);
+  const app=await analyzeFixture(data,{mount:{text:'ship',precomputed:expected}});
+  const section=app.container.querySelector('.egl-ph-observed');
+  assert.match(section.querySelector('.egl-ph-capture-status').textContent,/ได้รับคลิปแล้ว.*ถอดเสียงได้/);
+  const reading=section.querySelector('.egl-ph-provisional-reading');
+  assert.equal(reading.textContent,'คำถอดเบื้องต้นของโมเดล: /ʃ tʃ ɪ p/');
+  assert.equal(reading.closest('.egl-ph-analysis-details'),null,'raw decoding must be visible without opening technical details');
+  assert.equal(section.querySelector('.egl-ph-target-reading').textContent,'เสียงอ้างอิงที่เลือก: /ʃɪp/');
+  assert.equal(section.querySelector('.egl-ph-percent').textContent,'—');
+  assert.equal(section.querySelector('.egl-ph-phone-pairs'),null);
+  assert.match(section.querySelector('.egl-ph-recognition-evidence').textContent,/ยังใช้ตัดสิน.*ผิด.*ไม่ได้/);
+  assert.equal(JSON.stringify(data),before);assert.equal(data.recognition_quality.threshold,.65);
+  assert.match(app.container.querySelector('[role=status]').textContent,/ได้รับคลิปแล้ว.*ยังให้เปอร์เซ็นต์ไม่ได้/);
+  app.button('ฟังเสียงของฉันทั้งคลิป').click();assert.equal(app.playedElements.at(-1),app.container.querySelector('.egl-ph-player'));
+  app.cleanup();app.dom.window.close();
+});
+
+test('empty decoding with adequate input preserves an unassessed replayable result without fabricating phones', async () => {
+  const data=recognitionFixture([]);data.recognition_quality.reason='no_nonblank_frames';
+  const app=await analyzeFixture(data,recognitionUIOptions(data));
+  const observed=app.container.querySelector('.egl-ph-observed');
+  assert.match(observed.querySelector('.egl-ph-capture-status').textContent,/ได้รับคลิปแล้ว.*ยังถอดหน่วยเสียงไม่ได้/);
+  assert.equal(observed.querySelector('.egl-ph-provisional-reading'),null);
+  assert.equal(observed.querySelector('.egl-ph-percent').textContent,'—');
+  assert.match(app.container.querySelector('[role=status]').textContent,/ได้รับคลิปแล้ว.*ยังให้เปอร์เซ็นต์ไม่ได้/);
+  app.button('ฟังเสียงของฉันทั้งคลิป').click();assert.equal(app.playedElements.at(-1),app.container.querySelector('.egl-ph-player'));
+  app.cleanup();app.dom.window.close();
+});
+
+test('insufficient input does not promote decoder guesses as evidence of captured speech', async () => {
+  const data=recognitionFixture(['ʃ','ɪ','p']);data.metrics.rms_dbfs=-80;data.metrics.voiced_seconds=0;
+  const app=await analyzeFixture(data,recognitionUIOptions(data));
+  const observed=app.container.querySelector('.egl-ph-observed');
+  assert.equal(observed.querySelector('.egl-ph-recognition-evidence'),null);
+  assert.equal(observed.querySelector('.egl-ph-percent').textContent,'—');
+  assert.match(app.container.querySelector('[role=status]').textContent,/สัญญาณเสียงยังไม่เพียงพอ/);
+  app.cleanup();app.dom.window.close();
+});

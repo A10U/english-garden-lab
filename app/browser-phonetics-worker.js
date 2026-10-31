@@ -1,6 +1,7 @@
 /* Acoustic phoneme recognition runs in this worker. Audio is never uploaded. */
 'use strict';
-importScripts('vendor/onnxruntime/ort.wasm.min.js', 'phonetic-alignment.js', 'browser-phoneme-model.js');
+const runtimeQuery = new URL(self.location.href).search;
+importScripts('vendor/onnxruntime/ort.wasm.min.js', 'phonetic-alignment.js' + runtimeQuery, 'browser-phoneme-model.js' + runtimeQuery);
 const model = self.EGLBrowserPhonemeModel;
 const alignment = self.EGLPhoneticAlignment;
 const vocabulary = Object.fromEntries(Object.entries(model.vocab).map(([phone, id]) => [id, phone]));

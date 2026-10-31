@@ -27,15 +27,15 @@ const phoneFrames = (posterior = .8, tokens = [17, 6, 5]) => tokens.flatMap(toke
   { token: 0, posterior: .99 }, { token, posterior },
 ]);
 
-function setup(outputFactory) {
-  const messages = [], inputs = [], outputDisposals = [];
+function setup(outputFactory, query = '') {
+  const messages = [], inputs = [], outputDisposals = [], imports = [];
   let creates = 0, runs = 0;
   class Tensor {
     constructor(type, data, dims) { this.type = type; this.data = data; this.dims = dims; this.disposals = 0; inputs.push(this); }
     dispose() { this.disposals++; }
   }
   const self = {
-    location: { href: 'https://garden.example/app/browser-phonetics-worker.js' },
+    location: { href: 'https://garden.example/app/browser-phonetics-worker.js' + query },
     EGLPhoneticAlignment: alignment,
     EGLBrowserPhonemeModel: { ...model, bytes: 1, sha256: '00'.repeat(32) },
     postMessage(message) { messages.push(message); },
@@ -53,13 +53,13 @@ function setup(outputFactory) {
     } };
   } } };
   const context = vm.createContext({
-    self, ort, Float32Array, Uint8Array, URL, Response, importScripts() {},
+    self, ort, Float32Array, Uint8Array, URL, Response, importScripts(...names) { imports.push(...names); },
     crypto: { subtle: { digest: async () => new Uint8Array(32).buffer } },
     fetch() { throw new Error('Tests must not download weights or upload learner audio'); },
   });
   vm.runInContext(source, context, { filename: 'browser-phonetics-worker.js' });
   return {
-    context, messages, inputs, outputDisposals, creates: () => creates, runs: () => runs,
+    context, messages, inputs, outputDisposals, imports, creates: () => creates, runs: () => runs,
     async analyze(id = 1, expected = reference(), samples = waveform()) {
       await self.onmessage({ data: { id, samples, reference: expected } });
       return messages.filter(message => message.id === id && message.type !== 'progress').at(-1);
@@ -288,12 +288,34 @@ test('invalid tensor dimensions and truncated or oversized data cannot publish a
   }
 });
 
-test('missing output and blank-only recognition fail without manufacturing a pronunciation result', async () => {
-  for (const output of [null, {}, { logits: logits([{ token: 0, posterior: .99 }]) }]) {
+test('missing model output fails rather than claiming an analyzed clip', async () => {
+  for (const output of [null, {}]) {
     const app = setup(() => output);
     const failed = await app.analyze();
     assert.equal(failed.type, 'error');
     assert.equal(app.messages.some(message => message.type === 'result'), false);
     assert.equal(app.inputs[0].disposals, 1);
   }
+});
+
+test('adequate captured signal with blank CTC output returns unresolved evidence and the worker can analyze the next take', async () => {
+  const app=setup(run=>({logits:logits(run===0?Array.from({length:25},()=>({token:0,posterior:.99})):phoneFrames(.9))}));
+  const blank=await app.analyze(1);
+  assert.equal(blank.type,'result');assert.equal(blank.result.audio_analyzed,true);
+  assert.equal(blank.result.observed.phones.length,0);
+  assert.equal(blank.result.metrics.duration_seconds,.6);
+  assert.ok(blank.result.metrics.voiced_seconds>0);
+  assert.equal(blank.result.recognition_quality.reason,'no_nonblank_frames');
+  assert.equal(blank.result.recognition_quality.mean_token_posterior,null);
+  assert.equal(blank.result.recognition_quality.status,'uncertain');
+  assert.equal(blank.result.alignment.summary.match_percent,null);
+  assert.equal(blank.result.alignment.words[0].status,'unresolved');
+  const next=await app.analyze(2);assert.equal(next.type,'result');assert.equal(next.result.recognition_quality.status,'recognized');
+  assert.equal(app.creates(),1);assert.equal(app.runs(),2);
+  assert.ok(app.inputs.every(input=>input.disposals===1));assert.ok(app.outputDisposals.every(output=>output.disposals===1));
+});
+test('versioned worker imports matching analysis helpers so stale cached empty-result behavior cannot mix releases',()=>{
+  const versioned=setup(()=>({logits:logits(phoneFrames(.9))}),'?v=release-hash');
+  assert.deepEqual(versioned.imports,['vendor/onnxruntime/ort.wasm.min.js','phonetic-alignment.js?v=release-hash','browser-phoneme-model.js?v=release-hash']);
+  assert.ok(setup(()=>null).imports.includes('phonetic-alignment.js'));
 });
