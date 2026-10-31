@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "accent": "en-us",
   "purpose": "Basic word listening/practice and independent evaluation; not expert grading labels",
   "dictionary": {
@@ -131,7 +131,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "bit",
@@ -186,7 +187,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "beat",
@@ -241,7 +243,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "sit",
@@ -296,7 +299,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "seat",
@@ -351,7 +355,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "ship",
@@ -406,7 +411,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "sheep",
@@ -461,7 +467,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "see",
@@ -514,7 +521,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "this",
@@ -574,7 +582,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Muke",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "that",
@@ -634,7 +643,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "these",
@@ -689,7 +699,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "those",
@@ -744,7 +755,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "thin",
@@ -799,7 +811,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Muke",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "then",
@@ -854,7 +867,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "think",
@@ -911,7 +925,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "three",
@@ -966,7 +981,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "leaf",
@@ -1021,7 +1037,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "leave",
@@ -1076,7 +1093,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "lip",
@@ -1131,7 +1149,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "leap",
@@ -1169,7 +1188,8 @@
       },
       "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
       "available": false,
-      "reason": "No approved audio/license/self-declared native-speaker provenance in this pass"
+      "reason": "No approved audio/license/self-declared native-speaker provenance in this pass",
+      "accent": "en-us"
     },
     {
       "word": "light",
@@ -1224,7 +1244,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "right",
@@ -1279,7 +1300,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "write",
@@ -1334,7 +1356,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "it's",
@@ -1394,7 +1417,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "with",
@@ -1464,7 +1488,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "we",
@@ -1517,7 +1542,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "you",
@@ -1570,7 +1596,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "what",
@@ -1631,7 +1658,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "where",
@@ -1691,7 +1719,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "when",
@@ -1763,7 +1792,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "who",
@@ -1816,7 +1846,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "why",
@@ -1874,7 +1905,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "how",
@@ -1927,7 +1959,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "yes",
@@ -1982,7 +2015,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "no",
@@ -2035,7 +2069,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "can",
@@ -2095,7 +2130,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "can't",
@@ -2152,7 +2188,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "want",
@@ -2215,7 +2252,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "water",
@@ -2272,7 +2310,8 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
     },
     {
       "word": "work",
@@ -2327,7 +2366,751 @@
       "speaker_profile": "https://commons.wikimedia.org/wiki/User:Dvortygirl",
       "native_status": "self-declared native English on contributor profile; not independently certified",
       "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
-      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review"
+      "audio_label_review": "source filename/metadata plus dictionary cross-reference; no expert listening review",
+      "accent": "en-us"
+    },
+    {
+      "word": "it",
+      "accent": "en-gb",
+      "group": "vowels",
+      "reference": {
+        "text": "it",
+        "accent": "en-gb",
+        "ipa": "ɪt",
+        "words": [
+          {
+            "index": 0,
+            "text": "it",
+            "ipa": "ɪt",
+            "phones": [
+              "ɪ",
+              "t"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-8599dce0ac074df41564.wav",
+      "sha256": "330b66d94e7e34b44a5d2fa069051a8022c4d291443372ce2d5788be2f71676c",
+      "bytes": 55278,
+      "duration_seconds": 1.15,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-it.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/4/43/En-uk-it.ogg",
+      "source_sha1": "70769f1c6eca476380b895c502ae11cfe6220850",
+      "source_sha256": "8599dce0ac074df415647bbe261713dd27c702a882192813c6e562e130b39799",
+      "source_timestamp": "2010-01-18T23:33:01Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-it.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "light",
+      "accent": "en-gb",
+      "group": "endings",
+      "reference": {
+        "text": "light",
+        "accent": "en-gb",
+        "ipa": "lˈaɪt",
+        "words": [
+          {
+            "index": 0,
+            "text": "light",
+            "ipa": "lˈaɪt",
+            "phones": [
+              "l",
+              "aɪ",
+              "t"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-370de43555c565269f54.wav",
+      "sha256": "5347c610c2635f032632c09894dbce3c34a2b36affce40faa84fe9d741573a08",
+      "bytes": 60078,
+      "duration_seconds": 1.25,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-light.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/a/ac/En-uk-light.ogg",
+      "source_sha1": "1abb9093c247dd24b8f3d055edf03665a057cdaf",
+      "source_sha256": "370de43555c565269f54fee58b02371125df68eee1c1d3952d638fbad2870c1a",
+      "source_timestamp": "2010-01-19T06:51:01Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-light.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "right",
+      "accent": "en-gb",
+      "group": "endings",
+      "reference": {
+        "text": "right",
+        "accent": "en-gb",
+        "ipa": "ɹˈaɪt",
+        "words": [
+          {
+            "index": 0,
+            "text": "right",
+            "ipa": "ɹˈaɪt",
+            "phones": [
+              "ɹ",
+              "aɪ",
+              "t"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-dfecf774e2685d55610b.wav",
+      "sha256": "0dbc65a2782d8b7f85864a3e20bfb2d432fcd433b3947922a74c93b7647eb5ea",
+      "bytes": 62478,
+      "duration_seconds": 1.3,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-right.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/4/45/En-uk-right.ogg",
+      "source_sha1": "366e8b41e468d838fe7574231459859ba409f97e",
+      "source_sha256": "dfecf774e2685d55610b7696def0f5c556528d068d0e412a6c360225f6d48607",
+      "source_timestamp": "2010-01-19T07:18:36Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-right.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "we",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "we",
+        "accent": "en-gb",
+        "ipa": "wiː",
+        "words": [
+          {
+            "index": 0,
+            "text": "we",
+            "ipa": "wiː",
+            "phones": [
+              "w",
+              "iː"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-563aa513df67d89b4b2a.wav",
+      "sha256": "6226032d58af2ca4c409e5c357594d0288bc12b52e4a641be2510d02b1b4d865",
+      "bytes": 50478,
+      "duration_seconds": 1.05,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-we.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/5/52/En-uk-we.ogg",
+      "source_sha1": "1f55ac5894b0a2d6b5c01b6020909e72357f7391",
+      "source_sha256": "563aa513df67d89b4b2accde2d581f1dab84b588a18a2f8e2c12750802d3bbfb",
+      "source_timestamp": "2010-01-19T22:52:23Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-we.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "you",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "you",
+        "accent": "en-gb",
+        "ipa": "juː",
+        "words": [
+          {
+            "index": 0,
+            "text": "you",
+            "ipa": "juː",
+            "phones": [
+              "j",
+              "uː"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-fb44e431c151ae4780de.wav",
+      "sha256": "e290da4d9ffc1e68737f27207c1f9514b11f64422bfa11e7bc0d1ea60f902d3d",
+      "bytes": 55278,
+      "duration_seconds": 1.15,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-you.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/1/13/En-uk-you.ogg",
+      "source_sha1": "1a9bed51dfae5b29d109f60fdb56ad41982e0a47",
+      "source_sha256": "fb44e431c151ae4780decb4ca5aefec6b8b9270f7807f9f950254078290562d3",
+      "source_timestamp": "2010-01-19T22:57:36Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-you.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "what",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "what",
+        "accent": "en-gb",
+        "ipa": "wˌɒt",
+        "words": [
+          {
+            "index": 0,
+            "text": "what",
+            "ipa": "wˌɒt",
+            "phones": [
+              "w",
+              "ɒ",
+              "t"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-920edf8edb263da4302d.wav",
+      "sha256": "a0d1e2599d36681c79dcbb71a62579ed7f61b34b057ef59331b970985d6e5af1",
+      "bytes": 57678,
+      "duration_seconds": 1.2,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-what.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/f2/En-uk-what.ogg",
+      "source_sha1": "7a005869dff7e96170c943be749c55818d762557",
+      "source_sha256": "920edf8edb263da4302d0de485b30291a207159c1ee883a357b3f1cba491b39c",
+      "source_timestamp": "2010-01-19T22:52:51Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-what.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "where",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "where",
+        "accent": "en-gb",
+        "ipa": "wˈeə",
+        "words": [
+          {
+            "index": 0,
+            "text": "where",
+            "ipa": "wˈeə",
+            "phones": [
+              "w",
+              "eə"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-6639e9760aae06959a15.wav",
+      "sha256": "604d118861b08a6cde151b11d25d343ae314c5bdaca98b9c5fc34e09a8049545",
+      "bytes": 60078,
+      "duration_seconds": 1.25,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-where.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/9/92/En-uk-where.ogg",
+      "source_sha1": "ec8321a4af9998a45cad0962750bab441527ee30",
+      "source_sha256": "6639e9760aae06959a1573a42c67f2ef48bf2e6af1c1fff659ee13fed5164348",
+      "source_timestamp": "2010-01-19T22:53:07Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-where.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "when",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "when",
+        "accent": "en-gb",
+        "ipa": "wˌɛn",
+        "words": [
+          {
+            "index": 0,
+            "text": "when",
+            "ipa": "wˌɛn",
+            "phones": [
+              "w",
+              "ɛ",
+              "n"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-3d1e02c185920a1b9cff.wav",
+      "sha256": "9ce4fb1196bd8e0152af5540e673535192e36f0765b0ed54d4d9a20f728e2e76",
+      "bytes": 57678,
+      "duration_seconds": 1.2,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-when.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/6/6c/En-uk-when.ogg",
+      "source_sha1": "0e7265676cbfb7496c75e5f7fab19aec0fef0571",
+      "source_sha256": "3d1e02c185920a1b9cffb3358a924f4f7435f919d2a8156053b6df7438ba6349",
+      "source_timestamp": "2010-01-19T22:53:02Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-when.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "who",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "who",
+        "accent": "en-gb",
+        "ipa": "hˈuː",
+        "words": [
+          {
+            "index": 0,
+            "text": "who",
+            "ipa": "hˈuː",
+            "phones": [
+              "h",
+              "uː"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-576a2753a665ac18e37c.wav",
+      "sha256": "6e2783106e0ce51913b4881de6e4c1d8b3e3db27a983ed203b3b956c405063d6",
+      "bytes": 55278,
+      "duration_seconds": 1.15,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-who.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/c/cf/En-uk-who.ogg",
+      "source_sha1": "e9768bc12fcc83123948c78a690025a09f976c2c",
+      "source_sha256": "576a2753a665ac18e37c0ad4e1e9ff9861c48d8f551bbbb75a4ef59c95bc8eb4",
+      "source_timestamp": "2010-01-19T22:53:24Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-who.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "why",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "why",
+        "accent": "en-gb",
+        "ipa": "wˈaɪ",
+        "words": [
+          {
+            "index": 0,
+            "text": "why",
+            "ipa": "wˈaɪ",
+            "phones": [
+              "w",
+              "aɪ"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-da722da400498f74c297.wav",
+      "sha256": "f66de2b1f9112b34d5f33b493d862ab5ee6ee0f08298cbe4f35f133f1031a31c",
+      "bytes": 60078,
+      "duration_seconds": 1.25,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-why.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/d/d9/En-uk-why.ogg",
+      "source_sha1": "f3bbd8ec91b60224d74f7720e68cca7fa2927045",
+      "source_sha256": "da722da400498f74c297607f68900489a4f8c8c6ad79b7f7d2f0b85c0d6d350e",
+      "source_timestamp": "2010-01-19T22:53:30Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-why.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "how",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "how",
+        "accent": "en-gb",
+        "ipa": "hˈaʊ",
+        "words": [
+          {
+            "index": 0,
+            "text": "how",
+            "ipa": "hˈaʊ",
+            "phones": [
+              "h",
+              "aʊ"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-ad014ac5c0dd7852c355.wav",
+      "sha256": "5a4a251498fd139d3e77e449f5e88fa6b596acd02826da082e0db30ff100024f",
+      "bytes": 57678,
+      "duration_seconds": 1.2,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-how.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/c/cc/En-uk-how.ogg",
+      "source_sha1": "4325dd4b41549b00be0e425bee8193a757b014d4",
+      "source_sha256": "ad014ac5c0dd7852c3553bcc9f11630e2e5ea9fca0414b68ca28c3ad7bd3c55a",
+      "source_timestamp": "2010-01-18T23:32:28Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-how.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "yes",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "yes",
+        "accent": "en-gb",
+        "ipa": "jˈɛs",
+        "words": [
+          {
+            "index": 0,
+            "text": "yes",
+            "ipa": "jˈɛs",
+            "phones": [
+              "j",
+              "ɛ",
+              "s"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-23e43523cf9fba8225fa.wav",
+      "sha256": "b8d7685b892bd1fbdd9c5984e680b6138c4255d5158e1fac421bc7c2121901b8",
+      "bytes": 55278,
+      "duration_seconds": 1.15,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-yes.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/a/a3/En-uk-yes.ogg",
+      "source_sha1": "02d61649fd461c6cd9879d92a385494d2e4cd58f",
+      "source_sha256": "23e43523cf9fba8225fa36f172ee4cc2d63dfa888fe95550bf36f57c057b6d55",
+      "source_timestamp": "2010-01-19T22:57:24Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-yes.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "no",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "no",
+        "accent": "en-gb",
+        "ipa": "nˈəʊ",
+        "words": [
+          {
+            "index": 0,
+            "text": "no",
+            "ipa": "nˈəʊ",
+            "phones": [
+              "n",
+              "əʊ"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-3423463a61d8a27258ba.wav",
+      "sha256": "df2f475945b179ed69733a2ee8bdea0878fbc6ac8abba648fe5c2d056096b0a0",
+      "bytes": 52878,
+      "duration_seconds": 1.1,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-no.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/9/91/En-uk-no.ogg",
+      "source_sha1": "daa8cc83a8be09c0576e908e3d6f0a5d51f3337c",
+      "source_sha256": "3423463a61d8a27258ba49378634c24cc5501d3293280b27a47032aba448cfd1",
+      "source_timestamp": "2010-01-19T07:13:21Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-no.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "water",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "water",
+        "accent": "en-gb",
+        "ipa": "wˈɔːtə",
+        "words": [
+          {
+            "index": 0,
+            "text": "water",
+            "ipa": "wˈɔːtə",
+            "phones": [
+              "w",
+              "ɔː",
+              "t",
+              "ə"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-e1d6da91922489f92454.wav",
+      "sha256": "135964c86b989c70b0d38ea45b110f30ccde0d1e7e2db3319d49a3c0a788ede6",
+      "bytes": 60078,
+      "duration_seconds": 1.25,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-water.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/1/1a/En-uk-water.ogg",
+      "source_sha1": "138388c677dc2f838e9935cfbda64c6cb457bd32",
+      "source_sha256": "e1d6da91922489f924541897f35024c1f1667dc80b2daf266017903389008af2",
+      "source_timestamp": "2010-01-19T22:52:12Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-water.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
+    },
+    {
+      "word": "work",
+      "accent": "en-gb",
+      "group": "everyday",
+      "reference": {
+        "text": "work",
+        "accent": "en-gb",
+        "ipa": "wˈɜːk",
+        "words": [
+          {
+            "index": 0,
+            "text": "work",
+            "ipa": "wˈɜːk",
+            "phones": [
+              "w",
+              "ɜː",
+              "k"
+            ]
+          }
+        ],
+        "analysis_type": "text_pronunciation_reference",
+        "audio_analyzed": false,
+        "reference_context": "isolated_word",
+        "notes": [
+          "คำอ่านอ้างอิง UK แบบ canonical ไม่ใช่ผู้เชี่ยวชาญถอดเสียงของคลิปนี้"
+        ]
+      },
+      "reference_source": "eSpeak NG en-gb canonical word reference; not US CMUdict",
+      "available": true,
+      "assessment_label": "canonical_text_reference_not_expert_audio_annotation",
+      "source_kind": "human",
+      "standalone": true,
+      "url": "assets/native-words/word-71ac50ecc26cdd486018.wav",
+      "sha256": "cd49ff1d492f8f7bee92c04c7edb2b0aec31f68c9bf93ff7ba91308f358f75e0",
+      "bytes": 60078,
+      "duration_seconds": 1.25,
+      "source_page": "https://commons.wikimedia.org/wiki/File:En-uk-work.ogg",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/ff/En-uk-work.ogg",
+      "source_sha1": "9b8f82abe320d582770cd22d582a7ca706bdbba3",
+      "source_sha256": "71ac50ecc26cdd4860185ae1ae8b5b29e8c94698a08fdb2354848a44c4d00345",
+      "source_timestamp": "2010-01-19T22:54:09Z",
+      "author": "Association Shtooka, Judith Franck",
+      "license": "CC BY 3.0 us",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/us/",
+      "speaker_profile": "https://commons.wikimedia.org/wiki/File:En-uk-work.ogg",
+      "speaker_region": "London, England, according to the source file description",
+      "native_status": "UK recording and speaker location are source-described; native language not independently certified",
+      "changes": "OGG Vorbis converted to mono 24kHz PCM16 WAV; no trimming, normalization or synthetic speech",
+      "audio_label_review": "source metadata plus canonical UK reference; no expert listening review"
     }
   ],
   "training_performed": false,
@@ -2335,5 +3118,19 @@
     "Single recordings per word are insufficient for a general recognition model.",
     "Canonical dictionary references may differ from legitimate variants/allophones in a recording.",
     "Audio with matching source hashes is one recording, including homophones/redirects; do not split duplicates across train/test."
-  ]
+  ],
+  "accents": {
+    "en-us": {
+      "label": "US",
+      "description": "เสียง US ตามป้ายต้นฉบับ"
+    },
+    "en-gb": {
+      "label": "UK",
+      "description": "ตัวอย่างผู้พูดจากลอนดอนตามต้นฉบับ ไม่ครอบคลุมทุกสำเนียงใน UK"
+    }
+  },
+  "accent_detection": {
+    "available": false,
+    "note": "Labels describe reference recordings; the learner's accent is not automatically classified."
+  }
 }

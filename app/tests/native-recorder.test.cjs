@@ -3,7 +3,7 @@ const {JSDOM}=require('jsdom');
 const root=path.resolve(__dirname,'..');const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 const scope={};vm.runInNewContext(read('core-word-data.js'),scope);
 const item=scope.EGL_CORE_WORDS.words.find(w=>w.word==='this');
-function setup(t,recordingOnly){
+function setup(t,recordingOnly,referenceItem=item){
  const dom=new JSDOM('<main></main>',{url:'https://garden.example/prefix/app/foundations.html',runScripts:'outside-only'}),w=dom.window;
  const played=[],network=[];w.HTMLMediaElement.prototype.pause=function(){};w.HTMLMediaElement.prototype.load=function(){};w.HTMLMediaElement.prototype.play=function(){played.push(this.src);return Promise.resolve();};
  w.fetch=(...args)=>{network.push(args);throw Error('No automatic requests');};
@@ -11,8 +11,8 @@ function setup(t,recordingOnly){
  for(const name of ['phone-guide.js','spelling-guide.js','spelling-feedback.js','word-audio.js','phonetics.js'])w.eval(read(name));
  w.EGLBrowserPhonetics={supported:()=>true,analyze:()=>{throw Error('No automatic inference');}};
  const container=w.document.querySelector('main');
- const cleanup=w.EGLPhonetics.mount(container,{text:item.word,precomputed:JSON.parse(JSON.stringify(item.reference)),demo:true,expanded:true,recordingOnly,
-   wordAudio:{by_word:{this:{...JSON.parse(JSON.stringify(item)),text:'this'}}}});
+ const cleanup=w.EGLPhonetics.mount(container,{text:referenceItem.word,precomputed:JSON.parse(JSON.stringify(referenceItem.reference)),demo:true,expanded:true,recordingOnly,
+   wordAudio:{by_word:{[referenceItem.word]:{...JSON.parse(JSON.stringify(referenceItem)),text:referenceItem.word}}}});
  t.after(()=>{cleanup();w.close();});return {w,container,played,network};
 }
 test('beginner recorder hides editing/reference tabs and keeps optional analysis closed without starting work',t=>{
@@ -30,4 +30,13 @@ test('the per-widget human catalog takes precedence over synthesized assets and 
  assert.ok(a.played.at(-1).includes('/prefix/app/assets/native-words/'));
  assert.match(a.container.querySelector('.egl-ph-example-caption').textContent,/ผู้พูดจริง/);
  assert.doesNotMatch(a.container.querySelector('.egl-ph-example-caption').textContent,/สร้างเสียงคำนี้/);assert.deepEqual(a.network,[]);
+});
+test('a UK precomputed reference initializes the real widget in UK and plays its UK human asset',t=>{
+ const uk=scope.EGL_CORE_WORDS.words.find(w=>w.word==='work'&&w.accent==='en-gb');
+ const a=setup(t,false,uk);
+ assert.equal(a.container.querySelector('.egl-ph-select').value,'en-gb');
+ assert.equal(a.container.querySelector('.egl-ph-reference .egl-ph-ipa').textContent,uk.reference.ipa);
+ a.container.querySelector('.egl-ph-ref-word').click();
+ [...a.container.querySelector('.egl-ph-reference-focus').querySelectorAll('button')].find(b=>b.textContent==='ฟังคำตัวอย่าง').click();
+ assert.ok(a.played.at(-1).endsWith(uk.url));assert.deepEqual(a.network,[]);
 });

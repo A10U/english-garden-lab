@@ -148,3 +148,23 @@ npm test
 ข้อมูลฝึก [Hi-Fi TTS](https://www.openslr.org/109/) โดย Evelina Bakhturina, Vitaly Lavrukhin, Boris Ginsburg และ Yang Zhang (2021) ใช้ **CC BY 4.0** เลือก subset และ resample เพื่อฝึกเสียง ดูรายละเอียดการดัดแปลงและที่มาของเดโมใน [ATTRIBUTION.txt](demo-assets/ATTRIBUTION.txt)
 
 [Qwen3-TTS Base](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base), [MLX Audio](https://github.com/Blaizzy/mlx-audio), [MLX-Tune](https://github.com/ARahim3/mlx-tune), acoustic checkpoint [wav2vec2-lv-60-espeak-cv-ft](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) และ [ONNX conversion](https://huggingface.co/onnx-community/wav2vec2-lv-60-espeak-cv-ft-ONNX) ระบุ Apache 2.0; ONNX Runtime ใช้ MIT License พร้อม notices ใน `app/vendor/onnxruntime/` ส่วน [Phonemizer](https://bootphon.github.io/phonemizer/) และ [eSpeak NG](https://github.com/espeak-ng/espeak-ng) เป็น dependency GPL 3.0 ที่ติดตั้งแยก โมเดล browser ดาวน์โหลดเมื่อกดใช้ ไม่รวม model weights หรือชุดเสียงต้นฉบับไว้ใน repository
+
+## Public human reference accents for basic word practice
+
+`app/foundations.html` offers 39 available US whole-word recordings and 15 UK
+recordings whose source describes a speaker from London. These labels describe
+references, not automatic identification of a learner's accent or all regional
+variants. Same-word comparison preserves the selected target and its separate
+practice record. Changing target accent changes audio, canonical IPA and widget
+reference together. Existing v1 completion migrates to US only; v2 stores accent
+and word identifiers, never audio or scores.
+
+`prepare_core_word_audio.py` refreshes US references and preserves UK rows;
+`prepare_uk_word_audio.py` adds only the specifically attributed UK source set.
+These public-source scripts need no provider keys or training. The exporter
+verifies paths, source/author/license, accent/reference consistency and WAV
+integrity, and copies only approved assets. See per-file attribution in
+`app/assets/native-words/ATTRIBUTION.json` and `.md` for reuse conditions.
+Dictionary/G2P IPA is canonical, not an expert transcription of each recording.
+Adding example recordings does not retrain or validate the acoustic detector.
+No Google Cloud TTS service has been connected or charged for this release.

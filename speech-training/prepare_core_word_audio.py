@@ -31,6 +31,29 @@ LICENSES = {"Public domain", "CC BY-SA 3.0"}
 AGENT = "EnglishGardenCoreWords/0.1 (https://github.com/A10U/english-garden-lab; educational audio references)"
 
 
+def write_corpus(document):
+    """Keep one public catalog/credit set when an accent is added or refreshed."""
+    out = ROOT / "app/assets/native-words"
+    document["schema_version"] = 2
+    document["accent"] = "en-us"  # Legacy default, not a label for every row.
+    document["accents"] = {"en-us": {"label": "US", "description": "เสียง US ตามป้ายต้นฉบับ"}}
+    for record in document["words"]:
+        record.setdefault("accent", record["reference"]["accent"])
+    if any(record["accent"] == "en-gb" for record in document["words"]):
+        document["accents"]["en-gb"] = {"label": "UK", "description": "ตัวอย่างผู้พูดจากลอนดอนตามต้นฉบับ ไม่ครอบคลุมทุกสำเนียงใน UK"}
+    document["accent_detection"] = {"available": False, "note": "Labels describe reference recordings; the learner's accent is not automatically classified."}
+    (out / "ATTRIBUTION.json").write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n")
+    credits = ["# เสียงคำศัพท์จากผู้พูดจริง", "", "ไฟล์ WAV คง license ของเสียงต้นฉบับแต่ละรายการ เก็บเครดิตและเงื่อนไขพร้อมไฟล์เมื่อแจกจ่ายต่อ", "", "US/UK เป็นป้ายของเสียงต้นแบบ ไม่ใช่ผลจำแนกสำเนียงผู้เรียน คำอ่านเป็น canonical reference ไม่ใช่ผู้เชี่ยวชาญถอดเสียงคลิป", ""]
+    for record in document["words"]:
+        if record["available"]:
+            credits.append("- " + record["word"] + " (" + record["accent"] + ") — " + record["author"] + ", " + record["license"] + "; " + record["source_page"] + "; " + record["license_url"] + "; " + record["changes"])
+    source = document["dictionary"]
+    credits.extend(["", "CMUdict (US dictionary comparison): " + source["url"] + " @ " + source["revision"] + ". License: CMUDICT-LICENSE.txt.",
+                    "UK canonical references: eSpeak NG en-gb; no US dictionary was relabelled as UK."])
+    (out / "ATTRIBUTION.md").write_text("\n".join(credits) + "\n")
+    (ROOT / "app/core-word-data.js").write_text("/* Attributed human recordings and canonical word references; no expert pronunciation grades. */\nglobalThis.EGL_CORE_WORDS=" + json.dumps(document, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c") + ";\n")
+
+
 def fetch(url, maximum=8 * 1024 * 1024):
     req = urllib.request.Request(url, headers={"User-Agent": AGENT})
     for attempt in range(4):
@@ -135,14 +158,11 @@ def prepare():
                 "limitations": ["Single recordings per word are insufficient for a general recognition model.",
                                 "Canonical dictionary references may differ from legitimate variants/allophones in a recording.",
                                 "Audio with matching source hashes is one recording, including homophones/redirects; do not split duplicates across train/test."]}
-    (out / "ATTRIBUTION.json").write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n")
-    credits = ["# เสียงคำศัพท์จากผู้พูดจริง", "", "ไฟล์ WAV คง license ของเสียงต้นฉบับแต่ละรายการ เก็บเครดิตและเงื่อนไขพร้อมไฟล์เมื่อแจกจ่ายต่อ", "", "คำอ่านเป็น canonical reference ไม่ใช่การให้คะแนนเสียงโดยผู้เชี่ยวชาญ", ""]
-    for record in records:
-        if record["available"]:
-            credits.append("- " + record["word"] + " — " + record["author"] + ", " + record["license"] + "; " + record["source_page"] + "; " + record["license_url"] + "; " + record["changes"])
-    credits.extend(["", "CMUdict: " + dict_source["url"] + " @ " + dict_source["revision"] + ". License: CMUDICT-LICENSE.txt."])
-    (out / "ATTRIBUTION.md").write_text("\n".join(credits) + "\n")
-    (ROOT / "app/core-word-data.js").write_text("/* Attributed human recordings and canonical word references; no expert pronunciation grades. */\nglobalThis.EGL_CORE_WORDS=" + json.dumps(document, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c") + ";\n")
+    previous_path = out / "ATTRIBUTION.json"
+    if previous_path.is_file():
+        previous = json.loads(previous_path.read_text())
+        document["words"].extend(row for row in previous["words"] if row.get("accent") == "en-gb")
+    write_corpus(document)
     print(json.dumps({"target_words": len(records), "human_audio_words": sum(row["available"] for row in records), "paid_calls": 0, "training_performed": False}))
 
 

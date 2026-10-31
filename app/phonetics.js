@@ -1631,6 +1631,8 @@
     [['en-us', 'อเมริกัน (US)'], ['en-gb', 'อังกฤษ (UK)']].forEach(([value, text]) => {
       const option = el('option', '', text); option.value = value; accent.append(option);
     });
+    const initialAccent = options.accent || options.precomputed?.accent || 'en-us';
+    accent.value = ['en-us', 'en-gb'].includes(initialAccent) ? initialAccent : 'en-us';
     accentLabel.append(accent);
     advanced.append(label, textarea, accentLabel);
     const controls = el('div', 'egl-ph-actions');

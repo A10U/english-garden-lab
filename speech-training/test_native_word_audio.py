@@ -27,5 +27,17 @@ class NativeWordAudioTests(unittest.TestCase):
  def test_symlinked_audio_is_rejected(self):
   outside=self.root/'outside.wav';self.audio.rename(outside);self.audio.symlink_to(outside)
   with self.assertRaisesRegex(ValueError,'symlinked'):verified_files(self.root)
+ def test_uk_license_and_reference_are_verified_without_us_relabelling(self):
+  all_rows=json.loads((ROOT/'app/assets/native-words/ATTRIBUTION.json').read_text())['words']
+  uk=copy.deepcopy(next(row for row in all_rows if row.get('accent')=='en-gb'))
+  audio=self.root/'app'/uk['url'];audio.write_bytes((ROOT/'app'/uk['url']).read_bytes())
+  self.manifest['words']=[uk];self.write();self.assertIn('app/'+uk['url'],verified_files(self.root))
+  uk['reference']['accent']='en-us';self.write()
+  with self.assertRaisesRegex(ValueError,'accent/reference'):verified_files(self.root)
+ def test_source_label_and_unknown_accent_cannot_override_provenance(self):
+  row=self.manifest['words'][0];row['accent']='en-gb';row['reference']['accent']='en-gb';self.write()
+  with self.assertRaisesRegex(ValueError,'provenance'):verified_files(self.root)
+  row['accent']='en-au';self.write()
+  with self.assertRaisesRegex(ValueError,'provenance'):verified_files(self.root)
 
 if __name__=='__main__':unittest.main()
