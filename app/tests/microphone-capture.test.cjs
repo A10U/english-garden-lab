@@ -442,6 +442,7 @@ test('native start timeout cleans up and never announces ready from a stale even
 
 const micSelect = app => app.container.querySelector('.egl-ph-input-select');
 const micActual = app => app.container.querySelector('.egl-ph-input-actual').textContent;
+const processingSelect = app => app.container.querySelector('.egl-ph-input-processing');
 async function refreshMics(app) {
   app.button('ดูไมค์ที่ใช้งานได้').click();
   await until(() => !app.button('ดูไมค์ที่ใช้งานได้').disabled);
@@ -449,12 +450,16 @@ async function refreshMics(app) {
 function chooseMic(app, id) {
   const select = micSelect(app); select.value = id; select.dispatchEvent(new app.window.Event('change'));
 }
+function chooseProcessing(app, value) {
+  const select = processingSelect(app); select.value = value; select.dispatchEvent(new app.window.Event('change'));
+}
 const usbInput = () => ({ kind:'audioinput', deviceId:'fake-usb-input', label:'Example USB microphone' });
 
 test('microphone controls are idle on mount and explicit refresh enumerates inputs without opening a microphone', async t => {
   const app = setup(t, { enumerate:[usbInput(), {kind:'videoinput',deviceId:'camera',label:'Camera'}, {kind:'audiooutput',deviceId:'speaker',label:'Speaker'}, {kind:'audioinput',deviceId:'private-label',label:''}] });
   assert.equal(app.events.some(e=>['microphone','enumerate','context'].includes(e[0])),false); assert.equal(app.contexts.length,0);
   assert.equal(micSelect(app).value,''); assert.equal(micSelect(app).options.length,1);
+  assert.equal(processingSelect(app).value,'browser'); assert.equal(processingSelect(app).options.length,2);
   await refreshMics(app);
   assert.equal(app.events.filter(e=>e[0]==='enumerate').length,1);
   assert.equal(app.events.some(e=>e[0]==='microphone'),false); assert.equal(app.contexts.length,0);
@@ -492,6 +497,57 @@ test('default recording preserves audio:true and absent or throwing track settin
   }
 });
 
+test('experimental input processing requests ideal false only when selected, preserving exact routing and actual reported settings', async t => {
+  for (const explicitDevice of [false, true]) {
+    const changes=[],app=setup(t,{enumerate:[usbInput()],track:{label:'Reported processing input',getSettings:()=>({echoCancellation:true,noiseSuppression:true,autoGainControl:true})},mount:{onClipChange:value=>changes.push(value)}});
+    let stores=0;app.window.Storage.prototype.setItem=()=>{stores++;};
+    if(explicitDevice){await refreshMics(app);chooseMic(app,'fake-usb-input');}
+    chooseProcessing(app,'less-processing');
+    assert.equal(app.events.some(event=>event[0]==='microphone'),false,'selecting a profile must not open a microphone');
+    assert.equal(app.contexts.length,0);
+    const node=await start(app);
+    const request=JSON.parse(JSON.stringify(app.events.find(event=>event[0]==='microphone')[1]));
+    assert.deepEqual(request,{audio:{...(explicitDevice?{deviceId:{exact:'fake-usb-input'}}:{}),echoCancellation:{ideal:false},noiseSuppression:{ideal:false},autoGainControl:{ideal:false}}});
+    assert.match(micActual(app),/ลดเสียงสะท้อนเปิด.*ลดเสียงรบกวนเปิด.*ปรับระดับอัตโนมัติเปิด/,'a browser may ignore ideal:false; report the track settings');
+    assert.doesNotMatch(micActual(app),/ลดเสียงสะท้อนปิด|ลดเสียงรบกวนปิด|ปรับระดับอัตโนมัติปิด/);
+    samples(app,node,28800);await finish(app,node);
+    const previousActual=micActual(app);chooseProcessing(app,'browser');
+    assert.equal(micActual(app),previousActual,'changing the next recording profile must not relabel the existing clip');
+    assert.match(previousActual,/ไมค์ของคลิปนี้: Reported processing input/);
+    assert.doesNotMatch(JSON.stringify(changes.find(value=>value.blob).info),/processing|echoCancellation|noiseSuppression|autoGainControl|Reported processing/);
+    assert.equal(stores,0);assert.equal(app.network.length,0);
+  }
+});
+
+test('experimental requests leave unreported processing unknown and switching back restores audio:true on the next take', async t => {
+  const app=setup(t);chooseProcessing(app,'less-processing');
+  const node=await start(app);
+  assert.match(micActual(app),/เบราว์เซอร์ไม่แจ้งค่ารูปแบบเสียง/);
+  assert.doesNotMatch(micActual(app),/ลดเสียงสะท้อนปิด|ลดเสียงรบกวนปิด|ปรับระดับอัตโนมัติปิด/);
+  samples(app,node,28800);await finish(app,node);chooseProcessing(app,'browser');
+  await start(app);
+  assert.equal(app.events.filter(event=>event[0]==='microphone').at(-1)[1].audio,true);
+});
+
+test('processing preferences survive word-widget remount only in page memory without activity or persistence', async t => {
+  const app=setup(t);let stores=0;app.window.Storage.prototype.setItem=()=>{stores++;};
+  chooseProcessing(app,'less-processing');app.remount();
+  assert.equal(processingSelect(app).value,'less-processing');
+  assert.equal(app.events.some(event=>['microphone','enumerate','context'].includes(event[0])),false);
+  assert.equal(app.network.length,0);assert.equal(stores,0);
+  const fresh=setup(t);assert.equal(processingSelect(fresh).value,'browser','a separate page must reset to browser defaults');
+  chooseProcessing(app,'browser');app.remount();assert.equal(processingSelect(app).value,'browser');
+});
+
+test('enumeration disables the processing selector and ignores stale programmatic profile changes', async t => {
+  const enumeration=deferred(),app=setup(t,{enumerate:()=>enumeration.promise});
+  chooseProcessing(app,'less-processing');app.button('ดูไมค์ที่ใช้งานได้').click();
+  assert.equal(processingSelect(app).disabled,true);chooseProcessing(app,'browser');assert.equal(processingSelect(app).value,'less-processing');
+  enumeration.resolve([usbInput()]);await until(()=>!processingSelect(app).disabled);
+  assert.equal(app.events.some(event=>event[0]==='microphone'),false);
+  chooseProcessing(app,'browser');assert.equal(processingSelect(app).value,'browser');
+});
+
 test('refresh preserves an explicit preference, missing devices remain explicit, and routing failures never retry default', async t => {
   let list=[usbInput()],calls=0;
   const app=setup(t,{enumerate:()=>Promise.resolve(list),getUserMedia:()=>{calls++;return Promise.reject(Object.assign(new Error('Missing input'),{name:calls===1?'NotFoundError':'OverconstrainedError'}));}});
@@ -509,15 +565,20 @@ test('refresh preserves an explicit preference, missing devices remain explicit,
 
 test('route controls stay disabled through permission, capture and preparation; stale route change events cannot change the active request', async t => {
   const permission=deferred(),app=setup(t,{permission,enumerate:[usbInput(),{kind:'audioinput',deviceId:'second-input',label:'Second input'}]});
-  await refreshMics(app);chooseMic(app,'fake-usb-input');app.button('บันทึกเสียงของฉัน').click();
+  await refreshMics(app);chooseMic(app,'fake-usb-input');chooseProcessing(app,'less-processing');app.button('บันทึกเสียงของฉัน').click();
   assert.equal(micSelect(app).disabled,true);assert.equal(app.button('ดูไมค์ที่ใช้งานได้').disabled,true);
+  assert.equal(processingSelect(app).disabled,true);chooseProcessing(app,'browser');assert.equal(processingSelect(app).value,'less-processing');
   chooseMic(app,'second-input');assert.equal(micSelect(app).value,'fake-usb-input');
   permission.resolve(app.newStream());await until(()=>app.nodes.length&&app.nodes[0].port.commands.some(c=>c.type==='start'));
   app.nodes[0].port.emit({type:'started'});await until(()=>Boolean(app.button('หยุดบันทึก')));
+  assert.equal(processingSelect(app).disabled,true);chooseProcessing(app,'browser');assert.equal(processingSelect(app).value,'less-processing');
   const node=app.nodes[0];assert.equal(micSelect(app).disabled,true);samples(app,node,28800);app.setTime(600);app.button('หยุดบันทึก').click();
   assert.equal(micSelect(app).disabled,true);assert.equal(app.button('ดูไมค์ที่ใช้งานได้').disabled,true);
+  assert.equal(processingSelect(app).disabled,true);chooseProcessing(app,'browser');assert.equal(processingSelect(app).value,'less-processing');
   node.port.emit({type:'stopped'});await until(()=>Boolean(app.button('บันทึกเสียงของฉัน')));assert.equal(micSelect(app).disabled,false);
+  assert.equal(processingSelect(app).disabled,false);app.remount();assert.equal(processingSelect(app).value,'less-processing','ignored changes must not overwrite the remembered profile');
   assert.equal(app.events.filter(e=>e[0]==='microphone').length,1);
+  const request=app.events.find(e=>e[0]==='microphone')[1];assert.equal(request.audio.deviceId.exact,'fake-usb-input');assert.equal(request.audio.autoGainControl.ideal,false);
 });
 
 test('late enumeration after cleanup or a fresh recording cannot repopulate or change microphone controls', async t => {
@@ -553,6 +614,7 @@ test('failed enumeration preserves the explicit choice and analysis busy state p
   const input=app.container.querySelector('.egl-ph-file');Object.defineProperty(input,'files',{configurable:true,value:[new app.window.File(['fixture'],'fixture.wav',{type:'audio/wav'})]});
   input.dispatchEvent(new app.window.Event('change'));app.button('ดูผลเสียงของฉัน').click();
   assert.equal(micSelect(app).disabled,true);assert.equal(app.button('ดูไมค์ที่ใช้งานได้').disabled,true);
+  assert.equal(processingSelect(app).disabled,true);chooseProcessing(app,'less-processing');assert.equal(processingSelect(app).value,'browser');
   chooseMic(app,'second-input');assert.equal(micSelect(app).value,'fake-usb-input');
   app.cleanup();analysis.resolve(null);await flush();assert.equal(app.container.children.length,0);
 });
