@@ -230,6 +230,25 @@ class StaticDemoBuildTests(unittest.TestCase):
         for page in pages:
             self.assertEqual((self.root / page).read_bytes(), source_pages[page], 'cache versions belong to generated HTML only')
 
+    def test_read_along_page_gets_runtime_csp_and_version_without_dev_config(self):
+        app = self.root / 'app'
+        (app / 'read.html').write_text('''<!doctype html><html><head>
+<link rel="stylesheet" href="read.css"><script src="phonetics.js" defer></script>
+<script src="read.js" defer></script></head><body>
+<p id="egl-hosted-demo-notice">Cloud only after an explicit request.</p>
+<h1>Read along</h1></body></html>''')
+        (app / 'read.js').write_text('globalThis.readReady=true;')
+        (app / 'read.css').write_text('h1{font-size:3rem}')
+        (self.root / '.env.speech-cloud').write_text('PRIVATE_CONFIG_SHOULD_NOT_SHIP=1')
+        build(self.root, self.output)
+        html = (self.output / 'app/read.html').read_text()
+        self.assertIn('egl-demo-csp', html)
+        self.assertIn('EGL_DEMO_RUNTIME', html)
+        self.assertRegex(html, r'read\.js\?v=[a-f0-9]{16}')
+        self.assertRegex(html, r'read\.css\?v=[a-f0-9]{16}')
+        self.assertNotIn('PRIVATE_CONFIG_SHOULD_NOT_SHIP', html)
+        self.assertFalse((self.output / '.env.speech-cloud').exists())
+
     def test_stale_authoring_link_fails_before_output_writes(self):
         (self.root / 'index.html').write_text('<html><body><a href="SDLC/private.json">private</a></body></html>')
         with self.assertRaisesRegex(ValueError, 'Private/authoring path'):
