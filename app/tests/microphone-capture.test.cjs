@@ -35,15 +35,20 @@ function setup(t, options = {}) {
   window.fetch = (...args) => { network.push(args); return Promise.reject(new Error('Capture must remain local')); };
   function newStream() {
     const track = { stopped: 0, stop() { this.stopped++; }, readyState: 'live' };
+    Object.assign(track, typeof options.track === 'function' ? options.track(streams.length) : options.track || {});
     const stream = { track, getTracks: () => [track], getAudioTracks: () => [track] };
     streams.push(stream); return stream;
   }
   Object.defineProperty(window.navigator, 'mediaDevices', { configurable: true, value: {
     getUserMedia(constraints) {
       events.push(['microphone', constraints]);
+      if (options.getUserMedia) return options.getUserMedia(constraints, newStream);
       return options.permission ? options.permission.promise : Promise.resolve(newStream());
     }
   } });
+  if (options.enumerate !== undefined) window.navigator.mediaDevices.enumerateDevices = () => {
+    events.push(['enumerate']); return typeof options.enumerate === 'function' ? options.enumerate() : Promise.resolve(options.enumerate);
+  };
   class AudioContext {
     constructor() {
       this.sampleRate = 48000; this.state = 'suspended'; this.closed = 0;
@@ -103,10 +108,11 @@ function setup(t, options = {}) {
     { index: 0, text: 'leaf', ipa: 'liːf', phones: ['l', 'iː', 'f'] }
   ], analysis_type: 'text_pronunciation_reference', audio_analyzed: false };
   const container = window.document.getElementById('widget');
-  const cleanup = window.EGLPhonetics.mount(container, { text: 'leaf', expanded: true, precomputed: reference });
+  const mount = () => window.EGLPhonetics.mount(container, { text: 'leaf', expanded: true, precomputed: reference, ...(options.mount || {}) });
+  let cleanup = mount();
   const button = text => [...container.querySelectorAll('button')].find(item => item.textContent === text);
   t.after(() => { cleanup(); window.close(); });
-  return { window, container, cleanup, events, contexts, nodes, streams, network, blobs, revoked, encoded, button, newStream,
+  return { window, container, cleanup: () => cleanup(), remount() { cleanup(); cleanup = mount(); }, events, contexts, nodes, streams, network, blobs, revoked, encoded, button, newStream,
     setTime: value => { time = value; }, mediaRecorders: () => mediaRecorders, decodeCalls: () => decodeCalls,
     status: () => container.querySelector('[role=status]').textContent,
     player: () => container.querySelector('.egl-ph-player') };
@@ -432,4 +438,130 @@ test('native start timeout cleans up and never announces ready from a stale even
   assert.equal(timers.count(), 0);
   started(); await flush();
   assert.doesNotMatch(app.status(), /^เริ่มพูดได้/); assert.equal(app.blobs.size, 0);
+});
+
+const micSelect = app => app.container.querySelector('.egl-ph-input-select');
+const micActual = app => app.container.querySelector('.egl-ph-input-actual').textContent;
+async function refreshMics(app) {
+  app.button('ดูไมค์ที่ใช้งานได้').click();
+  await until(() => !app.button('ดูไมค์ที่ใช้งานได้').disabled);
+}
+function chooseMic(app, id) {
+  const select = micSelect(app); select.value = id; select.dispatchEvent(new app.window.Event('change'));
+}
+const usbInput = () => ({ kind:'audioinput', deviceId:'fake-usb-input', label:'Example USB microphone' });
+
+test('microphone controls are idle on mount and explicit refresh enumerates inputs without opening a microphone', async t => {
+  const app = setup(t, { enumerate:[usbInput(), {kind:'videoinput',deviceId:'camera',label:'Camera'}, {kind:'audiooutput',deviceId:'speaker',label:'Speaker'}, {kind:'audioinput',deviceId:'private-label',label:''}] });
+  assert.equal(app.events.some(e=>['microphone','enumerate','context'].includes(e[0])),false); assert.equal(app.contexts.length,0);
+  assert.equal(micSelect(app).value,''); assert.equal(micSelect(app).options.length,1);
+  await refreshMics(app);
+  assert.equal(app.events.filter(e=>e[0]==='enumerate').length,1);
+  assert.equal(app.events.some(e=>e[0]==='microphone'),false); assert.equal(app.contexts.length,0);
+  assert.equal(micSelect(app).options.length,3); assert.doesNotMatch(micSelect(app).textContent,/Camera|Speaker/);
+  assert.match(micSelect(app).textContent,/เบราว์เซอร์ยังไม่แจ้งชื่อ/);
+  assert.equal(app.network.length,0);
+});
+
+test('explicit device selection uses exact routing while the displayed actual track and clip metadata remain separate', async t => {
+  const changes=[],app=setup(t,{enumerate:[usbInput()],track:{label:'Actual capture input',getSettings:()=>({deviceId:'secret-actual-id',groupId:'secret-group',sampleRate:44100,channelCount:2,echoCancellation:false,noiseSuppression:true,autoGainControl:false})},mount:{onClipChange:value=>changes.push(value)}});
+  let stores=0;app.window.Storage.prototype.setItem=()=>{stores++;};
+  await refreshMics(app);chooseMic(app,'fake-usb-input');
+  assert.equal(app.events.some(e=>e[0]==='microphone'),false);assert.doesNotMatch(micActual(app),/Actual capture input|Example USB/);
+  const node=await start(app);
+  const request=app.events.find(e=>e[0]==='microphone')[1];assert.deepEqual(JSON.parse(JSON.stringify(request)),{audio:{deviceId:{exact:'fake-usb-input'}}});
+  assert.match(micActual(app),/ไมค์ที่เบราว์เซอร์เปิด: Actual capture input/);
+  assert.match(micActual(app),/44100 Hz.*2 ช่องเสียง.*ลดเสียงสะท้อนปิด.*ลดเสียงรบกวนเปิด.*ปรับระดับอัตโนมัติปิด/);
+  assert.doesNotMatch(micActual(app),/secret-actual-id|secret-group|fake-usb-input|Example USB/);
+  samples(app,node,28800);await finish(app,node);
+  assert.match(micActual(app),/ไมค์ของคลิปนี้: Actual capture input/);
+  const wav=new DataView(await bytes(app.window,app.blobs.get(app.player().src)));
+  assert.equal(wav.getUint32(24,true),48000,'recorded AudioContext sample rate stays separate from track settings');
+  const clip=changes.find(value=>value.blob);assert.ok(clip);
+  assert.doesNotMatch(JSON.stringify(clip.info),/input|label|deviceId|Actual capture|secret-/);
+  assert.equal(stores,0);assert.equal(app.network.length,0);
+});
+
+test('default recording preserves audio:true and absent or throwing track settings cannot break capture', async t => {
+  for (const track of [{}, {label:'Unnamed settings input',getSettings(){throw new Error('Not available');}}]) {
+    const app=setup(t,{track}),node=await start(app);
+    assert.equal(app.events.find(e=>e[0]==='microphone')[1].audio,true);
+    assert.match(micActual(app),/เบราว์เซอร์ไม่แจ้งค่ารูปแบบเสียง/);
+    samples(app,node,28800);await finish(app,node);assert.ok(app.player().src.startsWith('blob:'));
+    assert.doesNotMatch(micActual(app),/NaN|undefined|deviceId/);
+  }
+});
+
+test('refresh preserves an explicit preference, missing devices remain explicit, and routing failures never retry default', async t => {
+  let list=[usbInput()],calls=0;
+  const app=setup(t,{enumerate:()=>Promise.resolve(list),getUserMedia:()=>{calls++;return Promise.reject(Object.assign(new Error('Missing input'),{name:calls===1?'NotFoundError':'OverconstrainedError'}));}});
+  await refreshMics(app);chooseMic(app,'fake-usb-input');await refreshMics(app);assert.equal(micSelect(app).value,'fake-usb-input');
+  list=[];await refreshMics(app);assert.equal(micSelect(app).value,'fake-usb-input');
+  assert.match(app.container.querySelector('.egl-ph-input-list-note').textContent,/ไม่อยู่ในรายการ/);
+  for(let i=0;i<2;i++){
+    app.button('บันทึกเสียงของฉัน').click();await until(()=>Boolean(app.button('บันทึกเสียงของฉัน')));
+    assert.match(app.status(),/เปิดไมค์ที่เลือกไม่ได้.*ไม่ได้เปลี่ยนไปใช้ไมค์อื่น/);
+    assert.doesNotMatch(micActual(app),/Example USB/);
+  }
+  assert.equal(calls,2);assert.ok(app.events.filter(e=>e[0]==='microphone').every(e=>e[1].audio.deviceId.exact==='fake-usb-input'));
+  assert.equal(app.nodes.length,0);assert.ok(app.contexts.every(c=>c.closed>=1));
+});
+
+test('route controls stay disabled through permission, capture and preparation; stale route change events cannot change the active request', async t => {
+  const permission=deferred(),app=setup(t,{permission,enumerate:[usbInput(),{kind:'audioinput',deviceId:'second-input',label:'Second input'}]});
+  await refreshMics(app);chooseMic(app,'fake-usb-input');app.button('บันทึกเสียงของฉัน').click();
+  assert.equal(micSelect(app).disabled,true);assert.equal(app.button('ดูไมค์ที่ใช้งานได้').disabled,true);
+  chooseMic(app,'second-input');assert.equal(micSelect(app).value,'fake-usb-input');
+  permission.resolve(app.newStream());await until(()=>app.nodes.length&&app.nodes[0].port.commands.some(c=>c.type==='start'));
+  app.nodes[0].port.emit({type:'started'});await until(()=>Boolean(app.button('หยุดบันทึก')));
+  const node=app.nodes[0];assert.equal(micSelect(app).disabled,true);samples(app,node,28800);app.setTime(600);app.button('หยุดบันทึก').click();
+  assert.equal(micSelect(app).disabled,true);assert.equal(app.button('ดูไมค์ที่ใช้งานได้').disabled,true);
+  node.port.emit({type:'stopped'});await until(()=>Boolean(app.button('บันทึกเสียงของฉัน')));assert.equal(micSelect(app).disabled,false);
+  assert.equal(app.events.filter(e=>e[0]==='microphone').length,1);
+});
+
+test('late enumeration after cleanup or a fresh recording cannot repopulate or change microphone controls', async t => {
+  const request=deferred(),app=setup(t,{enumerate:()=>request.promise});
+  const select=micSelect(app);app.button('ดูไมค์ที่ใช้งานได้').click();app.cleanup();request.resolve([usbInput()]);await flush();await flush();
+  assert.equal(app.container.children.length,0);assert.equal(select.options.length,1);assert.equal(app.streams.length,0);
+  const second=deferred(),active=setup(t,{enumerate:()=>second.promise});
+  active.button('ดูไมค์ที่ใช้งานได้').click();await start(active);second.resolve([usbInput()]);await flush();await flush();
+  assert.equal(micSelect(active).options.length,1);assert.equal(micSelect(active).disabled,true);
+});
+
+test('a remembered microphone survives word-widget remount in page memory but never carries actual clip provenance', async t => {
+  const app=setup(t,{enumerate:[usbInput()],track:{label:'Actual USB input'}});
+  await refreshMics(app);chooseMic(app,'fake-usb-input');const first=await start(app);samples(app,first,28800);await finish(app,first);
+  app.remount();assert.equal(micSelect(app).value,'fake-usb-input');assert.match(micSelect(app).selectedOptions[0].textContent,/เลือกไว้ก่อนหน้า.*ยังไม่ยืนยัน/);
+  chooseMic(app,'fake-usb-input');app.remount();
+  assert.equal((micSelect(app).selectedOptions[0].textContent.match(/เลือกไว้ก่อนหน้า/g)||[]).length,1,'remembered labels must not accumulate status prefixes');
+  assert.doesNotMatch(micActual(app),/Actual USB input/);
+  const node=await start(app);assert.equal(app.events.filter(e=>e[0]==='microphone').at(-1)[1].audio.deviceId.exact,'fake-usb-input');
+  samples(app,node,28800);app.setTime(1200);app.button('หยุดบันทึก').click();node.port.emit({type:'stopped'});await until(()=>Boolean(app.button('บันทึกเสียงของฉัน')));
+  const file=new app.window.File(['test-audio'],'local-test.wav',{type:'audio/wav'}),input=app.container.querySelector('.egl-ph-file');
+  Object.defineProperty(input,'files',{configurable:true,value:[file]});input.dispatchEvent(new app.window.Event('change'));
+  assert.match(micActual(app),/ไฟล์ที่เลือกไม่มีข้อมูลยืนยัน/);assert.doesNotMatch(micActual(app),/Actual USB input/);
+  const independent=setup(t);assert.equal(micSelect(independent).value,'','a separate page has no remembered device');
+});
+
+test('failed enumeration preserves the explicit choice and analysis busy state prevents route changes', async t => {
+  let failure=false;
+  const app=setup(t,{enumerate:()=>failure?Promise.reject(new Error('Enumeration unavailable')):Promise.resolve([usbInput(),{kind:'audioinput',deviceId:'second-input',label:'Second input'}])});
+  await refreshMics(app);chooseMic(app,'fake-usb-input');failure=true;await refreshMics(app);
+  assert.equal(micSelect(app).value,'fake-usb-input');assert.match(app.container.querySelector('.egl-ph-input-list-note').textContent,/อ่านรายการไมค์ไม่ได้/);
+  const analysis=deferred();app.window.EGLBrowserPhonetics={supported:()=>true,analyze:()=>analysis.promise};
+  const input=app.container.querySelector('.egl-ph-file');Object.defineProperty(input,'files',{configurable:true,value:[new app.window.File(['fixture'],'fixture.wav',{type:'audio/wav'})]});
+  input.dispatchEvent(new app.window.Event('change'));app.button('ดูผลเสียงของฉัน').click();
+  assert.equal(micSelect(app).disabled,true);assert.equal(app.button('ดูไมค์ที่ใช้งานได้').disabled,true);
+  chooseMic(app,'second-input');assert.equal(micSelect(app).value,'fake-usb-input');
+  app.cleanup();analysis.resolve(null);await flush();assert.equal(app.container.children.length,0);
+});
+
+test('a fresh permission attempt clears an older clip route and a late denied stream cannot restore it after cleanup', async t => {
+  const next=deferred();let count=0;
+  const app=setup(t,{track:{label:'Earlier input'},getUserMedia:(_constraints,newStream)=>++count===1?Promise.resolve(newStream()):next.promise});
+  const node=await start(app);samples(app,node,28800);await finish(app,node);assert.match(micActual(app),/Earlier input/);
+  app.button('บันทึกเสียงของฉัน').click();assert.match(micActual(app),/ยังไม่ทราบไมค์ของการบันทึกครั้งนี้/);assert.doesNotMatch(micActual(app),/Earlier input/);
+  app.cleanup();const late=app.newStream();next.resolve(late);await flush();await flush();
+  assert.equal(late.track.stopped,1);assert.equal(app.container.children.length,0);
 });

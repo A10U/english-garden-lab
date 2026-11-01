@@ -168,3 +168,22 @@ integrity, and copies only approved assets. See per-file attribution in
 Dictionary/G2P IPA is canonical, not an expert transcription of each recording.
 Adding example recordings does not retrain or validate the acoustic detector.
 No Google Cloud TTS service has been connected or charged for this release.
+
+## Choosing and verifying the recording microphone
+
+The phonetics widget offers an explicit microphone-list button and a selector
+for the next recording. Mounting or changing words does not request permission
+or enumerate devices. Default capture keeps the browser default; an explicitly
+selected device uses an exact ID and an unavailable selection fails visibly
+rather than switching to another input. Selection survives word-widget changes
+in page memory only and resets on a page reload.
+
+After capture opens, the widget shows the actual audio track label and any
+sample-rate, channel-count and processing flags the browser reports. These
+values describe the browser track, not the microphone's native converter or
+export format. Per-clip route data stays outside analysis requests, callbacks,
+WAV metadata and persistent storage. Uploaded files have unknown input route.
+Existing technical analysis details also distinguish the received decoder status
+from the UI's reason for withholding a result, with model revision when reported.
+Neither input selection nor a higher-quality microphone validates the current
+phoneme recognizer or its pronunciation feedback.

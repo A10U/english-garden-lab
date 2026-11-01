@@ -1182,3 +1182,18 @@ test('insufficient input does not promote decoder guesses as evidence of capture
   assert.match(app.container.querySelector('[role=status]').textContent,/สัญญาณเสียงยังไม่เพียงพอ/);
   app.cleanup();app.dom.window.close();
 });
+
+test('technical diagnostics preserve decoder status separately from the display signal gate and never convert posterior into a grade', async () => {
+  const data=recognitionFixture(['ɪ','t','s'],'recognized');data.metrics.voiced_seconds=0;
+  data.model={id:'public/example-ctc',revision:'abc123'};
+  const before=JSON.stringify(data),app=await analyzeFixture(data,recognitionUIOptions(data));
+  const box=app.container.querySelector('.egl-ph-recognition-diagnostics');
+  assert.match(box.querySelector('.egl-ph-received-quality').textContent,/recognized/);
+  assert.match(box.querySelector('.egl-ph-display-reason').textContent,/insufficient_audio_signal/);
+  assert.match(box.querySelector('.egl-ph-received-posterior').textContent,/0\.860.*0\.650.*ไม่ใช่คะแนน/);
+  assert.doesNotMatch(box.textContent,/%/);
+  assert.match(box.querySelector('.egl-ph-model-version').textContent,/public\/example-ctc.*abc123/);
+  assert.equal(app.container.querySelector('.egl-ph-percent').textContent,'—');
+  assert.equal(JSON.stringify(data),before);
+  app.cleanup();app.dom.window.close();
+});

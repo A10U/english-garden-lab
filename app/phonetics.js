@@ -4,6 +4,8 @@
   const MAX_BYTES = 10 * 1024 * 1024;
   const runtimeScriptURL = global.document && global.document.currentScript && global.document.currentScript.src;
   let nextId = 0;
+  // A choice survives word widgets on this page only; never persisted or sent.
+  let preferredInputId = '', preferredInputLabel = '';
 
   function validPercent(value) {
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100 ? Math.round(value * 10) / 10 : null;
@@ -229,6 +231,9 @@
     let stream = null, recorder = null, recording = false, requestingMic = false, preparing = false;
     let prepareController = null, decodeContext = null, captureContext = null;
     let recordingVersion = 0, recordTimer = null;
+    let selectedInputId = preferredInputId, loadingInputs = false, inputListVersion = 0;
+    // Route details remain outside analysis payloads and onClipChange metadata.
+    const recordedInputs = new WeakMap();
     let clip = null, clipLabel = '', clipURL = null, clipKind = '', clipInfo = null, reference = null, clipId = 0;
     let mode = 'own', analysisData = null, wordItems = [], selectedIndex = null, slow = false;
     let practiceWord = null, practicePhone = null, sentenceResult = null, referenceFocus = null, inspector = null;
@@ -283,6 +288,8 @@
       listenButtons.forEach(node => { node.disabled = occupied || recording || requestingMic; });
       recordButton.disabled = occupied || requestingMic;
       fileInput.disabled = occupied || recording || requestingMic;
+      inputSelect.disabled = occupied || recording || requestingMic || loadingInputs;
+      refreshInputsButton.disabled = occupied || recording || requestingMic || loadingInputs;
       recordButton.textContent = preparing ? 'กำลังเตรียมเสียง…' : requestingMic ? 'กำลังขอใช้ไมโครโฟน…' : recording ? 'หยุดบันทึก' : 'บันทึกเสียงของฉัน';
       selfListenButton.textContent = clipKind === 'recorded' ? 'ฟังเสียงของฉัน' : 'ฟังเสียงที่เลือก';
       selfAudioControls.hidden = !clip;
@@ -425,6 +432,7 @@
       clip = blob;
       clipLabel = label;
       clipKind = kind || 'uploaded'; clipInfo = info || null;
+      showInput(clipKind === 'recorded' ? recordedInputs.get(blob) : null, clipKind === 'recorded' ? 'clip' : 'uploaded');
       clipURL = win.URL.createObjectURL(blob);
       objectURLs.add(clipURL);
       player.src = clipURL;
@@ -440,6 +448,7 @@
       clip = null; clipURL = null; clipLabel = ''; clipKind = ''; clipInfo = null;
       player.removeAttribute('src'); player.hidden = true; chosen.textContent = '';
       durationText.textContent = '';
+      showInput(null);
       fileInput.value = '';
       notifyClip();
     }
@@ -1507,6 +1516,7 @@
     }
     function renderAnalysis(data) {
       clearObserved();
+      const receivedQuality = data.recognition_quality;
       const issue = recognitionIssue(data);
       if (issue) data = { ...data, recognition_quality: { ...data.recognition_quality, status: 'uncertain', reason: issue, calibrated: false } };
       if (practiceWord && practiceWord.isolated && !practicePhone && data.reference && data.reference.text === practiceWord.text && data.reference.accent === accent.value && Array.isArray(data.reference.words) && data.reference.words.length === 1) {
@@ -1589,6 +1599,25 @@
       inspector.setAttribute('aria-label', 'แยกหน่วยเสียงของคำที่เลือก'); observed.append(inspector);
       const details = el('details', 'egl-ph-technical egl-ph-analysis-details');
       details.append(el('summary', '', 'ดู IPA และรายละเอียดการเปรียบเทียบ'));
+      const diagnostic = el('div', 'egl-ph-recognition-diagnostics');
+      diagnostic.append(el('h4', 'egl-ph-heading', 'ข้อมูลตัวแยกเสียงสำหรับตรวจปัญหา'));
+      if (receivedQuality && typeof receivedQuality === 'object') {
+        const receivedStatus = ['recognized', 'uncertain'].includes(receivedQuality.status) ? receivedQuality.status : 'ไม่รายงาน';
+        const reason = ['low_token_posterior', 'no_nonblank_frames', 'unsupported_english_tokens', 'no_detected_phones', 'insufficient_audio_signal'].includes(receivedQuality.reason) ? receivedQuality.reason : 'ไม่มีเหตุผลที่รายงาน';
+        diagnostic.append(el('p', 'egl-ph-note egl-ph-received-quality', 'สถานะจากตัวแยกเสียง: ' + receivedStatus + ' · ' + reason));
+        const mean = receivedQuality.mean_token_posterior, threshold = receivedQuality.threshold;
+        if (typeof mean === 'number' && Number.isFinite(mean) && mean >= 0 && mean <= 1
+          && typeof threshold === 'number' && Number.isFinite(threshold) && threshold >= 0 && threshold <= 1) {
+          diagnostic.append(el('p', 'egl-ph-note egl-ph-received-posterior', 'ดัชนีภายใน ' + mean.toFixed(3) + ' · เกณฑ์ ' + threshold.toFixed(3) + ' · ไม่ใช่คะแนนการออกเสียงหรือความน่าจะเป็นที่พูดถูก'));
+        }
+      } else diagnostic.append(el('p', 'egl-ph-note', 'ตัวแยกเสียงไม่ได้รายงานสถานะความมั่นคง'));
+      if (issue) diagnostic.append(el('p', 'egl-ph-note egl-ph-display-reason', 'เหตุผลที่หน้านี้เว้นผลประเมิน: ' + issue));
+      const modelInfo = data.model;
+      if (modelInfo && typeof modelInfo.id === 'string') {
+        diagnostic.append(el('p', 'egl-ph-note egl-ph-model-version', 'โมเดล: ' + modelInfo.id.slice(0, 200)
+          + (typeof modelInfo.revision === 'string' ? ' · รุ่น ' + modelInfo.revision.slice(0, 80) : '')));
+      }
+      details.append(diagnostic);
       details.append(el('h4', 'egl-ph-heading', 'เสียงที่ระบบตรวจพบจากไฟล์'), el('p', 'egl-ph-ipa egl-ph-detected', found.ipa || phones.map(phone => typeof phone === 'string' ? phone : phone.phone).join(' ') || 'ยังตรวจแยกหน่วยเสียงไม่ได้'));
       const duration = Number(metrics.duration_seconds == null ? found.duration_seconds : metrics.duration_seconds);
       if (Number.isFinite(duration)) details.append(el('p', 'egl-ph-note', 'ความยาวเสียง ' + duration.toFixed(2) + ' วินาที'));
@@ -1690,6 +1719,22 @@
     targetBanner.append(targetText, wordPracticeHint, button('กลับไปฝึกทั้งประโยค', backToSentence, 'egl-ph-button egl-ph-return'));
     const soundTarget = el('div', 'egl-ph-sound-target'); soundTarget.hidden = true; targetBanner.append(soundTarget);
     const recordHint = el('p', 'egl-ph-record-hint', 'พูดประโยคด้านบนให้จบ แล้วกดหยุด');
+    const inputControls = el('div', 'egl-ph-input-controls');
+    const inputLabel = el('label', 'egl-ph-label', 'ไมโครโฟนสำหรับการอัดครั้งถัดไป');
+    const inputSelect = el('select', 'egl-ph-select egl-ph-input-select');
+    inputSelect.id = id + '-microphone'; inputSelect.setAttribute('aria-label', 'เลือกไมโครโฟนสำหรับการอัดครั้งถัดไป');
+    const defaultInput = el('option', '', 'ค่าเริ่มต้นของเบราว์เซอร์'); defaultInput.value = ''; inputSelect.append(defaultInput);
+    inputLabel.append(inputSelect);
+    if (selectedInputId) {
+      const remembered = el('option', '', 'เลือกไว้ก่อนหน้า: ' + (preferredInputLabel || 'ไมโครโฟน') + ' (ยังไม่ยืนยัน)');
+      remembered.dataset.inputLabel = preferredInputLabel;
+      remembered.value = selectedInputId; inputSelect.append(remembered); inputSelect.value = selectedInputId;
+    }
+    const refreshInputsButton = button('ดูไมค์ที่ใช้งานได้', refreshInputs);
+    const inputListNote = el('p', 'egl-ph-note egl-ph-input-list-note', 'กดดูรายการเมื่อต้องการเลือกไมค์ การเลือกจะมีผลตอนกดบันทึกครั้งถัดไป');
+    const actualInput = el('p', 'egl-ph-note egl-ph-input-actual', 'ยังไม่ทราบไมค์ของคลิปนี้ · ชื่อจะปรากฏเมื่อเบราว์เซอร์เปิดไมค์');
+    actualInput.setAttribute('aria-live', 'polite');
+    inputControls.append(inputLabel, refreshInputsButton, inputListNote, actualInput);
     const audioControls = el('div', 'egl-ph-actions');
     const sources = Array.isArray(options.audioSources) ? options.audioSources : [];
     sources.forEach((source, index) => {
@@ -1738,7 +1783,7 @@
     const recordingControls = el('div', 'egl-ph-actions'); recordingControls.append(recordButton, analyzeButton, cancelBrowserButton);
     const uploadDetails = el('details', 'egl-ph-technical egl-ph-upload');
     uploadDetails.append(el('summary', '', 'หรือเลือกไฟล์เสียง'), fileLabel);
-    ownPanel.append(recordHint, recordingControls, uploadDetails);
+    ownPanel.append(inputControls, recordHint, recordingControls, uploadDetails);
     const browserNotice = demoMode ? el('p', 'egl-ph-note egl-ph-demo-learner-notice') : null;
     if (browserNotice) ownPanel.append(browserNotice);
     const chosen = el('p', 'egl-ph-note');
@@ -1777,7 +1822,76 @@
     }
     root.append(body); container.append(root);
 
+    function showInput(details, state) {
+      if (disposed) return;
+      if (!details) {
+        actualInput.textContent = state === 'uploaded' ? 'ไฟล์ที่เลือกไม่มีข้อมูลยืนยันไมโครโฟนต้นทาง'
+          : state === 'pending' ? 'กำลังเปิดไมค์ · ยังไม่ทราบไมค์ของการบันทึกครั้งนี้'
+            : 'ยังไม่มีคลิปที่ยืนยันไมค์ได้ · ชื่อจะปรากฏเมื่อเบราว์เซอร์เปิดไมค์';
+        return;
+      }
+      const facts = [];
+      if (Number.isFinite(details.sampleRate) && details.sampleRate > 0) facts.push('อัตราเสียงที่เบราว์เซอร์แจ้ง ' + details.sampleRate + ' Hz');
+      if (Number.isFinite(details.channelCount) && details.channelCount > 0) facts.push(details.channelCount + ' ช่องเสียง');
+      for (const [key, label] of [['echoCancellation', 'ลดเสียงสะท้อน'], ['noiseSuppression', 'ลดเสียงรบกวน'], ['autoGainControl', 'ปรับระดับอัตโนมัติ']]) {
+        if (typeof details[key] === 'boolean') facts.push(label + (details[key] ? 'เปิด' : 'ปิด'));
+      }
+      actualInput.textContent = (state === 'clip' ? 'ไมค์ของคลิปนี้: ' : 'ไมค์ที่เบราว์เซอร์เปิด: ')
+        + (details.label || 'เบราว์เซอร์ไม่แจ้งชื่อ') + (facts.length ? ' · ' + facts.join(' · ') : ' · เบราว์เซอร์ไม่แจ้งค่ารูปแบบเสียง');
+    }
+    function inputDetails(acquired) {
+      let track = null, settings = {};
+      try { track = typeof acquired.getAudioTracks === 'function' ? acquired.getAudioTracks()[0] : acquired.getTracks().find(item => item.kind === 'audio'); } catch (_) {}
+      try { settings = track && typeof track.getSettings === 'function' ? track.getSettings() || {} : {}; } catch (_) {}
+      let label = '';
+      try { if (typeof track?.label === 'string') label = track.label.slice(0, 200); } catch (_) {}
+      const details = { label };
+      for (const key of ['sampleRate', 'channelCount']) if (Number.isFinite(settings[key]) && settings[key] > 0) details[key] = settings[key];
+      for (const key of ['echoCancellation', 'noiseSuppression', 'autoGainControl']) if (typeof settings[key] === 'boolean') details[key] = settings[key];
+      return details;
+    }
+    async function refreshInputs() {
+      if (disposed || busy || requestingMic || recording || preparing || loadingInputs) return;
+      const media = win.navigator.mediaDevices;
+      if (!media || typeof media.enumerateDevices !== 'function') { inputListNote.textContent = 'เบราว์เซอร์นี้ไม่แจ้งรายการไมค์ เลือกไมค์จากการตั้งค่าของเบราว์เซอร์ได้'; return; }
+      const attempt = ++inputListVersion;
+      loadingInputs = true; updateButtons(); inputListNote.textContent = 'กำลังดูรายการไมค์…';
+      try {
+        const devices = await media.enumerateDevices();
+        if (disposed || attempt !== inputListVersion) return;
+        const available = Array.isArray(devices) ? devices.filter(device => device && device.kind === 'audioinput' && typeof device.deviceId === 'string' && device.deviceId) : [];
+        inputSelect.replaceChildren(defaultInput);
+        const seen = new Set();
+        available.forEach(device => {
+          if (seen.has(device.deviceId)) return; seen.add(device.deviceId);
+          const option = el('option', '', typeof device.label === 'string' && device.label.trim() ? device.label.slice(0, 200) : 'ไมโครโฟน ' + seen.size + ' (เบราว์เซอร์ยังไม่แจ้งชื่อ)');
+          option.dataset.inputLabel = typeof device.label === 'string' ? device.label.slice(0, 200) : '';
+          option.value = device.deviceId; inputSelect.append(option);
+        });
+        const missing = selectedInputId && !seen.has(selectedInputId);
+        if (missing) {
+          const option = el('option', '', 'ไมค์ที่เลือกก่อนหน้าไม่อยู่ในรายการ'); option.value = selectedInputId; option.dataset.inputLabel = preferredInputLabel; option.disabled = true; inputSelect.append(option);
+        }
+        inputSelect.value = selectedInputId;
+        inputListNote.textContent = missing ? 'ไมค์ที่เลือกไม่อยู่ในรายการ กรุณาเชื่อมต่อหรือเลือกใหม่ ระบบจะไม่เปลี่ยนไมค์ให้เอง'
+          : seen.size ? 'รายการไมค์จากเบราว์เซอร์ · หากชื่อยังว่าง ให้อนุญาตไมค์ตอนบันทึกแล้วกดดูรายการอีกครั้ง'
+            : 'เบราว์เซอร์ยังไม่แจ้งรายการไมค์ที่เลือกแยกได้ ตรวจสิทธิ์ไมค์แล้วกดดูรายการอีกครั้ง';
+      } catch (_) {
+        if (!disposed && attempt === inputListVersion) inputListNote.textContent = 'อ่านรายการไมค์ไม่ได้ เลือกไมค์จากการตั้งค่าของเบราว์เซอร์หรือลองกดดูรายการอีกครั้ง';
+      } finally {
+        if (!disposed && attempt === inputListVersion) { loadingInputs = false; updateButtons(); }
+      }
+    }
+    on(inputSelect, 'change', () => {
+      if (disposed || busy || requestingMic || recording || preparing || loadingInputs) { inputSelect.value = selectedInputId; return; }
+      selectedInputId = inputSelect.value;
+      preferredInputId = selectedInputId;
+      preferredInputLabel = selectedInputId ? inputSelect.selectedOptions[0]?.dataset.inputLabel || '' : '';
+      inputListNote.textContent = 'เลือกสำหรับการอัดครั้งถัดไป · ชื่อไมค์ที่ใช้จริงจะแสดงเมื่อเบราว์เซอร์เปิดไมค์';
+    });
+
     function stopCapture() {
+      if (requestingMic || recording || preparing) showInput(null);
       recordingVersion++;
       if (prepareController) prepareController.abort();
       prepareController = null; preparing = false;
@@ -1808,6 +1922,9 @@
       cancelRequest();
       stopExample(); stopPlayback();
       doc.querySelectorAll('audio, video').forEach(media => media.pause());
+      inputListVersion++; loadingInputs = false;
+      const requestedInputId = selectedInputId;
+      showInput(null, 'pending');
       requestingMic = true; updateButtons();
       setStatus('กำลังเปิดไมโครโฟน… รอข้อความ “เริ่มพูดได้” ก่อนครับ');
       const attempt = ++recordingVersion;
@@ -1825,9 +1942,10 @@
             closeContext(context); captureContext = null; context = null;
           }
         }
-        const acquired = await win.navigator.mediaDevices.getUserMedia({ audio: true });
+        const acquired = await win.navigator.mediaDevices.getUserMedia({ audio: requestedInputId ? { deviceId: { exact: requestedInputId } } : true });
         if (!current()) { acquired.getTracks().forEach(track => track.stop()); return; }
         stream = acquired;
+        const acquiredInput = inputDetails(acquired); showInput(acquiredInput);
         let active = null;
         if (context) {
           try {
@@ -1885,6 +2003,7 @@
           active.onstop = null; active.ondataavailable = null; active.onerror = null;
           if (active.state !== 'inactive') { try { active.stop(); } catch (_) {} }
           stopTracks(); recording = false; recorder = null; requestingMic = false; preparing = false; updateButtons();
+          showInput(null);
           setStatus('บันทึกเสียงไม่สำเร็จ ลองอีกครั้งหรือเลือกไฟล์เสียง', true);
         };
         active.onstop = async () => {
@@ -1902,6 +2021,7 @@
             if (elapsed - prepared.duration > Math.max(0.75, elapsed * 0.35)) {
               throw friendly('เสียงที่บันทึกขาดหายหรือไมโครโฟนหยุดทำงาน ลองบันทึกใหม่โดยเปิดหน้านี้ค้างไว้ หรือเลือกไฟล์เสียงแทน');
             }
+            recordedInputs.set(prepared.blob, acquiredInput);
             setClip(prepared.blob, 'เสียงที่คุณบันทึก', 'recorded', prepared);
             const quiet = prepared.rmsDbfs < -55;
             setStatus('บันทึกแล้ว ' + prepared.duration.toFixed(2) + ' วินาที · ' + (quiet ? 'เสียงเบามาก ลองกดฟังหรือบันทึกใกล้ไมโครโฟนขึ้น' : 'กด “ฟังเสียงของฉัน” เพื่อลองฟัง'), quiet);
@@ -1921,8 +2041,10 @@
         };
         const ready = active.start();
         clearClip();
+        showInput(acquiredInput);
         if (ready && typeof ready.then === 'function') await ready;
         if (!current()) return;
+        showInput(acquiredInput);
         startedAt = win.performance.now();
         requestingMic = false; recording = true; updateButtons();
         setStatus('เริ่มพูดได้… กำลังบันทึกเสียง กดหยุดเมื่อพูดจบ (หยุดอัตโนมัติภายใน 15 วินาที)');
@@ -1933,7 +2055,10 @@
         stopTracks(); requestingMic = false; recording = false; preparing = false;
         recorder = null;
         updateButtons();
-        setStatus(error.userMessage || (error.name === 'NotAllowedError' ? 'ยังไม่ได้อนุญาตไมโครโฟน คุณเลือกไฟล์เสียงแทนได้ครับ' : 'เปิดไมโครโฟนไม่สำเร็จ ลองใหม่หรือเลือกไฟล์เสียง'), true);
+        showInput(null);
+        setStatus(error.userMessage || (requestedInputId && ['NotFoundError', 'OverconstrainedError'].includes(error.name)
+          ? 'เปิดไมค์ที่เลือกไม่ได้ กรุณาเชื่อมต่อหรือเลือกไมค์ใหม่ ระบบไม่ได้เปลี่ยนไปใช้ไมค์อื่น'
+          : error.name === 'NotAllowedError' ? 'ยังไม่ได้อนุญาตไมโครโฟน คุณเลือกไฟล์เสียงแทนได้ครับ' : 'เปิดไมโครโฟนไม่สำเร็จ ลองใหม่หรือเลือกไฟล์เสียง'), true);
       }
     }
     on(textarea, 'input', changeText); on(accent, 'change', changeText);
