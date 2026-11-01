@@ -6,6 +6,7 @@
   let nextId = 0;
   // A choice survives word widgets on this page only; never persisted or sent.
   let preferredInputId = '', preferredInputLabel = '';
+  let preferredInputProcessing = 'browser';
 
   function validPercent(value) {
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100 ? Math.round(value * 10) / 10 : null;
@@ -232,6 +233,7 @@
     let prepareController = null, decodeContext = null, captureContext = null;
     let recordingVersion = 0, recordTimer = null;
     let selectedInputId = preferredInputId, loadingInputs = false, inputListVersion = 0;
+    let selectedInputProcessing = preferredInputProcessing;
     // Route details remain outside analysis payloads and onClipChange metadata.
     const recordedInputs = new WeakMap();
     let clip = null, clipLabel = '', clipURL = null, clipKind = '', clipInfo = null, reference = null, clipId = 0;
@@ -289,6 +291,7 @@
       recordButton.disabled = occupied || requestingMic;
       fileInput.disabled = occupied || recording || requestingMic;
       inputSelect.disabled = occupied || recording || requestingMic || loadingInputs;
+      inputProcessingSelect.disabled = occupied || recording || requestingMic || loadingInputs;
       refreshInputsButton.disabled = occupied || recording || requestingMic || loadingInputs;
       recordButton.textContent = preparing ? 'กำลังเตรียมเสียง…' : requestingMic ? 'กำลังขอใช้ไมโครโฟน…' : recording ? 'หยุดบันทึก' : 'บันทึกเสียงของฉัน';
       selfListenButton.textContent = clipKind === 'recorded' ? 'ฟังเสียงของฉัน' : 'ฟังเสียงที่เลือก';
@@ -1732,9 +1735,21 @@
     }
     const refreshInputsButton = button('ดูไมค์ที่ใช้งานได้', refreshInputs);
     const inputListNote = el('p', 'egl-ph-note egl-ph-input-list-note', 'กดดูรายการเมื่อต้องการเลือกไมค์ การเลือกจะมีผลตอนกดบันทึกครั้งถัดไป');
+    const inputProcessingLabel = el('label', 'egl-ph-label', 'การปรับเสียงสำหรับการอัดครั้งถัดไป');
+    const inputProcessingSelect = el('select', 'egl-ph-select egl-ph-input-processing');
+    inputProcessingSelect.id = id + '-input-processing';
+    inputProcessingSelect.setAttribute('aria-label', 'การปรับเสียงสำหรับการอัดครั้งถัดไป');
+    for (const [value, label] of [['browser', 'ค่าปกติของเบราว์เซอร์'], ['less-processing', 'ลดการปรับเสียงอัตโนมัติ (ทดลอง)']]) {
+      const option = el('option', '', label); option.value = value; inputProcessingSelect.append(option);
+    }
+    inputProcessingSelect.value = selectedInputProcessing;
+    inputProcessingLabel.append(inputProcessingSelect);
+    const inputProcessingNote = el('p', 'egl-ph-note egl-ph-input-processing-note', 'ทดลองเปรียบเทียบได้ในการอัดครั้งถัดไป เมื่อเลือกโหมดทดลอง ระบบจะขอปิดการลดเสียงสะท้อน การลดเสียงรบกวน และการปรับระดับเสียงอัตโนมัติ ค่าที่ใช้จริงดูด้านล่าง เบราว์เซอร์อาจไม่รองรับหรือไม่แจ้งค่า ไม่รับประกันว่าจะได้เสียงดิบหรือประเมินแม่นขึ้น');
+    inputProcessingSelect.setAttribute('aria-describedby', id + '-input-processing-note');
+    inputProcessingNote.id = id + '-input-processing-note';
     const actualInput = el('p', 'egl-ph-note egl-ph-input-actual', 'ยังไม่ทราบไมค์ของคลิปนี้ · ชื่อจะปรากฏเมื่อเบราว์เซอร์เปิดไมค์');
     actualInput.setAttribute('aria-live', 'polite');
-    inputControls.append(inputLabel, refreshInputsButton, inputListNote, actualInput);
+    inputControls.append(inputLabel, refreshInputsButton, inputListNote, inputProcessingLabel, inputProcessingNote, actualInput);
     const audioControls = el('div', 'egl-ph-actions');
     const sources = Array.isArray(options.audioSources) ? options.audioSources : [];
     sources.forEach((source, index) => {
@@ -1889,6 +1904,14 @@
       preferredInputLabel = selectedInputId ? inputSelect.selectedOptions[0]?.dataset.inputLabel || '' : '';
       inputListNote.textContent = 'เลือกสำหรับการอัดครั้งถัดไป · ชื่อไมค์ที่ใช้จริงจะแสดงเมื่อเบราว์เซอร์เปิดไมค์';
     });
+    on(inputProcessingSelect, 'change', () => {
+      if (disposed || busy || requestingMic || recording || preparing || loadingInputs
+        || !['browser', 'less-processing'].includes(inputProcessingSelect.value)) {
+        inputProcessingSelect.value = selectedInputProcessing; return;
+      }
+      selectedInputProcessing = inputProcessingSelect.value;
+      preferredInputProcessing = selectedInputProcessing;
+    });
 
     function stopCapture() {
       if (requestingMic || recording || preparing) showInput(null);
@@ -1924,6 +1947,11 @@
       doc.querySelectorAll('audio, video').forEach(media => media.pause());
       inputListVersion++; loadingInputs = false;
       const requestedInputId = selectedInputId;
+      const requestedInputProcessing = selectedInputProcessing;
+      const audioConstraints = requestedInputProcessing === 'less-processing'
+        ? { ...(requestedInputId ? { deviceId: { exact: requestedInputId } } : {}),
+          echoCancellation: { ideal: false }, noiseSuppression: { ideal: false }, autoGainControl: { ideal: false } }
+        : requestedInputId ? { deviceId: { exact: requestedInputId } } : true;
       showInput(null, 'pending');
       requestingMic = true; updateButtons();
       setStatus('กำลังเปิดไมโครโฟน… รอข้อความ “เริ่มพูดได้” ก่อนครับ');
@@ -1942,7 +1970,7 @@
             closeContext(context); captureContext = null; context = null;
           }
         }
-        const acquired = await win.navigator.mediaDevices.getUserMedia({ audio: requestedInputId ? { deviceId: { exact: requestedInputId } } : true });
+        const acquired = await win.navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
         if (!current()) { acquired.getTracks().forEach(track => track.stop()); return; }
         stream = acquired;
         const acquiredInput = inputDetails(acquired); showInput(acquiredInput);
