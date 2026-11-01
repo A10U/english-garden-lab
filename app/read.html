@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#27593e">
+  <title>อ่านไป พูดไป — สวนภาษา</title>
+  <link rel="stylesheet" href="read.css?v=9c119fb0e4d17d50">
+  <link rel="stylesheet" href="phonetics.css?v=9c119fb0e4d17d50">
+  <script src="core-word-data.js?v=9c119fb0e4d17d50" defer></script>
+  <script src="phonetic-data.js" defer></script>
+  <script src="reference-audio.js" defer></script>
+  <script src="phone-guide.js?v=9c119fb0e4d17d50" defer></script>
+  <script src="sound-foundations.js" defer></script>
+  <script src="vowel-pairs.js" defer></script>
+  <script src="vowel-audio.js" defer></script>
+  <script src="articulation-images.js" defer></script>
+  <script src="spelling-guide.js" defer></script>
+  <script src="spelling-feedback.js?v=9c119fb0e4d17d50" defer></script>
+  <script src="browser-phonetics.js?v=9c119fb0e4d17d50" defer></script>
+  <script id="egl-demo-runtime">globalThis.EGL_DEMO_RUNTIME={mode:"demo",apiBase:null};</script>
+<script src="../speech-training/demo-assets/demo-data.js" defer></script>
+<script src="phonetics.js?v=9c119fb0e4d17d50" defer></script>
+  <script src="read.js?v=9c119fb0e4d17d50" defer></script>
+<meta id="egl-demo-csp" http-equiv="Content-Security-Policy" content="connect-src 'self' https://huggingface.co https://*.hf.co; worker-src 'self' blob:; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'">
+</head>
+<body>
+  <a class="read-skip" href="#read-prompt">ข้ามไปข้อความสำหรับอ่าน</a>
+  <header class="read-top"><a href="index.html">สวนภาษา</a><nav aria-label="พื้นที่ฝึก"><a href="foundations.html">ฝึกทีละคำ</a><a href="speak.html">Speak</a></nav></header>
+  <main class="read-main">
+    <div class="read-intro"><p>อ่านไป พูดไป · เสียงอ้างอิง US</p><h1>มองข้อความไว้ แล้วค่อย ๆ พูด</h1><p>ไม่ต้องจำก่อนอัด กรอบข้อความจะอยู่ใกล้ปุ่มบันทึกตลอด</p></div>
+    <p id="egl-hosted-demo-notice">ฟังและบันทึกในเครื่องได้ · Cloud ส่งเสียงเมื่อคุณกดเท่านั้น</p>
+    <details class="read-choices"><summary>เลือกคำหรือประโยค</summary><div class="read-picker"><label for="read-mode">แบบฝึก<select id="read-mode"><option value="word">คำเดี่ยว</option><option value="sentence">ประโยคสั้น</option><option value="custom">ข้อความของฉัน</option></select></label><label for="read-selection">ข้อความที่จะอ่าน<select id="read-selection"></select></label></div><label class="read-custom-label" for="read-custom">หรือวางข้อความอักษรอังกฤษของคุณ ไม่เกิน 200 ตัวอักษร<textarea id="read-custom" lang="en" rows="2" maxlength="200" placeholder="เช่น Could you help me, please?"></textarea></label><button id="read-custom-use" type="button">ใช้ข้อความนี้</button></details>
+    <section class="read-prompt-panel" aria-labelledby="read-prompt">
+      <p id="read-kind"></p>
+      <h2 id="read-prompt" lang="en" tabindex="-1"></h2>
+      <div class="read-meaning"><button id="read-translation-toggle" type="button" aria-expanded="false" aria-controls="read-translation">ดูความหมาย</button><p id="read-translation" hidden></p></div>
+    </section>
+    <div class="read-example-actions"><button id="read-listen" class="read-primary" type="button">ฟังตัวอย่าง</button><button id="read-slow" type="button" aria-pressed="false">ฟังช้า 0.75×</button><button id="read-prev" type="button">← ก่อนหน้า</button><button id="read-next" type="button">ถัดไป →</button></div>
+    <p id="read-cue-note" class="read-note"></p>
+    <section class="read-record" aria-label="บันทึกเสียงขณะอ่านข้อความ"><h2 class="read-sr-only">อ่านข้อความด้านบนขณะอัดได้เลย</h2><div id="read-recorder"></div></section>
+    <p id="read-status" role="status" aria-live="polite">กำลังเตรียมข้อความ…</p>
+    <details class="read-example-details"><summary>แถบเล่นเสียงตัวอย่างเต็มคลิป</summary><audio id="read-audio" controls preload="none" aria-label="เสียงตัวอย่างเต็มคลิป"></audio></details>
+    <section class="read-cloud" aria-labelledby="read-cloud-heading"><h2 id="read-cloud-heading">ให้ Cloud ช่วยฟัง</h2><p id="read-cloud-notice">เมื่อกด จะส่งคลิปนี้ไป OpenAI ผ่านเซิร์ฟเวอร์ มีค่าใช้จ่ายตามการใช้งาน ไม่ส่งอัตโนมัติ</p><p class="read-note">ข้อความที่ถอดตรงกันยังใช้ยืนยันคะแนนการออกเสียงไม่ได้</p><div class="read-cloud-actions"><button id="read-cloud" type="button" disabled>ส่งคลิปนี้ให้ Cloud ฟัง</button><button id="read-cloud-cancel" type="button" hidden>ยกเลิก</button></div><div id="read-feedback" role="status" aria-live="polite"></div></section>
+    <details class="read-details"><summary>คำอ่านและที่มาของตัวอย่าง</summary><p id="read-ipa" lang="en"></p><p id="read-source"></p><div id="read-credit"></div><p class="read-note">คำอ่านเป็นข้อมูลอ้างอิง ไม่ใช่ผลประเมินเสียงของคุณ</p></details>
+  </main>
+  <noscript>เปิด JavaScript เพื่อฟังตัวอย่างและบันทึกเสียง</noscript>
+</body>
+</html>
