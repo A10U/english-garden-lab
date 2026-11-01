@@ -951,6 +951,31 @@
       bucket.push(() => taskListeners.splice(0).forEach(remove => remove()));
       const phoneData = index => feedback && feedback.phones && feedback.phones.find(item => item.phoneIndex === index);
       const phoneObservation = index => observation && observation.phones && observation.phones.find(item => item.phoneIndex === index);
+      function partPresentation(indices, result) {
+        const evidence = phoneEvidence(result);
+        if (evidence.state !== 'unassessed' || !observation || !observation.available) return evidence;
+        const parts = indices.map(phoneObservation);
+        const owners = indices.map(index => groups.filter(group => Array.isArray(group.phoneIndices) && group.phoneIndices.includes(index)));
+        // Only the checked observation projection may supply a provisional
+        // reading. Missing/invalid mappings must not inherit a nearby token.
+        if (!parts.length || new Set(indices).size !== indices.length
+          || parts.some((part, at) => !part || part.relation === 'unavailable' || part.expected !== source.phones[indices[at]]
+            || owners[at].length !== 1 || owners[at][0].silent === true
+            || !Array.isArray(owners[at][0].phones) || owners[at][0].phones.length !== owners[at][0].phoneIndices.length
+            || new Set(owners[at][0].phoneIndices).size !== owners[at][0].phoneIndices.length
+            || owners[at][0].phoneIndices.some((index, offset) => !Number.isSafeInteger(index) || index < 0 || index >= source.phones.length
+              || owners[at][0].phones[offset] !== source.phones[index]))) return evidence;
+        const tokens = new Map();
+        parts.flatMap(part => part.operations).forEach(operation => {
+          if (Number.isSafeInteger(operation.observed_index) && typeof operation.observed === 'string') tokens.set(operation.observed_index, operation.observed);
+        });
+        const heard = [...tokens].sort((a, b) => a[0] - b[0]).map(item => item[1]);
+        if (!heard.length) return { ...evidence, note: 'ยังไม่มีคำถอดส่วนนี้' };
+        const tentative = parts.some(part => part.diagnosticAvailable && part.tentative);
+        const stabilityKnown = parts.every(part => part.diagnosticAvailable);
+        return { ...evidence, provisional: true, label: 'ถอดเป็น /' + heard.join(' ') + '/',
+          note: tentative ? 'คำถอดยังไม่มั่นคง' : stabilityKnown ? 'คำถอดเบื้องต้น' : 'ยังไม่ทราบความมั่นคงรายส่วน' };
+      }
       function labelFor(index) {
         const group = groups.find(item => item.phoneIndices.includes(index));
         return (group && group.letters ? group.letters + ' ' : '') + '/' + source.phones[index] + '/';
@@ -1030,21 +1055,23 @@
         buttons.forEach(item => item.node.setAttribute('aria-pressed', String(item.group === group)));
         panel.replaceChildren();
         if (group.silent) { taskListeners.splice(0).forEach(remove => remove()); taskBox.replaceChildren(); taskBox.hidden = true; panel.append(el('strong', '', 'ตัวสะกด ' + group.letters + ' ไม่ออกเสียงแยกในคำนี้'), el('p', 'egl-ph-note', 'ส่วนนี้แสดง — เพราะไม่มีหน่วยเสียงแยกให้เทียบ ฟังรวมอยู่ในคำเต็มได้')); return; }
-        const index = currentPhone, phone = source.phones[index], result = phoneData(index), evidence = phoneEvidence(result);
+        const index = currentPhone, phone = source.phones[index], result = phoneData(index), evidence = partPresentation([index], result);
         panel.append(el('strong', 'egl-ph-spelling-focus', (group.letters ? group.letters + ' → ' : '') + '/' + phone + '/'));
         if (group.phoneIndices.length > 1) {
           panel.append(el('p', 'egl-ph-note', 'ช่องบนแสดงการจับคู่รวมทั้งกลุ่ม ด้านล่างเลือกฟังเทียบทีละเสียงได้'));
           const parts = el('div', 'egl-ph-actions');
           group.phoneIndices.forEach(at => {
-            const item = phoneEvidence(phoneData(at));
+            const item = partPresentation([at], phoneData(at));
             const node = button('/' + source.phones[at] + '/ · ' + item.label, () => choose(group, at), 'egl-ph-button egl-ph-evidence-' + item.state, detailListeners);
             node.setAttribute('aria-pressed', String(at === index)); parts.append(node);
           });
           panel.append(parts);
         }
         const resultBox = el('div', 'egl-ph-part-result egl-ph-evidence-' + evidence.state);
-        resultBox.append(el('strong', 'egl-ph-part-status', evidence.label), el('span', 'egl-ph-part-result-label', 'การจับคู่ของโมเดล · ไม่ใช่คะแนนการออกเสียง'));
-        const advice = el('p', 'egl-ph-part-advice', phoneResultText(result, phone));
+        resultBox.append(el('strong', 'egl-ph-part-status', evidence.label), el('span', 'egl-ph-part-result-label', evidence.provisional ? 'คำถอดเบื้องต้นของโมเดล · ยังไม่ใช่ผลประเมินการออกเสียง' : 'การจับคู่ของโมเดล · ไม่ใช่คะแนนการออกเสียง'));
+        const advice = el('p', 'egl-ph-part-advice', evidence.provisional
+          ? evidence.note + ' · แสดงสิ่งที่โมเดลถอดได้ในส่วนนี้ อาจมีเสียงเพิ่ม ขาด หรือคลาดเคลื่อน จึงยังใช้ตัดสินว่าคุณออกเสียงผิดไม่ได้'
+          : phoneResultText(result, phone));
         resultBox.append(advice, el('p', 'egl-ph-part-method', 'หากต้องการฝึกส่วนนี้: ' + recommendedMethod(phone, source.text))); panel.append(resultBox);
         const raw = phoneObservation(index);
         if (raw && observation.available) resultBox.append(el('p', 'egl-ph-part-observation', 'คำถอดเบื้องต้นส่วนนี้: ' + (raw.observed.length ? '/' + raw.observed.join(' ') + '/' : 'ยังไม่พบการจับคู่') + ' · ' + (raw.diagnosticAvailable && raw.tentative ? 'โมเดลยังไม่มั่นคง' : 'ยังไม่ใช่ผลประเมินการออกเสียง')));
@@ -1068,11 +1095,11 @@
         observation = recognitionIssue(analysisData) === 'insufficient_audio_signal' ? null : spellingProjection(source, groups, 'observeWord');
         renderObservation();
         buttons.forEach((item, at) => {
-          const result = feedback && feedback.groups && feedback.groups[at], evidence = phoneEvidence(result);
+          const result = feedback && feedback.groups && feedback.groups[at], evidence = partPresentation(item.group.phoneIndices, result);
           item.node.className = 'egl-ph-spelling-group egl-ph-evidence-' + evidence.state + (item.group.silent ? ' egl-ph-silent' : '');
           item.score.textContent = evidence.label;
-          item.counts.textContent = item.group.silent ? 'ไม่มีเสียงแยก' : evidence.state === 'unassessed' ? 'ยังไม่มีข้อมูลพอ' : 'ผลจากโมเดล';
-          item.node.setAttribute('aria-label', (item.group.letters || item.group.phones.join(' ')) + (item.group.silent ? ' · ไม่ออกเสียงแยก' : '') + ' · ' + evidence.label + ' · การจับคู่ของโมเดล ไม่ใช่คะแนนความถูกต้อง');
+          item.counts.textContent = item.group.silent ? 'ไม่มีเสียงแยก' : evidence.note || (evidence.state === 'unassessed' ? 'ยังไม่มีข้อมูลพอ' : 'ผลจากโมเดล');
+          item.node.setAttribute('aria-label', (item.group.letters || item.group.phones.join(' ')) + (item.group.silent ? ' · ไม่ออกเสียงแยก' : '') + ' · ' + evidence.label + (evidence.provisional ? ' · ' + evidence.note + ' · ยังไม่ใช่ผลประเมินการออกเสียง' : ' · การจับคู่ของโมเดล ไม่ใช่คะแนนความถูกต้อง'));
         });
         const known = assessedPhones();
         summary.replaceChildren();
@@ -1080,7 +1107,9 @@
         const sourceLabel = analysisData ? (mode === 'ai' || analysisData.precomputed === true ? 'ผลจากเสียงตัวอย่าง AI' : 'ผลจากเสียงของฉัน') : 'ยังไม่ได้วิเคราะห์เสียง';
         summary.append(el('small', 'egl-ph-feedback-source', sourceLabel));
         summary.append(el('strong', '', 'ฟังเทียบทีละเสียง'), el('p', 'egl-ph-feedback-explainer', 'ป้ายบอกสิ่งที่โมเดลจับคู่ได้ โมเดลอาจถอดผิดหรือข้ามเสียง จึงยังใช้จัดอันดับว่าคุณควรแก้เสียงไหนก่อนไม่ได้'));
-        if (!known.length) summary.append(el('p', 'egl-ph-note', '— หมายถึงยังไม่มีข้อมูลจับคู่ที่ใช้ได้ ฟังตัวอย่างและฝึกต่อได้โดยไม่ต้องรอผลอัตโนมัติ'));
+        const hasReading = observation && observation.available && observation.phones.some(part => part.relation !== 'unavailable' && part.observed.length);
+        if (!known.length && hasReading) summary.append(el('p', 'egl-ph-note egl-ph-provisional-summary', (observation.completeRawMatch ? 'ถอดได้ครบ ' + observation.referenceCount + ' เสียง (เบื้องต้น)' : 'มีคำถอดเบื้องต้นแล้ว') + ' · ยังไม่ให้คะแนนการออกเสียง และยังใช้ระบุว่าคุณควรแก้เสียงใดไม่ได้'));
+        else if (!known.length) summary.append(el('p', 'egl-ph-note', '— หมายถึงยังไม่มีข้อมูลจับคู่ที่ใช้ได้ ฟังตัวอย่างและฝึกต่อได้โดยไม่ต้องรอผลอัตโนมัติ'));
         const actions = el('div', 'egl-ph-actions');
         source.phones.forEach((phone, index) => {
           const group = groups.find(candidate => candidate.phoneIndices.includes(index));
@@ -1539,8 +1568,9 @@
       const overall = uncertain ? null : percentage(summary, operations);
       const evidence = practicePhone ? phoneEvidence({ match_percent: overall, counts: summary, operations }) : null;
       const score = el('div', 'egl-ph-agreement egl-ph-' + (evidence ? 'evidence-' + evidence.state : percentLevel(overall)));
-      score.append(el('strong', evidence ? 'egl-ph-evidence-status' : 'egl-ph-percent', evidence ? evidence.label : percentText(overall)), el('span', 'egl-ph-agreement-label', uncertain ? 'ยังประเมินการออกเสียงไม่ได้' : evidence ? 'การจับคู่เฉพาะเสียงของโมเดล · ไม่ใช่คะแนนความถูกต้อง' : 'หน่วยเสียงจับคู่กับอ้างอิง'));
-      score.append(el('span', 'egl-ph-counts', uncertain ? issue === 'insufficient_audio_signal' ? 'สัญญาณเสียงยังไม่เพียงพอสำหรับเปรียบเทียบ' : 'ระบบยังแยกหน่วยเสียงสำหรับเปรียบเทียบไม่ได้อย่างมั่นคง' : evidence ? 'ตัวเลขจับคู่ดิบอยู่ในรายละเอียดด้านล่าง' : countsText(summary, operations)));
+      const provisionalReading = uncertain && issue !== 'insufficient_audio_signal' && rawPhones.length > 0;
+      score.append(el('strong', evidence ? 'egl-ph-evidence-status' : 'egl-ph-percent', evidence ? evidence.label : percentText(overall)), el('span', 'egl-ph-agreement-label', uncertain ? provisionalReading ? 'มีคำถอดเบื้องต้นแล้ว · ยังไม่ให้คะแนนการออกเสียง' : 'ยังประเมินการออกเสียงไม่ได้' : evidence ? 'การจับคู่เฉพาะเสียงของโมเดล · ไม่ใช่คะแนนความถูกต้อง' : 'หน่วยเสียงจับคู่กับอ้างอิง'));
+      score.append(el('span', 'egl-ph-counts', uncertain ? issue === 'insufficient_audio_signal' ? 'สัญญาณเสียงยังไม่เพียงพอสำหรับเปรียบเทียบ' : provisionalReading ? 'โมเดลถอดหน่วยเสียงได้ แต่ผลยังไม่มั่นคงพอสำหรับให้คะแนน' : 'ระบบยังแยกหน่วยเสียงสำหรับเปรียบเทียบไม่ได้อย่างมั่นคง' : evidence ? 'ตัวเลขจับคู่ดิบอยู่ในรายละเอียดด้านล่าง' : countsText(summary, operations)));
       observed.replaceChildren(el('h3', 'egl-ph-step-title', practicePhone ? '3 · ผลเฉพาะเสียง /' + practicePhone.phone + '/ ในคำ ' + practiceWord.text : practiceWord ? '3 · ผลคำว่า ' + practiceWord.text : '3 · ดูผลทีละคำ'), score);
       if (uncertain) {
         if (issue !== 'insufficient_audio_signal') {

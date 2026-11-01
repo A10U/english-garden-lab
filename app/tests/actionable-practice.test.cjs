@@ -91,7 +91,8 @@ test('AP-001 uncertain exact with exposes provisional observations and valid ten
   const before = JSON.stringify(data), app = setup(t, expected, [data]), section = await analyze(app);
   assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '—');
   assert.equal(app.container.querySelector('.egl-ph-word-percent').textContent, '—');
-  assert.deepEqual(statuses(section), ['—', '—', '—']);
+  assert.deepEqual(statuses(section), ['ถอดเป็น /w/', 'ถอดเป็น /ɪ/', 'ถอดเป็น /ð/']);
+  assert.ok(cards(section).every(node => node.classList.contains('egl-ph-evidence-unassessed')));
   assert.match(observation(section).querySelector('.egl-ph-model-reading').textContent, /with: \/w ɪ ð\//);
   assert.match(observation(section).querySelector('.egl-ph-observation-match').textContent, /ครบ 3 หน่วยเสียง.*ยังใช้ยืนยันคะแนน.*ไม่ได้/);
   const uncertainty = observation(section).querySelector('.egl-ph-model-uncertainty').textContent;
@@ -119,7 +120,9 @@ test('AP-002 absent or malformed token diagnostics remain unknown and never inhe
       assert.match(observation(section).querySelector('.egl-ph-model-reading').textContent, /\/w ɪ ð\//);
       assert.match(observation(section).querySelector('.egl-ph-model-uncertainty').textContent, /ยังไม่มีข้อมูลความมั่นคงรายส่วนเพียงพอ/);
       assert.doesNotMatch(observation(section).textContent, /ส่วนที่โมเดลยังไม่มั่นคง:|โมเดลมั่นใจ|คุณพูดผิด/);
-      assert.deepEqual(statuses(section), ['—', '—', '—']); noAutomaticActions(app, 1);
+      assert.deepEqual(statuses(section), ['ถอดเป็น /w/', 'ถอดเป็น /ɪ/', 'ถอดเป็น /ð/']);
+      assert.ok(cards(section).every(node => node.querySelector('.egl-ph-part-counts').textContent === 'ยังไม่ทราบความมั่นคงรายส่วน'));
+      noAutomaticActions(app, 1);
     });
   }
 });
@@ -130,7 +133,8 @@ test('AP-003 valid high token diagnostics differ from unknown metadata while glo
   assert.equal(observation(section).querySelector('.egl-ph-model-uncertainty'), null);
   assert.match(observation(section).querySelector('.egl-ph-model-reading').textContent, /\/w ɪ ð\//);
   assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '—');
-  assert.deepEqual(statuses(section), ['—', '—', '—']);
+  assert.deepEqual(statuses(section), ['ถอดเป็น /w/', 'ถอดเป็น /ɪ/', 'ถอดเป็น /ð/']);
+  assert.ok(cards(section).every(node => node.querySelector('.egl-ph-part-counts').textContent === 'คำถอดเบื้องต้น'));
   assert.doesNotMatch(learningText(section), /โมเดลมั่นใจ|คุณออกเสียงถูกต้อง/); noAutomaticActions(app, 1);
 });
 
@@ -239,7 +243,7 @@ test('AP-008 explicit non-first phone practice keeps observations and the select
   assert.match(observation(section).querySelector('.egl-ph-model-reading').textContent, /เฉพาะเสียงที่เลือกใน leaf: \/iː\//);
   assert.equal(observation(section).querySelector('.egl-ph-observation-match'), null, 'one sound cannot imply whole-word matching');
   assert.match(observation(section).querySelector('.egl-ph-model-uncertainty').textContent, /\/iː\//);
-  assert.deepEqual(statuses(section), ['—', '—', '—']);
+  assert.deepEqual(statuses(section), ['—', 'ถอดเป็น /iː/', '—']);
   assert.deepEqual([...app.calls[0].reference.words[0].phones], ['iː']);
   assert.equal(app.calls[0].reference.context.phone_index, 1); noAutomaticActions(app, 1);
 });

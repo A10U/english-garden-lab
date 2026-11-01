@@ -429,7 +429,8 @@ test('uncertain real-speech recognition leaves all visible scores unassessed and
   assert.equal(app.button('คำที่มีเสียงต่างถัดไป').disabled, true);
   assert.doesNotMatch(observed.querySelector('.egl-ph-spelling-summary').textContent, /ควรฝึกก่อน:/);
   assert.ok(observed.querySelectorAll('.egl-ph-part-status').length >= 3);
-  assert.ok([...observed.querySelectorAll('.egl-ph-part-status')].every(node => node.textContent === '—'));
+  assert.ok([...observed.querySelectorAll('.egl-ph-part-status')].some(node => node.textContent.startsWith('ถอดเป็น /')));
+  assert.ok([...observed.querySelectorAll('.egl-ph-spelling-group')].every(node => node.classList.contains('egl-ph-evidence-unassessed')));
   assert.match(observed.querySelector('.egl-ph-part-advice').textContent, /ยังไม่มีผลจับคู่ที่ใช้ได้/);
   assert.equal(observed.querySelector('.egl-ph-detected').textContent, 'ʔ i', 'raw recognition remains inspectable');
   assert.match(app.container.querySelector('[role=status]').textContent, /ยังให้เปอร์เซ็นต์ไม่ได้/);
@@ -446,7 +447,8 @@ test('uncertain recognition cannot turn a coincidental raw perfect alignment int
   assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '—');
   assert.equal(app.container.querySelector('.egl-ph-word-percent').textContent, '—');
   assert.ok(app.container.querySelectorAll('.egl-ph-part-status').length >= 3);
-  assert.ok([...app.container.querySelectorAll('.egl-ph-part-status')].every(node => node.textContent === '—'));
+  assert.ok([...app.container.querySelectorAll('.egl-ph-part-status')].some(node => node.textContent === 'ถอดเป็น /ɪ/'));
+  assert.ok([...app.container.querySelectorAll('.egl-ph-spelling-group')].every(node => node.classList.contains('egl-ph-evidence-unassessed')));
   assert.doesNotMatch(app.container.querySelector('.egl-ph-spelling-summary').textContent, /จับคู่ตรงดีแล้ว/);
   assert.equal(app.container.querySelector('.egl-ph-phone-pairs'), null);
   assert.equal(JSON.stringify(data), before);

@@ -24,14 +24,22 @@ function analysis(expected, phones, quality = 'recognized') {
     recognition_quality: { status: quality, mean_token_posterior: .9, calibrated: false },
     live_analysis: true, precomputed: false };
 }
+function withDiagnostics(data, posteriors) {
+  data.recognition_quality.threshold = .65;
+  data.recognition_quality.token_diagnostics = data.observed.phones.map((segment, observed_index) => ({
+    ...segment, observed_index, mean_token_posterior: posteriors[observed_index] ?? .9,
+    frame_count: 1, calibrated: false, diagnostic_only: true
+  }));
+  return data;
+}
 function setup(t, expected, responses) {
   const dom = new JSDOM('<main></main>', { url: 'https://garden.example/app/index.html', runScripts: 'outside-only' });
-  const win = dom.window, calls = [], network = [];
+  const win = dom.window, calls = [], network = [], played = [];
   let sequence = 0;
   win.URL.createObjectURL = () => 'blob:public-' + (++sequence); win.URL.revokeObjectURL = () => {};
   win.HTMLMediaElement.prototype.pause = function () {};
   win.HTMLMediaElement.prototype.load = function () {};
-  win.HTMLMediaElement.prototype.play = function () { return Promise.resolve(); };
+  win.HTMLMediaElement.prototype.play = function () { played.push(this); return Promise.resolve(); };
   win.fetch = (...args) => { network.push(args); return Promise.reject(new Error('No private audio or provider calls')); };
   for (const name of names.slice(0, -1)) win.eval(sources[name]);
   win.EGLBrowserPhonetics = { supported: () => true, analyze: async options => {
@@ -42,7 +50,7 @@ function setup(t, expected, responses) {
   const container = win.document.querySelector('main');
   const cleanup = win.EGLPhonetics.mount(container, { text: expected.text, precomputed: clone(expected), expanded: true });
   t.after(() => { cleanup(); win.close(); });
-  return { win, container, calls, network,
+  return { win, container, calls, network, played,
     button: (text, area = container) => [...area.querySelectorAll('button')].find(node => node.textContent === text) };
 }
 function selectFile(app) {
@@ -177,13 +185,111 @@ test('QE-006 feedback refresh preserves the chosen spelling group and a new clip
   noLearningPercentages(focus); assert.equal(app.calls.length, 1); assert.equal(app.network.length, 0);
 });
 
-test('QE-007 uncertain recognition keeps qualitative states unassessed without changing perfect raw diagnostics into success', async t => {
+test('QE-007 uncertain recognition shows neutral provisional readings without changing raw diagnostics into success', async t => {
   const expected = its(), data = analysis(expected, ['ɪ', 't', 's'], 'uncertain'), before = JSON.stringify(data);
   const app = setup(t, expected, [data]), section = await analyze(app);
-  assert.deepEqual(statuses(section), ['—', '—', '—']); noLearningPercentages(section);
+  assert.deepEqual(statuses(section), ['ถอดเป็น /ɪ/', 'ถอดเป็น /t/', 'ถอดเป็น /s/']); noLearningPercentages(section);
   assert.ok(cards(section).every(node => node.classList.contains('egl-ph-evidence-unassessed')));
   assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '—');
   assert.equal(data.alignment.summary.match_percent, 100); assert.equal(JSON.stringify(data), before);
+});
+
+test('QE-011 an uncertain complete ship reading stays visible on cards and focus while only the vowel is descriptively tentative', async t => {
+  const expected = reference('ship', ['ʃ', 'ɪ', 'p']);
+  const data = withDiagnostics(analysis(expected, ['ʃ', 'ɪ', 'p'], 'uncertain'), [.79, .38, .93]), before = JSON.stringify(data);
+  const app = setup(t, expected, [data]), section = await analyze(app);
+  assert.deepEqual(statuses(section), ['ถอดเป็น /ʃ/', 'ถอดเป็น /ɪ/', 'ถอดเป็น /p/']);
+  assert.deepEqual(cards(section).map(node => node.querySelector('.egl-ph-part-counts').textContent), ['คำถอดเบื้องต้น', 'คำถอดยังไม่มั่นคง', 'คำถอดเบื้องต้น']);
+  assert.match(cards(section)[1].getAttribute('aria-label'), /คำถอดยังไม่มั่นคง/);
+  assert.ok(cards(section).every(node => node.classList.contains('egl-ph-evidence-unassessed')));
+  assert.match(section.querySelector('.egl-ph-provisional-summary').textContent, /ถอดได้ครบ 3 เสียง.*ยังไม่ให้คะแนน/);
+  assert.doesNotMatch(section.querySelector('.egl-ph-spelling-summary').textContent, /— หมายถึงยังไม่มีข้อมูล/);
+  assert.match(app.container.querySelector('.egl-ph-agreement-label').textContent, /มีคำถอดเบื้องต้นแล้ว/);
+  cards(section)[1].click();
+  assert.equal(section.querySelector('.egl-ph-spelling-detail .egl-ph-part-status').textContent, 'ถอดเป็น /ɪ/');
+  assert.match(section.querySelector('.egl-ph-part-advice').textContent, /คำถอดยังไม่มั่นคง/);
+  assert.doesNotMatch(section.querySelector('.egl-ph-part-advice').textContent, /ยังไม่มีผลจับคู่ที่ใช้ได้/);
+  assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '—');
+  assert.equal(app.container.querySelector('.egl-ph-word-percent').textContent, '—');
+  noLearningPercentages(section); assert.equal(JSON.stringify(data), before);
+  assert.equal(app.calls.length, 1); assert.equal(app.network.length, 0); assert.equal(app.played.length, 0);
+});
+
+test('QE-012 missing diagnostics leave stability unknown without hiding validated provisional phones', async t => {
+  const expected = reference('ship', ['ʃ', 'ɪ', 'p']), data = analysis(expected, ['ʃ', 'ɪ', 'p'], 'uncertain');
+  data.recognition_quality.mean_token_posterior = .01;
+  const before = JSON.stringify(data), app = setup(t, expected, [data]), section = await analyze(app);
+  assert.deepEqual(statuses(section), ['ถอดเป็น /ʃ/', 'ถอดเป็น /ɪ/', 'ถอดเป็น /p/']);
+  assert.ok(cards(section).every(node => node.querySelector('.egl-ph-part-counts').textContent === 'ยังไม่ทราบความมั่นคงรายส่วน'));
+  assert.ok(cards(section).every(node => node.getAttribute('aria-label').includes('ยังไม่ทราบความมั่นคงรายส่วน')));
+  assert.match(section.querySelector('.egl-ph-part-advice').textContent, /ยังไม่ทราบความมั่นคงรายส่วน/);
+  assert.doesNotMatch(learningText(section), /มั่นใจสูง|คุณออกเสียงถูกต้อง|ผ่านเกณฑ์/);
+  assert.equal(JSON.stringify(data), before); noLearningPercentages(section);
+});
+
+test('QE-013 merged groups preserve observed order and owned insertions once, including focused phone controls', async t => {
+  const expected = reference('garden', ['ɡ', 'ɑː', 'ɹ', 'd', 'ə', 'n']);
+  const data = withDiagnostics(analysis(expected, ['ɡ', 'ɑː', 'ə', 'ɹ', 'd', 'ə', 'n'], 'uncertain'), []);
+  const before = JSON.stringify(data), app = setup(t, expected, [data]), section = await analyze(app), ar = card(section, 'ar');
+  assert.equal(ar.querySelector('.egl-ph-part-status').textContent, 'ถอดเป็น /ɑː ə ɹ/');
+  ar.click();
+  assert.ok(app.button('/ɹ/ · ถอดเป็น /ə ɹ/', section));
+  app.button('/ɹ/ · ถอดเป็น /ə ɹ/', section).click();
+  assert.equal(section.querySelector('.egl-ph-spelling-detail .egl-ph-part-status').textContent, 'ถอดเป็น /ə ɹ/');
+  assert.match(section.querySelector('.egl-ph-part-advice').textContent, /อาจมีเสียงเพิ่ม ขาด/);
+  assert.doesNotMatch(section.querySelector('.egl-ph-spelling-summary').textContent, /ถอดได้ครบ/);
+  assert.equal(JSON.stringify(data), before); noLearningPercentages(section);
+});
+
+test('QE-014 deleted or invalidly mapped slots never borrow nearby provisional speech', async t => {
+  for (const invalid of [false, true]) {
+    const expected = reference('ship', ['ʃ', 'ɪ', 'p']);
+    const data = withDiagnostics(analysis(expected, invalid ? ['ʃ', 'ɪ', 'p'] : ['ʃ', 'ɪ'], 'uncertain'), []);
+    if (invalid) data.alignment.operations[1].observed_index = 0;
+    const before = JSON.stringify(data), app = setup(t, expected, [data]), section = await analyze(app);
+    assert.deepEqual(statuses(section), invalid ? ['—', '—', 'ถอดเป็น /p/'] : ['ถอดเป็น /ʃ/', 'ถอดเป็น /ɪ/', '—']);
+    if (!invalid) assert.equal(cards(section)[2].querySelector('.egl-ph-part-counts').textContent, 'ยังไม่มีคำถอดส่วนนี้');
+    assert.doesNotMatch(section.querySelector('.egl-ph-spelling-summary').textContent, /ถอดได้ครบ/);
+    assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '—');
+    assert.equal(JSON.stringify(data), before); noLearningPercentages(section);
+  }
+});
+
+test('QE-015 insufficient signal suppresses provisional readings and silent letters remain outside speech evidence', async t => {
+  const expected = reference('make', ['m', 'eɪ', 'k']);
+  const quiet = withDiagnostics(analysis(expected, ['m', 'eɪ', 'k'], 'uncertain'), []);
+  quiet.metrics.voiced_seconds = 0;
+  const app = setup(t, expected, [quiet]), section = await analyze(app);
+  assert.deepEqual(statuses(section), ['—', '—', '—', '—']);
+  assert.equal(section.querySelector('.egl-ph-provisional-summary'), null);
+  assert.doesNotMatch(learningText(section), /ถอดเป็น \/|ถอดได้ครบ/);
+  assert.equal(card(section, 'e').querySelector('.egl-ph-part-counts').textContent, 'ไม่มีเสียงแยก');
+  assert.equal(app.played.length, 0); assert.equal(app.network.length, 0); noLearningPercentages(section);
+});
+
+test('QE-016 recognized results keep existing evidence labels even when one token diagnostic is tentative', async t => {
+  const expected = reference('ship', ['ʃ', 'ɪ', 'p']);
+  const data = withDiagnostics(analysis(expected, ['ʃ', 'ɪ', 'p']), [.79, .38, .93]), before = JSON.stringify(data);
+  const app = setup(t, expected, [data]), section = await analyze(app);
+  assert.deepEqual(statuses(section), ['จับคู่ตรง', 'จับคู่ตรง', 'จับคู่ตรง']);
+  assert.equal(app.container.querySelector('.egl-ph-percent').textContent, '100.0%');
+  assert.equal(section.querySelector('.egl-ph-provisional-summary'), null);
+  assert.equal(JSON.stringify(data), before); noLearningPercentages(section);
+});
+
+test('QE-017 malformed spelling-group phones cannot bypass the checked mapping guard through provisional feedback', async t => {
+  const expected = reference('leaf', ['l', 'iː', 'f']);
+  const data = withDiagnostics(analysis(expected, ['l', 'iː', 'f'], 'uncertain'), []), before = JSON.stringify(data);
+  const app = setup(t, expected, [data]), checkedGuide = app.win.EGLSpellingGuide;
+  app.win.EGLSpellingGuide = { forWord(...args) {
+    const result = checkedGuide.forWord(...args);
+    if (args[0] === 'leaf') result.groups[0].phones = ['s'];
+    return result;
+  } };
+  const section = await analyze(app);
+  assert.deepEqual(statuses(section), ['—', 'ถอดเป็น /iː/', 'ถอดเป็น /f/']);
+  assert.equal(section.querySelector('.egl-ph-spelling-detail .egl-ph-part-status').textContent, '—');
+  assert.equal(JSON.stringify(data), before); noLearningPercentages(section);
 });
 
 test('QE-008 explicit one-sound practice uses qualitative overall and word labels while raw 100/0 remain technical', async t => {
