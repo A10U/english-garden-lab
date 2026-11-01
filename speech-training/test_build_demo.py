@@ -249,6 +249,22 @@ class StaticDemoBuildTests(unittest.TestCase):
         self.assertNotIn('PRIVATE_CONFIG_SHOULD_NOT_SHIP', html)
         self.assertFalse((self.output / '.env.speech-cloud').exists())
 
+    def test_acoustic_page_versions_static_ui_without_shipping_local_engine(self):
+        app = self.root / 'app'
+        (app / 'acoustics.html').write_text('''<!doctype html><html><head>
+<link rel="stylesheet" href="acoustics.css"><script src="phonetics.js" defer></script>
+<script src="acoustics.js" defer></script></head><body><h1>Acoustic measurements</h1></body></html>''')
+        (app / 'acoustics.js').write_text('globalThis.acousticsReady=true;')
+        (app / 'acoustics.css').write_text('h1{font-size:2rem}')
+        (self.root / 'speech-training/acoustic_measure.py').write_text('PRIVATE_LOCAL_ENGINE_FIXTURE=1')
+        build(self.root, self.output)
+        html = (self.output / 'app/acoustics.html').read_text()
+        self.assertIn('egl-demo-csp', html)
+        self.assertIn('EGL_DEMO_RUNTIME', html)
+        self.assertRegex(html, r'acoustics\.js\?v=[a-f0-9]{16}')
+        self.assertRegex(html, r'acoustics\.css\?v=[a-f0-9]{16}')
+        self.assertFalse((self.output / 'speech-training/acoustic_measure.py').exists())
+
     def test_stale_authoring_link_fails_before_output_writes(self):
         (self.root / 'index.html').write_text('<html><body><a href="SDLC/private.json">private</a></body></html>')
         with self.assertRaisesRegex(ValueError, 'Private/authoring path'):

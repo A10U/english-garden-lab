@@ -253,7 +253,7 @@ def demo_html(source: str, *, data_url: str, trial: dict | None = None, runtime_
         def version_script(match):
             prefix, quote, url = match.groups()
             parsed = urlsplit(url)
-            if parsed.scheme or parsed.netloc or (Path(parsed.path).name not in {"phonetics.js", "browser-phonetics.js", "spelling-feedback.js", "speak.js", "foundations.js", "read.js", "core-word-data.js", "phone-guide.js"} and Path(parsed.path).suffix != '.css'):
+            if parsed.scheme or parsed.netloc or (Path(parsed.path).name not in {"phonetics.js", "browser-phonetics.js", "spelling-feedback.js", "speak.js", "foundations.js", "read.js", "acoustics.js", "core-word-data.js", "phone-guide.js"} and Path(parsed.path).suffix != '.css'):
                 return match[0]
             query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key != "v"]
             versioned = parsed._replace(query=urlencode(query + [("v", runtime_version)])).geturl()
@@ -406,6 +406,9 @@ def build(project_root: Path, output: Path) -> dict:
             data_url="../speech-training/demo-assets/demo-data.js", runtime_version=runtime_version).encode("utf-8")
     if "app/read.html" in files:
         files["app/read.html"] = demo_html(files["app/read.html"].decode("utf-8"),
+            data_url="../speech-training/demo-assets/demo-data.js", runtime_version=runtime_version).encode("utf-8")
+    if "app/acoustics.html" in files:
+        files["app/acoustics.html"] = demo_html(files["app/acoustics.html"].decode("utf-8"),
             data_url="../speech-training/demo-assets/demo-data.js", runtime_version=runtime_version).encode("utf-8")
     files["speech-training/listen.html"] = demo_html(
         (root / "speech-training/listen.html").read_text(encoding="utf-8"),

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#27593e">
+  <title>ดูเสียงของฉัน — สวนภาษา</title>
+  <link rel="stylesheet" href="phonetics.css">
+  <link rel="stylesheet" href="acoustics.css">
+  <script src="phonetics.js" defer></script>
+  <script src="acoustics.js" defer></script>
+</head>
+<body>
+  <a class="ac-skip" href="#ac-input-heading">ข้ามไปเลือกเสียง</a>
+  <header class="ac-top"><a href="index.html">สวนภาษา</a><nav aria-label="พื้นที่ฝึก"><a href="read.html">อ่านไป พูดไป</a><a href="foundations.html">ฝึกทีละคำ</a></nav></header>
+  <main class="ac-main">
+    <div class="ac-intro"><p>เครื่องมือดูเสียง · วัดในเครื่อง</p><h1>มองเห็นเสียงที่คุณพูด</h1><p>เลือกช่วงเสียง แล้วดูระดับ F0 และฟอร์แมนต์ F1–F3 เป็น Hz</p></div>
+    <p id="ac-local-notice" class="ac-notice">วัดผ่านบริการ Praat ใน local dev · ไม่ส่งเสียงไปผู้ให้บริการ Cloud</p>
+    <p class="ac-note">ตัวเลขเหล่านี้อธิบายสัญญาณเสียง ไม่ใช่คะแนนออกเสียงถูกผิด หรือตำแหน่งลิ้นที่ระบบตรวจยืนยัน</p>
+    <section class="ac-panel" aria-labelledby="ac-input-heading">
+      <h2 id="ac-input-heading">1 · เลือกไฟล์หรือบันทึกเสียง</h2>
+      <label class="ac-file" for="ac-file">เลือกไฟล์ WAV <input id="ac-file" type="file" accept="audio/wav,.wav" aria-describedby="ac-file-help"></label>
+      <p id="ac-file-help" class="ac-note">0.2–15 วินาที ไม่เกิน 10 MB · PCM 16 บิต หรือ float 32 บิต · โมโนหรือสเตอริโอ 16–96 kHz</p>
+      <details class="ac-record"><summary>หรือบันทึกเสียงใหม่</summary><div id="ac-recorder"></div></details>
+      <p id="ac-clip" class="ac-note">ยังไม่มีคลิปเสียง</p>
+      <audio id="ac-audio" controls preload="none" hidden aria-label="ฟังคลิปเต็มของฉัน"></audio>
+    </section>
+    <section class="ac-panel" aria-labelledby="ac-selection-heading">
+      <h2 id="ac-selection-heading">2 · เลือกช่วงที่จะวัดด้วยตัวเอง</h2>
+      <p class="ac-note">ดูรูปคลื่นและฟังคลิปเต็ม แล้วกำหนดจุดเริ่มกับจุดจบ ระบบไม่ได้หาขอบเขตสระให้อัตโนมัติ</p>
+      <figure class="ac-figure"><svg id="ac-waveform" viewBox="0 0 760 180" role="img" aria-label="รูปคลื่นเสียงและช่วงที่เลือก"></svg><figcaption id="ac-waveform-note">รูปคลื่นจะปรากฏเมื่อเลือกเสียงแล้ว</figcaption></figure>
+      <div class="ac-selection"><label for="ac-start">เริ่ม (วินาที)<input id="ac-start" type="number" min="0" step="0.001" inputmode="decimal" disabled></label><label for="ac-end">จบ (วินาที)<input id="ac-end" type="number" min="0" step="0.001" inputmode="decimal" disabled></label></div>
+      <div class="ac-selection ac-sliders"><label for="ac-start-range">เลื่อนจุดเริ่ม<input id="ac-start-range" type="range" min="0" max="1" step="0.001" value="0" disabled></label><label for="ac-end-range">เลื่อนจุดจบ<input id="ac-end-range" type="range" min="0" max="1" step="0.001" value="1" disabled></label></div>
+      <div class="ac-actions"><button id="ac-selection-play" type="button" disabled>ฟังช่วงที่เลือก</button><button id="ac-selection-stop" type="button" disabled>หยุดฟังช่วง</button></div><audio id="ac-selection-audio" preload="none" hidden aria-label="เสียงเฉพาะช่วงที่เลือก"></audio><p class="ac-note">ฟังช่วงที่เลือกเพื่อตรวจขอบเขตเอง ไฟล์ย่อยใช้ฟังเท่านั้น การวัดยังใช้คลิปต้นฉบับเต็ม</p>
+      <p id="ac-duration">ความยาวช่วงที่เลือก: —</p>
+      <label class="ac-checkbox"><input id="ac-vowel" type="checkbox" disabled>ช่วงนี้เป็นสระที่ฉันเลือกขอบเขตเอง</label>
+      <p class="ac-note">เมื่อเลือกข้อนี้ ชื่อช่วงจะเป็น “ช่วงสระที่คุณเลือก” โดยยังเป็นขอบเขตที่คุณกำหนดเอง</p>
+      <details class="ac-settings"><summary>ตั้งค่าการวัดเพิ่มเติม</summary><div class="ac-settings-grid"><label for="ac-floor">ขอบล่าง F0 (Hz)<input id="ac-floor" type="number" min="40" max="300" step="1" value="50"></label><label for="ac-top">ขอบบน F0 (Hz)<input id="ac-top" type="number" min="150" max="1500" step="1" value="800"></label><label for="ac-ceiling">เพดานฟอร์แมนต์ (Hz)<input id="ac-ceiling" type="number" min="3500" max="8000" step="1" value="5500"></label></div><p class="ac-note">เปลี่ยนช่วงค้นหาเมื่อเส้นติดตามไม่เหมาะกับเสียงของคุณ ค่า F0 บนต้องไม่น้อยกว่า 2 เท่าของค่าล่าง เพดานฟอร์แมนต์ต้องสอดคล้องกับอัตราเสียงของไฟล์</p></details>
+      <div class="ac-actions"><button id="ac-measure" class="ac-primary" type="button" disabled>วัดช่วงเสียงนี้</button><button id="ac-cancel" type="button" hidden>ยกเลิกการวัด</button></div>
+      <p id="ac-status" role="status" aria-live="polite">เลือกเสียงเพื่อเริ่มต้น · ยังไม่เปิดไมโครโฟนหรือเริ่มวัด</p>
+    </section>
+    <section id="ac-results" class="ac-panel" aria-labelledby="ac-result-heading" hidden>
+      <h2 id="ac-result-heading">สรุปค่าของช่วงที่คุณเลือก</h2><p id="ac-result-selection"></p>
+      <div id="ac-summary" class="ac-summary"></div>
+      <h3>F0 · ความถี่พื้นฐาน</h3><p class="ac-note">เส้นแสดงคลิปเต็ม ช่วงสีอ่อนคือช่วงที่เลือก · จุดที่ไม่มีค่าจะเว้นว่าง ไม่ลากเส้นเชื่อมข้าม</p>
+      <figure class="ac-figure"><svg id="ac-pitch" viewBox="0 0 760 250" role="img" aria-label="กราฟ F0 ตามเวลา หน่วย Hz"></svg><figcaption>เวลาเป็นวินาทีจากต้นคลิป · แกนตั้งเป็น Hz · ตัวเลขสรุปใช้เฉพาะช่วงที่เลือก</figcaption></figure>
+      <h3>F1, F2, F3 · ฟอร์แมนต์</h3><p class="ac-note">เส้นแสดงคลิปเต็มและประมาณตำแหน่งพลังงานในสเปกตรัม ไม่ใช่ภาพตำแหน่งอวัยวะออกเสียง</p>
+      <figure class="ac-figure"><svg id="ac-formants" viewBox="0 0 760 250" role="img" aria-label="กราฟ F1 F2 F3 ตามเวลา หน่วย Hz"></svg><figcaption><span class="ac-f1">F1</span> · <span class="ac-f2">F2</span> · <span class="ac-f3">F3</span> · เวลาเป็นวินาทีจากต้นคลิป</figcaption></figure>
+      <h3>ข้อจำกัดของข้อมูลครั้งนี้</h3><ul id="ac-flags"></ul><details><summary>ดูข้อมูลการวัด</summary><p id="ac-engine" class="ac-note"></p><div id="ac-sensitivity"></div></details>
+      <p class="ac-note">F0 และฟอร์แมนต์อาจคลาดเคลื่อน การเปรียบเทียบสระต้องตรวจขอบเขตและวิธีวัดร่วมด้วย เครื่องมือนี้ไม่ให้เปอร์เซ็นต์สำเนียงหรือคำตัดสินการออกเสียง</p>
+    </section>
+  </main>
+  <noscript>เปิด JavaScript เพื่อเลือกรูปคลื่นและดูค่าการวัด</noscript>
+</body>
+</html>
